@@ -64,11 +64,12 @@ def importConfigFile(file : str)-> None:
 _endpoint = 'https://analytics.adobe.io/api'
 _endpoint_company = 'https://analytics.adobe.io/api/{company_id}'
     
-def retrieveToken(verbose: bool = False,save:bool=False,**kwargs)->str:
+def retrieveToken(verbose:bool=False,save:bool=False,**kwargs)->str:
     """ Retrieve the token by using the information provided by the user during the import importConfigFile function. 
     
     Argument : 
         verbose : OPTIONAL : Default False. If set to True, print information.
+        save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt). 
     """
     global _token
     with open(_pathToKey, 'r') as f:
@@ -152,6 +153,25 @@ def _postData(endpoint:str,params:dict=None,data=None,*args,**kwargs):
     except:
         json = {'error':['Request Error']}
     return json
+
+@_checkToken
+def _putData(endpoint:str,params:dict=None,data=None,*args,**kwargs):
+    """
+    Abstraction for getting data
+    """
+    global _header
+    if params != None and data == None:
+        res = _requests.put(endpoint,headers=_header,params=params)
+    elif params == None and data != None:
+        res = _requests.put(endpoint,headers=_header,data=_json.dumps(data))
+    elif params != None and data != None:
+        res = _requests.put(endpoint,headers=_header,params=params,data=_json.dumps(data=data))
+    try:
+        json = res.json()
+    except:
+        json = {'error':['Request Error']}
+    return json
+
 
 def updateHeader(companyid:str=None,token:str=_token,**kwargs)->None:
     """ update the header when new token is generated
@@ -421,8 +441,31 @@ def getSegments(name:str=None,tagNames:str=None,inclType:str='all',rsids_list:li
         df_segments.to_csv('segments.csv',sep='\t')
     return df_segments
 
-def createSegment():
-    pass
+def createSegment(segmentJSON:dict=None)->object:
+    """
+    Method that creates a new segment based on the dictionary passed to it.
+    Arguments:
+        segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment. 
+    """
+    if segmentJSON == None:
+        print('No segment data has been pushed')
+        return None
+    data = _deepcopy(segmentJSON)
+    seg = _postData(_endpoint_company+_getSegments,data=data)
+    return seg
+
+def updateSegment(segmentID:str=None,segmentJSON:dict=None)->object:
+    """
+    Method that update a specific segment based on the dictionary passed to it.
+    Arguments:
+        segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment. 
+    """
+    if segmentJSON == None or segmentID == None:
+        print('No segment or segementID data has been pushed')
+        return None
+    data = _deepcopy(segmentJSON)
+    seg = _putData(_endpoint_company+_getSegments+'/'+segmentID,data=data)
+    return seg
 
 
 def getCalculatedMetrics(name:str=None,tagNames:str=None,inclType:str='all',rsids_list:list=None,extended_info:bool=False,save=False,**kwargs)->object:
@@ -513,7 +556,7 @@ def _dataDescriptor(json_request:dict):
                 filters.append(metrics_info['metricFilters'][int(item)]['segmentId'])
             if 'dimension' in metrics_info['metricFilters'][int(item)].keys():
                 filters.append(metrics_info['metricFilters'][int(item)]['dimension'])
-            obj['filters']['metricsFilters'][metric] = filters
+        obj['filters']['metricsFilters'][metric] = set(filters)
     for fil in json_request['globalFilters']:
         if 'dateRange' in fil.keys():
             obj['filters']['globalFilters'].append(fil['dateRange'])

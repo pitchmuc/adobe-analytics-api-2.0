@@ -2,7 +2,7 @@
 This is a python wrapper for the adobe analytics API 2.0. 
 
 ## Documentation
-Most of the documentation for this API will be hosted at <a href='https://www.datanalyst.info'>datanalyst.info</>
+Most of the documentation for this API will be hosted at <a href='https://www.datanalyst.info'>datanalyst.info</a>
 
 ## Functionalities
 Basic Functionalities that are covered :
