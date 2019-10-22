@@ -309,8 +309,8 @@ def getDimensions(rsid:str,tags:bool=False,save=False,**kwargs)->object:
     Returns the data frame of available dimensions. 
     Arguments:
         rsid : REQUIRED : Report Suite ID from which you want the dimensions
-        tags : OPTIONAL : If you would like to have additional information, such as tags.
-        save : OPTIONAL : If set to True, it will save the info in a csv file
+        tags : OPTIONAL : If you would like to have additional information, such as tags. (bool : default False)
+        save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
     Possible kwargs:
         full : Boolean : Doesn't shrink the number of columns if set to true
         example : getDimensions(rsid,full=True)
@@ -337,9 +337,9 @@ def getMetrics(rsid:str,tags:bool=False,save=False,**kwargs)->object:
     Retrieve the list of metrics from a specific reportSuite. Shrink columns to simplify output.
     Returns the data frame of available metrics. 
     Arguments:
-        rsid : REQUIRED : Report Suite ID from which you want the dimensions
-        tags : OPTIONAL : If you would like to have additional information, such as tags.
-        save : OPTIONAL : If set to True, it will save the info in a csv file (Default False)
+        rsid : REQUIRED : Report Suite ID from which you want the dimensions (str)
+        tags : OPTIONAL : If you would like to have additional information, such as tags.(bool : default False)
+        save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
     Possible kwargs:
         full : Boolean : Doesn't shrink the number of columns if set to true.
     """
@@ -365,7 +365,7 @@ def getUsers(save:bool=False,**kwargs)->object:
     """
     Retrieve the list of users for a login company.Returns a data frame.
     Arguments:
-        save : OPTIONAL : Save the data in a file. 
+        save : OPTIONAL : Save the data in a file (bool : default False). 
     Possible kwargs: 
         limit : OPTIONAL : Nummber of results per requests. Default 100. 
     """
@@ -407,25 +407,25 @@ def getSegments(name:str=None,tagNames:str=None,inclType:str='all',rsids_list:li
     """
     Retrieve the list of segments. Returns a data frame. 
     Arguments:
-        name : OPTIONAL : Filter to only include segments that contains the name
+        name : OPTIONAL : Filter to only include segments that contains the name (str)
         tagNames : OPTIONAL : Filter list to only include segments that contains one of the tags (string delimited with comma, can be list as well)
-        inclType : OPTIONAL : type of segments to be retrieved. Possible values: 
-            - all : Default value (all segements possibles)
+        inclType : OPTIONAL : type of segments to be retrieved.(str) Possible values: 
+            - all : Default value (all segments possibles)
             - shared : shared segments
             - template : template segments
             - deleted : deleted segments
             - internal : internal segments
             - curatedItem : curated segments
-        rsid_list : OPTIONAL : Filter list to only include segments tied to specified RSID list
-        sidFilter : OPTIONAL : Filter list to only include segments in the specified list
-        extended_info : OPTIONAL : additional segment metadata fields to include on response
+        rsid_list : OPTIONAL : Filter list to only include segments tied to specified RSID list (list)
+        sidFilter : OPTIONAL : Filter list to only include segments in the specified list (list)
+        extended_info : OPTIONAL : additional segment metadata fields to include on response (bool : default False)
             additional infos: reportSuiteName, ownerFullName, modified, tags, compatibility, definition
-        save : OPTIONAL : If set to True, it will save the info in a csv file (Default False)
+        save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
     
     Possible kwargs:
         limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.
     
-    NOTE : Segment Endpoint doesn't support multi-threading. Defaukt
+    NOTE : Segment Endpoint doesn't support multi-threading. Default to 500. 
     """
     limit = int(kwargs.get('limit',500))
     params = {'includeType':'all','limit':limit}
@@ -506,18 +506,18 @@ def getCalculatedMetrics(name:str=None,tagNames:str=None,inclType:str='all',rsid
     """
     Retrieve the list of calculated metrics. Returns a data frame. 
     Arguments:
-        name : OPTIONAL : Filter to only include calculated metrics that contains the name
+        name : OPTIONAL : Filter to only include calculated metrics that contains the name (str)
         tagNames : OPTIONAL : Filter list to only include calculated metrics that contains one of the tags (string delimited with comma, can be list as well)
-        inclType : OPTIONAL : type of calculated Metrics to be retrieved. Possible values: 
+        inclType : OPTIONAL : type of calculated Metrics to be retrieved. (str) Possible values: 
             - all : Default value (all calculated metrics possibles)
             - shared : shared calculated metrics
             - template : template calculated metrics
-        rsid_list : OPTIONAL : Filter list to only include segments tied to specified RSID list
-        extended_info : OPTIONAL : additional segment metadata fields to include on response
+        rsid_list : OPTIONAL : Filter list to only include segments tied to specified RSID list (list)
+        extended_info : OPTIONAL : additional segment metadata fields to include on response (list)
             additional infos: reportSuiteName,definition, ownerFullName, modified, tags, compatibility
         save : OPTIONAL : If set to True, it will save the info in a csv file (Default False)
     Possible kwargs:
-        limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.
+        limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.(int)
     """
     limit = int(kwargs.get('limit',500))
     params = {'includeType':'all','limit':limit}
@@ -582,15 +582,16 @@ def _dataDescriptor(json_request:dict):
     obj['rsid'] = json_request['rsid']
     metrics_info = json_request['metricContainer']
     obj['metrics'] = [metric['id'] for metric in metrics_info['metrics']]
-    metricsFilter = {metric['id']:metric['filters'] for metric in metrics_info['metrics'] if len(metric['filters'])>0}
-    filters = []
-    for metric in metricsFilter:
-        for item in metricsFilter[metric]:
-            if 'segmentId' in metrics_info['metricFilters'][int(item)].keys():
-                filters.append(metrics_info['metricFilters'][int(item)]['segmentId'])
-            if 'dimension' in metrics_info['metricFilters'][int(item)].keys():
-                filters.append(metrics_info['metricFilters'][int(item)]['dimension'])
-        obj['filters']['metricsFilters'][metric] = set(filters)
+    if 'metricFilters' in metrics_info.keys():
+        metricsFilter = {metric['id']:metric['filters'] for metric in metrics_info['metrics'] if len(metric['filters'])>0}
+        filters = []
+        for metric in metricsFilter:
+            for item in metricsFilter[metric]:
+                if 'segmentId' in metrics_info['metricFilters'][int(item)].keys():
+                    filters.append(metrics_info['metricFilters'][int(item)]['segmentId'])
+                if 'dimension' in metrics_info['metricFilters'][int(item)].keys():
+                    filters.append(metrics_info['metricFilters'][int(item)]['dimension'])
+                obj['filters']['metricsFilters'][metric] = set(filters)
     for fil in json_request['globalFilters']:
         if 'dateRange' in fil.keys():
             obj['filters']['globalFilters'].append(fil['dateRange'])
