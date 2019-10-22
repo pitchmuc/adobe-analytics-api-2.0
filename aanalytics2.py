@@ -172,6 +172,26 @@ def _putData(endpoint:str,params:dict=None,data=None,*args,**kwargs):
         json = {'error':['Request Error']}
     return json
 
+@_checkToken
+def _deleteData(endpoint:str,params:dict=None,data=None,*args,**kwargs):
+    """
+    Abstraction for getting data
+    """
+    global _header
+    if params != None and data == None:
+        res = _requests.delete(endpoint,headers=_header,params=params)
+    elif params == None and data != None:
+        res = _requests.delete(endpoint,headers=_header,data=_json.dumps(data))
+    elif params != None and data != None:
+        res = _requests.delete(endpoint,headers=_header,params=params,data=_json.dumps(data=data))
+    elif params == None and data == None:
+        res = _requests.delete(endpoint,headers=_header)
+    try:
+        json = res.json()
+    except:
+        json = {'error':['Request Error']}
+    return json
+
 
 def updateHeader(companyid:str=None,token:str=_token,**kwargs)->None:
     """ update the header when new token is generated
@@ -458,6 +478,7 @@ def updateSegment(segmentID:str=None,segmentJSON:dict=None)->object:
     """
     Method that update a specific segment based on the dictionary passed to it.
     Arguments:
+        segmentID : REQUIRED : Segment ID to be deleted
         segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment. 
     """
     if segmentJSON == None or segmentID == None:
@@ -467,6 +488,19 @@ def updateSegment(segmentID:str=None,segmentJSON:dict=None)->object:
     seg = _putData(_endpoint_company+_getSegments+'/'+segmentID,data=data)
     return seg
 
+
+def deleteSegment(segmentID:str=None)->object:
+    """
+    Method that update a specific segment based on the dictionary passed to it.
+    Arguments:
+        segmentID : REQUIRED : Segment ID to be deleted
+        segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment. 
+    """
+    if segmentID == None:
+        print('No segment or segementID data has been pushed')
+        return None
+    seg = _deleteData(_endpoint_company+_getSegments+'/'+segmentID)
+    return seg
 
 def getCalculatedMetrics(name:str=None,tagNames:str=None,inclType:str='all',rsids_list:list=None,extended_info:bool=False,save=False,**kwargs)->object:
     """
