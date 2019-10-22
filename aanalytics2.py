@@ -494,10 +494,9 @@ def deleteSegment(segmentID:str=None)->object:
     Method that update a specific segment based on the dictionary passed to it.
     Arguments:
         segmentID : REQUIRED : Segment ID to be deleted
-        segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment. 
     """
     if segmentID == None:
-        print('No segment or segementID data has been pushed')
+        print('No segementID data has been pushed')
         return None
     seg = _deleteData(_endpoint_company+_getSegments+'/'+segmentID)
     return seg
@@ -550,6 +549,18 @@ def getCalculatedMetrics(name:str=None,tagNames:str=None,inclType:str='all',rsid
     if save:
         df_calc_metrics.to_csv('calculated_metrics.csv',sep='\t')
     return df_calc_metrics
+
+def deleteCalculatedMetrics(calcID:str=None)->object:
+    """
+    Method that update a specific segment based on the dictionary passed to it.
+    Arguments:
+        calcID : REQUIRED : Calculated Metrics ID to be deleted
+    """
+    if calcID == None:
+        print('No calculated metrics data has been pushed')
+        return None
+    cm = _deleteData(_endpoint_company+_getCalcMetrics+'/'+calcID)
+    return cm
 
 def getDateRanges(extended_info:bool=False,save:bool=False,**kwargs)->object:
     """
@@ -635,14 +646,14 @@ def getReport(json_request:Union[dict,str,IO],n_result:Union[int,str]=1000,save:
     Retrieve data from a JSON request.Returns an object containing meta info and dataframe. 
     Arguments:
         json_request: REQUIRED : JSON statement that contains your request for Analytics API 2.0.
-        n_result : OPTIONAL : Number of result that you would like to retrieve. (default 1000)
-        if you want to have all possible data, use "inf".
-        save : OPTIONAL : If you would like to save the data within a CSV file. (default False)
-        verbose : OPTIONAL : If you want to have comment display (default False)
         The argument can be : 
             - a dictionary : It will be used as it is.
             - a string that is a dictionary : It will be transformed to a dictionary / JSON.
             - a path to a JSON file that contains the statement (must end with ".json"). 
+        n_result : OPTIONAL : Number of result that you would like to retrieve. (default 1000)
+            if you want to have all possible data, use "inf".
+        save : OPTIONAL : If you would like to save the data within a CSV file. (default False)
+        verbose : OPTIONAL : If you want to have comment display (default False)
     """
     obj = {}
     if type(json_request) == str and '.json' not in json_request:
@@ -662,6 +673,9 @@ def getReport(json_request:Union[dict,str,IO],n_result:Union[int,str]=1000,save:
     request['limit']=1000
     ## info for creating report
     data_info = _dataDescriptor(request)
+    if verbose:
+        print('Data Info retrieved')
+        print(_json.dumps(data_info,indent=4))
     obj.update(data_info)
     anomaly = request['settings'].get('includeAnomalyDetection',False)
     columns = [data_info['dimension']] + data_info['metrics']
@@ -670,6 +684,8 @@ def getReport(json_request:Union[dict,str,IO],n_result:Union[int,str]=1000,save:
     data_list= []
     last_page = False
     page_nb,count_elements,total_elements = 0, 0, 0
+    if verbose:
+        print('Starting to fetch the data...')
     while not last_page : 
         request['settings']['page'] = page_nb
         report = _postData(_endpoint_company+_getReport,data=request)
@@ -689,6 +705,8 @@ def getReport(json_request:Union[dict,str,IO],n_result:Union[int,str]=1000,save:
             _time.sleep(65)
     #return report
     df = _readData(data_list,anomaly=anomaly,cols=columns)
+    if save :
+        df.to_csv('report.csv',index=False)
     obj['data'] = df
     if verbose:
         print(f'Report contains {(count_elements/total_elements)*100}% ofthe available dimensions')
