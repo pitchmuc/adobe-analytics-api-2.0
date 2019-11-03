@@ -1,5 +1,7 @@
 from setuptools import setup, find_packages
 
+from adobe_analytics_2 import __version__
+
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
@@ -17,7 +19,7 @@ CLASSIFIERS = [
 
 setup(
     name='adobe_analytics_2',
-    version='0.1',
+    version=__version__,
     license='GPL',
     description='Adobe Analytics v2 API wrapper',
     long_description=long_description,
