@@ -1,0 +1,4 @@
+pandas>=0.25.1
+jwt>=0.6.1
+pathlib2>=2.3.5
+requests>=2.22.0
