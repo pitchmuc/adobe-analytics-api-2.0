@@ -599,7 +599,7 @@ def getDateRanges(extended_info: bool = False, save: bool = False, **kwargs) -> 
         full : Boolean : Doesn't shrink the number of columns if set to true
     """
     limit = int(kwargs.get('limit', 500))
-    params = {'limit': limit}
+    params = {'limit': limit,'page':0}
     if extended_info:
         params.update({'expansion': 'definition,ownerFullName,modified,tags'})
     dateRanges = _getData(_endpoint_company + _getDateRanges, params=params)
@@ -699,7 +699,7 @@ def getReport(json_request: Union[dict, str, IO], n_result: Union[int, str] = 10
             request = _json.loads(file_string)
         except:
             raise TypeError("expected a parsable string")
-    request['limit'] = 1000
+    request['settings']['limit'] = 500
     # info for creating report
     data_info = _dataDescriptor(request)
     if verbose:
@@ -710,27 +710,35 @@ def getReport(json_request: Union[dict, str, IO], n_result: Union[int, str] = 10
     columns = [data_info['dimension']] + data_info['metrics']
     ##preparing for the loop
     n_result = float(n_result)  ## in case "inf" has been used. Turn it to a number
+    if n_result != float('inf') and n_result < request['settings']['limit']:
+        request['settings']['limit'] = n_result
     data_list = []
     last_page = False
     page_nb, count_elements, total_elements = 0, 0, 0
     if verbose:
         print('Starting to fetch the data...')
-    while not last_page:
+    while last_page == False:
         request['settings']['page'] = page_nb
         report = _postData(_endpoint_company + _getReport, data=request)
         if 'errorCode' in report.keys():
             print('Error with your statement \n' + report['errorDescription'])
             return {report['errorCode']: report['errorDescription']}
         count_elements += report['numberOfElements']
+        print(f'nb elements : {count_elements}')
         total_elements = report['totalElements']
+        print(f'total elements : {total_elements}')
         last_page = report['lastPage']
-        if not last_page and n_result != float('inf'):
-            if count_elements > n_result:
-                last_page == True
+        if last_page == False and n_result != float('inf'):
+            if total_elements > n_result:
+                last_page = True
+        print(f'last_page status : {last_page}')
         data = report['rows']
         data_list += _deepcopy(data)  ## do a deepcopy
         page_nb += 1
-        if page_nb % 100 == 0:  ## Analytics 2.0 can only receive 120 requests per minute.
+        print(f'# of requests : {page_nb}')
+        if page_nb % 110 == 0:  ## Analytics 2.0 can only receive 120 requests per minute.
+            if verbose:
+                print('stop for 60s for limit of the API.\nIt can get only 120 call per minute.')
             _time.sleep(65)
     # return report
     df = _readData(data_list, anomaly=anomaly, cols=columns)
