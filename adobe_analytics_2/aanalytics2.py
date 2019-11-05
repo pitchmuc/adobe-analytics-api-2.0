@@ -599,7 +599,7 @@ def getDateRanges(extended_info: bool = False, save: bool = False, **kwargs) -> 
         full : Boolean : Doesn't shrink the number of columns if set to true
     """
     limit = int(kwargs.get('limit', 500))
-    params = {'limit': limit,'page':0}
+    params = {'limit': limit,'includeType':['all']}
     if extended_info:
         params.update({'expansion': 'definition,ownerFullName,modified,tags'})
     dateRanges = _getData(_endpoint_company + _getDateRanges, params=params)
