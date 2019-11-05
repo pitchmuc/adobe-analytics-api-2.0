@@ -699,7 +699,7 @@ def getReport(json_request: Union[dict, str, IO], n_result: Union[int, str] = 10
             request = _json.loads(file_string)
         except:
             raise TypeError("expected a parsable string")
-    request['settings']['limit'] = 500
+    request['settings']['limit'] = 1000
     # info for creating report
     data_info = _dataDescriptor(request)
     if verbose:
@@ -724,18 +724,18 @@ def getReport(json_request: Union[dict, str, IO], n_result: Union[int, str] = 10
             print('Error with your statement \n' + report['errorDescription'])
             return {report['errorCode']: report['errorDescription']}
         count_elements += report['numberOfElements']
-        print(f'nb elements : {count_elements}')
         total_elements = report['totalElements']
-        print(f'total elements : {total_elements}')
+        if verbose:
+            print(f'total elements retrieved: {round((count_elements/total_elements)*100,2)}%')
         last_page = report['lastPage']
         if last_page == False and n_result != float('inf'):
             if total_elements > n_result:
                 last_page = True
-        print(f'last_page status : {last_page}')
         data = report['rows']
         data_list += _deepcopy(data)  ## do a deepcopy
         page_nb += 1
-        print(f'# of requests : {page_nb}')
+        if verbose:
+            print(f'# of requests : {page_nb}')
         if page_nb % 110 == 0:  ## Analytics 2.0 can only receive 120 requests per minute.
             if verbose:
                 print('stop for 60s for limit of the API.\nIt can get only 120 call per minute.')
