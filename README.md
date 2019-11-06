@@ -21,7 +21,7 @@ Basic Functionality that are covered :
 To install the library with PIP use:
 
 ```bash
-python -m pip install --upgrade git+https://github.com/xSAVIKx/adobe_analytics_api_2.0.git#egg=adobe_analytics_2
+python -m pip install --upgrade git+https://github.com/pitchmuc/adobe_analytics_api_2.0.git#egg=adobe_analytics_2
 ```
 
 ## Dependencies
