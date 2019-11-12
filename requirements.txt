@@ -2,3 +2,4 @@ pandas>=0.25.3
 PyJWT>=1.7.1
 pathlib2>=2.3.5
 requests>=2.22.0
+PyJWT[crypto]
