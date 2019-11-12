@@ -31,6 +31,7 @@ In order to use this API in python, you would need to have those libraries insta
 - requests
 - json
 - PyJWT
+- PyJWT[crypto]
 - pathlib
 
 ## Others Sources
