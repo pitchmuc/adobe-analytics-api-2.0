@@ -31,8 +31,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        'pandas>=0.25.1',
-        'jwt>=0.6.1',
+        'pandas>=0.25.3',
         'pathlib2>=2.3.5',
         'requests>=2.22.0',
         'PyJWT>=1.7.1'
