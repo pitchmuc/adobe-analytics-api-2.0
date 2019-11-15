@@ -704,7 +704,7 @@ def getReport(json_request: Union[dict, str, IO], n_result: Union[int, str] = 10
     data_info = _dataDescriptor(request)
     if verbose:
         print('Data Info retrieved')
-        print(_json.dumps(data_info, indent=4))
+        print(data_info)
     obj.update(data_info)
     anomaly = request['settings'].get('includeAnomalyDetection', False)
     columns = [data_info['dimension']] + data_info['metrics']
