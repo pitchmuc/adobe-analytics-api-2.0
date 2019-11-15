@@ -1,6 +1,6 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
-# version : 0.4
+# version : 0.1
 
 
 import json as _json
@@ -726,10 +726,10 @@ def getReport(json_request: Union[dict, str, IO], n_result: Union[int, str] = 10
         count_elements += report['numberOfElements']
         total_elements = report['totalElements']
         if verbose:
-            print(f'total elements retrieved: {round((count_elements/total_elements)*100,2)}%')
+            print(f'% of total elements retrieved: {round((count_elements/total_elements)*100,2)} %')
         last_page = report['lastPage']
         if last_page == False and n_result != float('inf'):
-            if total_elements > n_result:
+            if count_elements >= n_result:
                 last_page = True
         data = report['rows']
         data_list += _deepcopy(data)  ## do a deepcopy
@@ -746,5 +746,5 @@ def getReport(json_request: Union[dict, str, IO], n_result: Union[int, str] = 10
         df.to_csv('report.csv', index=False)
     obj['data'] = df
     if verbose:
-        print(f'Report contains {(count_elements / total_elements) * 100}% ofthe available dimensions')
+        print(f'Report contains {(count_elements / total_elements) * 100} % of the available dimensions')
     return obj
