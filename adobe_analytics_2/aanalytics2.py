@@ -136,7 +136,7 @@ def _getData(endpoint: str, params: dict = None, data=None, *args, **kwargs):
         res = _requests.get(endpoint, headers=_header, params=params, data=data)
     try:
         json = res.json()
-    except:
+    except ValueError:
         json = {'error': ['Request Error']}
     return json
 
@@ -155,7 +155,7 @@ def _postData(endpoint: str, params: dict = None, data=None, *args, **kwargs):
         res = _requests.post(endpoint, headers=_header, params=params, data=_json.dumps(data=data))
     try:
         json = res.json()
-    except:
+    except ValueError:
         json = {'error': ['Request Error']}
     return json
 
@@ -174,7 +174,7 @@ def _putData(endpoint: str, params: dict = None, data=None, *args, **kwargs):
         res = _requests.put(endpoint, headers=_header, params=params, data=_json.dumps(data=data))
     try:
         json = res.json()
-    except:
+    except ValueError:
         json = {'error': ['Request Error']}
     return json
 
@@ -621,7 +621,7 @@ def _dataDescriptor(json_request: dict):
     obj['metrics'] = [metric['id'] for metric in metrics_info['metrics']]
     if 'metricFilters' in metrics_info.keys():
         metricsFilter = {metric['id']: metric['filters'] for metric in metrics_info['metrics'] if
-                         len(metric['filters']) > 0}
+                         len(metric.get('filters',[])) > 0}
         filters = []
         for metric in metricsFilter:
             for item in metricsFilter[metric]:
