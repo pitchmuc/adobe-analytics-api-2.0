@@ -1,6 +1,6 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
-# version : 0.1
+# version : 0.4
 
 
 import json as _json

@@ -30,8 +30,8 @@ In order to use this API in python, you would need to have those libraries insta
 - pandas
 - requests
 - json
-- pyjwt
-- jwt 
+- PyJWT
+- PyJWT[crypto]
 - pathlib
 
 ## Others Sources
