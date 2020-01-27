@@ -640,7 +640,7 @@ def _dataDescriptor(json_request: dict):
     return obj
 
 
-def _readData(data_rows: list, anomaly: bool = False, cols: list = None):
+def _readData(data_rows: list, anomaly: bool = False, cols: list = None,item_id: bool = False):
     """
     read the data from the requests and returns a dataframe. 
     Parameters:
@@ -653,6 +653,10 @@ def _readData(data_rows: list, anomaly: bool = False, cols: list = None):
     dict_data = {row['value']: row['data'] for row in data_rows}
     if cols is not None:
         n_metrics = len(cols) - 1
+    if item_id: ## adding the itemId in the data returned
+        cols.append('item_id')
+        for row in data_rows:
+            dict_data[row['value']].append(row['itemId'])
     if anomaly:
         # set full columns
         cols = cols + [f'{metric}-{suffix}' for metric in cols[1:] for suffix in
@@ -670,7 +674,7 @@ def _readData(data_rows: list, anomaly: bool = False, cols: list = None):
 
 
 def getReport(json_request: Union[dict, str, IO], n_result: Union[int, str] = 1000, save: bool = False,
-              verbose: bool = False) -> object:
+              item_id: bool = False,verbose: bool = False) -> object:
     """
     Retrieve data from a JSON request.Returns an object containing meta info and dataframe. 
     Arguments:
@@ -741,7 +745,7 @@ def getReport(json_request: Union[dict, str, IO], n_result: Union[int, str] = 10
                 print('stop for 60s for limit of the API.\nIt can get only 120 call per minute.')
             _time.sleep(65)
     # return report
-    df = _readData(data_list, anomaly=anomaly, cols=columns)
+    df = _readData(data_list, anomaly=anomaly, cols=columns, item_id=item_id)
     if save:
         df.to_csv('report.csv', index=False)
     obj['data'] = df
