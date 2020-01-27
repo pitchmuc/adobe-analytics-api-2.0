@@ -685,6 +685,7 @@ def getReport(json_request: Union[dict, str, IO], n_result: Union[int, str] = 10
             - a path to a JSON file that contains the statement (must end with ".json"). 
         n_result : OPTIONAL : Number of result that you would like to retrieve. (default 1000)
             if you want to have all possible data, use "inf".
+        item_id : OPTIONAL : Boolean to define if you want to return the item id for sub requests (default False)
         save : OPTIONAL : If you would like to save the data within a CSV file. (default False)
         verbose : OPTIONAL : If you want to have comment display (default False)
     """
