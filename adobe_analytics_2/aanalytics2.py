@@ -138,6 +138,8 @@ def _getData(endpoint: str, params: dict = None, data=None, *args, **kwargs):
         json = res.json()
     except ValueError:
         json = {'error': ['Request Error']}
+    if res.status_code == 429:
+        json['status_code'] = 429
     return json
 
 
@@ -157,6 +159,8 @@ def _postData(endpoint: str, params: dict = None, data=None, *args, **kwargs):
         json = res.json()
     except ValueError:
         json = {'error': ['Request Error']}
+    if res.status_code == 429:
+        json['status_code'] = 429
     return json
 
 
@@ -674,7 +678,7 @@ def _readData(data_rows: list, anomaly: bool = False, cols: list = None,item_id:
 
 
 def getReport(json_request: Union[dict, str, IO], n_result: Union[int, str] = 1000, save: bool = False,
-              item_id: bool = False,verbose: bool = False) -> object:
+              item_id: bool = False,verbose: bool = False,debug=False) -> object:
     """
     Retrieve data from a JSON request.Returns an object containing meta info and dataframe. 
     Arguments:
@@ -708,31 +712,68 @@ def getReport(json_request: Union[dict, str, IO], n_result: Union[int, str] = 10
     # info for creating report
     data_info = _dataDescriptor(request)
     if verbose:
-        print('Data Info retrieved')
-        print(data_info)
+        print('Request decrypted')
     obj.update(data_info)
     anomaly = request['settings'].get('includeAnomalyDetection', False)
     columns = [data_info['dimension']] + data_info['metrics']
     ##preparing for the loop
     n_result = float(n_result)  ## in case "inf" has been used. Turn it to a number
     if n_result != float('inf') and n_result < request['settings']['limit']:
-        request['settings']['limit'] = n_result
+        request['settings']['limit'] = n_result ## making sure we don't call more than set in wrapper
     data_list = []
     last_page = False
     page_nb, count_elements, total_elements = 0, 0, 0
     if verbose:
         print('Starting to fetch the data...')
     while last_page == False:
+        timestamp = round(_time.time())
         request['settings']['page'] = page_nb
         report = _postData(_endpoint_company + _getReport, data=request)
+        if verbose:
+            print('Data received.')
+        if report.get('status_code',200) == 429:## Recursion to take care of throttling limit
+            if verbose:
+                print('reaching the limit : pause for 60 s and entering recursion.')
+            if debug:
+                with open(f'limit_reach_{timestamp}.json', 'w') as f:
+                    f.write(_json.dumps(report, indent=4))
+            _time.sleep(50)
+            obj = getReport(json_request=request, n_result=n_result,
+                             save=save, item_id=item_id, verbose=verbose)
+            return obj
+        if 'lastPage' not in report: ## checking error when no lastPage key in report
+            if verbose:
+                print(_json.dumps(report,indent=2))
+            print('Warning : Server Error - no save file & empty dataframe.')
+            if debug:
+                with open(f'server_failure_request_{timestamp}.json', 'w') as f:
+                    f.write(_json.dumps(request,indent=4))
+                with open(f'server_failure_response_{timestamp}.json', 'w') as f:
+                    f.write(_json.dumps(report, indent=4))
+                print(f'Warning : Save JSON request : server_failure_request_{timestamp}.json')
+                print(f'Warning : Save JSON response : server_failure_response_{timestamp}.json')
+            obj['data'] = _pd.DataFrame()
+            return obj
+        last_page = report.get('lastPage',True) ## fallback when no lastPage in report
+        if verbose:
+            print(f'last page status : {last_page}')
         if 'errorCode' in report.keys():
             print('Error with your statement \n' + report['errorDescription'])
             return {report['errorCode']: report['errorDescription']}
-        count_elements += report['numberOfElements']
-        total_elements = report['totalElements']
-        if verbose:
+        count_elements += report.get('numberOfElements',0)
+        total_elements = report.get(
+            'totalElements', request['settings']['limit'])
+        if total_elements == 0:
+            obj['data'] = _pd.DataFrame()
+            print('Warning : No data returned & lastPage is False.\nExit the loop - no save file & empty dataframe.')
+            if debug:
+                with open(f'report_no_element_{timestamp}.json', 'w') as f:
+                    f.write(_json.dumps(report, indent=4))
+            if verbose:
+                print(f'% of total elements retrieved. TotalElements: {report.get("totalElements","no data")}')
+            return obj  # in case loop happening with empty data, returns empty data
+        if verbose and total_elements != 0:
             print(f'% of total elements retrieved: {round((count_elements/total_elements)*100,2)} %')
-        last_page = report['lastPage']
         if last_page == False and n_result != float('inf'):
             if count_elements >= n_result:
                 last_page = True
@@ -741,14 +782,12 @@ def getReport(json_request: Union[dict, str, IO], n_result: Union[int, str] = 10
         page_nb += 1
         if verbose:
             print(f'# of requests : {page_nb}')
-        if page_nb % 110 == 0:  ## Analytics 2.0 can only receive 120 requests per minute.
-            if verbose:
-                print('stop for 60s for limit of the API.\nIt can get only 120 call per minute.')
-            _time.sleep(65)
     # return report
     df = _readData(data_list, anomaly=anomaly, cols=columns, item_id=item_id)
     if save:
-        df.to_csv('report.csv', index=False)
+        df.to_csv(f'report-{timestamp}.csv', index=False)
+        if verbose:
+            print(f'Saving data in file : report-{timestamp}.csv')
     obj['data'] = df
     if verbose:
         print(f'Report contains {(count_elements / total_elements) * 100} % of the available dimensions')
