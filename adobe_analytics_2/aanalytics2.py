@@ -140,7 +140,8 @@ def _getData(endpoint: str, params: dict = None, data=None, *args, **kwargs):
     elif params is None and data is not None:
         res = _requests.get(endpoint, headers=_header, data=data)
     elif params is not None and data is not None:
-        res = _requests.get(endpoint, headers=_header, params=params, data=data)
+        res = _requests.get(endpoint, headers=_header,
+                            params=params, data=data)
     try:
         json = res.json()
     except ValueError:
@@ -162,7 +163,8 @@ def _postData(endpoint: str, params: dict = None, data=None, *args, **kwargs):
         res = _requests.post(endpoint, headers=_header, data=_json.dumps(data))
     elif params is not None and data is not None:
         res = _requests.post(
-            endpoint, headers=_header, params=params, data=_json.dumps(data=data)
+            endpoint, headers=_header, params=params, data=_json.dumps(
+                data=data)
         )
     try:
         json = res.json()
@@ -185,7 +187,8 @@ def _putData(endpoint: str, params: dict = None, data=None, *args, **kwargs):
         res = _requests.put(endpoint, headers=_header, data=_json.dumps(data))
     elif params is not None and data is not None:
         res = _requests.put(
-            endpoint, headers=_header, params=params, data=_json.dumps(data=data)
+            endpoint, headers=_header, params=params, data=_json.dumps(
+                data=data)
         )
     try:
         json = res.json()
@@ -203,10 +206,12 @@ def _deleteData(endpoint: str, params: dict = None, data=None, *args, **kwargs):
     if params is not None and data is None:
         res = _requests.delete(endpoint, headers=_header, params=params)
     elif params is None and data is not None:
-        res = _requests.delete(endpoint, headers=_header, data=_json.dumps(data))
+        res = _requests.delete(endpoint, headers=_header,
+                               data=_json.dumps(data))
     elif params is not None and data is not None:
         res = _requests.delete(
-            endpoint, headers=_header, params=params, data=_json.dumps(data=data)
+            endpoint, headers=_header, params=params, data=_json.dumps(
+                data=data)
         )
     elif params is None and data is None:
         res = _requests.delete(endpoint, headers=_header)
@@ -255,7 +260,8 @@ def getCompanyId(infos: str = "all"):
             - <X> : number that gives the position of the id we want to return (string)
             You need to already know your position. 
     """
-    res = _requests.get("https://analytics.adobe.io/discovery/me", headers=_header)
+    res = _requests.get(
+        "https://analytics.adobe.io/discovery/me", headers=_header)
     json_res = res.json()
     if infos == "all":
         companies = json_res["imsOrgs"][0]["companies"]
@@ -324,13 +330,15 @@ def getReportSuites(
     last_page = rsids["lastPage"]
     if not last_page:  # if last_page =False
         callsToMake = total_page
-        list_params = [{**params, "page": page} for page in range(1, callsToMake)]
+        list_params = [{**params, "page": page}
+                       for page in range(1, callsToMake)]
         list_urls = [_endpoint_company + _getRS for x in range(1, callsToMake)]
         workers = min(10, total_page)
         with _futures.ThreadPoolExecutor(workers) as executor:
             res = executor.map(_getData, list_urls, list_params)
         res = list(res)
-        list_data = [val for sublist in [r["content"] for r in res] for val in sublist]
+        list_data = [val for sublist in [r["content"]
+                                         for r in res] for val in sublist]
         if not extended_info:
             list_append = [
                 {"name": item["name"], "rsid": item["rsid"]} for item in list_data
@@ -362,7 +370,8 @@ def getDimensions(rsid: str, tags: bool = False, save=False, **kwargs) -> object
     params.update({"rsid": rsid})
     dims = _getData(_endpoint_company + _getDimensions, params=params)
     df_dims = _pd.DataFrame(dims)
-    columns = ["id", "name", "category", "type", "parent", "pathable", "description"]
+    columns = ["id", "name", "category", "type",
+               "parent", "pathable", "description"]
     if kwargs.get("full", False):
         new_cols = _pd.DataFrame(
             df_dims.support.values.tolist(), columns=["support_oberon", "support_dw"]
@@ -437,13 +446,16 @@ def getUsers(save: bool = False, **kwargs) -> object:
     lastPage = users["lastPage"]
     if not lastPage:  # check if lastpage is inversed of False
         callsToMake = users["totalPages"]
-        list_params = [{"limit": 100, "page": page} for page in range(1, callsToMake)]
-        list_urls = [_endpoint_company + _getUsers for x in range(1, callsToMake)]
+        list_params = [{"limit": 100, "page": page}
+                       for page in range(1, callsToMake)]
+        list_urls = [_endpoint_company +
+                     _getUsers for x in range(1, callsToMake)]
         workers = min(10, len(list_params))
         with _futures.ThreadPoolExecutor(workers) as executor:
             res = executor.map(_getData, list_urls, list_params)
         res = list(res)
-        users_lists = [elem["content"] for elem in res if "content" in elem.keys()]
+        users_lists = [elem["content"]
+                       for elem in res if "content" in elem.keys()]
         nb_error = sum(1 for elem in res if "error_code" in elem.keys())
         nb_empty = sum(
             1 for elem in res if "content" in elem.keys() and len(elem["content"]) == 0
@@ -584,7 +596,8 @@ def updateSegment(segmentID: str = None, segmentJSON: dict = None) -> object:
         print("No segment or segementID data has been pushed")
         return None
     data = _deepcopy(segmentJSON)
-    seg = _putData(_endpoint_company + _getSegments + "/" + segmentID, data=data)
+    seg = _putData(_endpoint_company + _getSegments +
+                   "/" + segmentID, data=data)
     return seg
 
 
@@ -654,7 +667,8 @@ def getCalculatedMetrics(
         while not lastPage:
             page_nb += 1
             params["page"] = page_nb
-            metrics = _getData(_endpoint_company + _getCalcMetrics, params=params)
+            metrics = _getData(_endpoint_company +
+                               _getCalcMetrics, params=params)
             data += metrics["content"]
             lastPage = metrics["lastPage"]
     df_calc_metrics = _pd.DataFrame(data)
@@ -766,13 +780,16 @@ def _readData(
         for row in data_rows:
             for item in range(n_metrics):
                 dict_data[row["value"]].append(
-                    row.get("dataExpected", [0 for i in range(n_metrics)])[item]
+                    row.get("dataExpected", [
+                            0 for i in range(n_metrics)])[item]
                 )
                 dict_data[row["value"]].append(
-                    row.get("dataUpperBound", [0 for i in range(n_metrics)])[item]
+                    row.get("dataUpperBound", [
+                            0 for i in range(n_metrics)])[item]
                 )
                 dict_data[row["value"]].append(
-                    row.get("dataLowerBound", [0 for i in range(n_metrics)])[item]
+                    row.get("dataLowerBound", [
+                            0 for i in range(n_metrics)])[item]
                 )
     df = _pd.DataFrame(dict_data).T  # require to transform the data
     df.reset_index(inplace=True,)
@@ -801,6 +818,7 @@ def getReport(
         item_id : OPTIONAL : Boolean to define if you want to return the item id for sub requests (default False)
         save : OPTIONAL : If you would like to save the data within a CSV file. (default False)
         verbose : OPTIONAL : If you want to have comment display (default False)
+        debug : OPTIONAL : If you want to save your request and the response when error occures during API call. (default False)
     """
     obj = {}
     if type(json_request) == str and ".json" not in json_request:
@@ -883,7 +901,8 @@ def getReport(
             print("Error with your statement \n" + report["errorDescription"])
             return {report["errorCode"]: report["errorDescription"]}
         count_elements += report.get("numberOfElements", 0)
-        total_elements = report.get("totalElements", request["settings"]["limit"])
+        total_elements = report.get(
+            "totalElements", request["settings"]["limit"])
         if total_elements == 0:
             obj["data"] = _pd.DataFrame()
             print(
@@ -912,9 +931,14 @@ def getReport(
     # Filter out error Columns
     if "columnErrors" in report["columns"].keys():
         for column_error in report["columns"]["columnErrors"]:
-            column_name = next((column["id"] for column in json_request["metricContainer"]["metrics"] if str(column["columnId"]) == str(column_error["columnId"])), None)
-            if verbose:
-                print(f"Warning : not able to get column {column_name}: {column_error['errorDescription']}")
+            column_name = None
+            for column in json_request["metricContainer"]["metrics"]:
+                if str(column["columnId"]) == str(column_error["columnId"]):
+                    column_name = column["id"]
+                    if verbose:
+                        print(
+                            f"Warning : not able to get column {column_name}: {column_error['errorDescription']}")
+                    break
             columns.remove(column_name)
     # return report
     df = _readData(data_list, anomaly=anomaly, cols=columns, item_id=item_id)
