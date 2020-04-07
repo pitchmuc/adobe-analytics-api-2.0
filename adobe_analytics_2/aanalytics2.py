@@ -912,7 +912,7 @@ def getReport(
     # Filter out error Columns
     if "columnErrors" in report["columns"].keys():
         for column_error in report["columns"]["columnErrors"]:
-            column_name = next((column["id"] for column in json_request["metricContainer"]["metrics"] if column["columnId"] == column_error["columnId"]), None)
+            column_name = next((column["id"] for column in json_request["metricContainer"]["metrics"] if str(column["columnId"]) == str(column_error["columnId"])), None)
             if verbose:
                 print(f"Warning : not able to get column {column_name}: {column_error['errorDescription']}")
             columns.remove(column_name)
