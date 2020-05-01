@@ -24,6 +24,9 @@ To install the library with PIP use:
 python -m pip install --upgrade git+https://github.com/pitchmuc/adobe_analytics_api_2.0.git#egg=adobe_analytics_2
 ```
 
+[Getting Started details on how to use it](./docs/getting_started.md)
+
+
 ## Dependencies
 
 In order to use this API in python, you would need to have those libraries installed : 
