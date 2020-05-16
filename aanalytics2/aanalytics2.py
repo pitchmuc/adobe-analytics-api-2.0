@@ -1,14 +1,15 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
-# version : 0.0.3
+# version : 0.0.5
 
 
 import json as _json
 import time as _time
 from concurrent import futures as _futures
 from copy import deepcopy as _deepcopy
-from pathlib import _Path
-from typing import _Union, _IO
+from pathlib import Path as _Path
+from typing import Union as _Union
+from typing import IO as _IO
 import os
 
 # Non standard libraries
@@ -305,7 +306,7 @@ class Analytics:
             save : OPTIONAL : if set to True, it will save the list in a file. (Default False)
 
         """
-        global _companyid
+        nb_error, nb_empty = 0, 0  # use for multi-thread loop
         params = {}
         params.update({'limit': str(limit)})
         params.update({'page': '0'})

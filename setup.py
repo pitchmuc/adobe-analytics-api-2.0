@@ -16,7 +16,7 @@ CLASSIFIERS = [
 
 setup(
     name='aanalytics2',
-    version="0.0.3",
+    version="0.0.5",
     license='GPL',
     description='Adobe Analytics v2 API wrapper',
     long_description=long_description,
