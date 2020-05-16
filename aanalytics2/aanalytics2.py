@@ -1,14 +1,14 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
-# version : 0.1
+# version : 0.0.3
 
 
 import json as _json
 import time as _time
 from concurrent import futures as _futures
 from copy import deepcopy as _deepcopy
-from pathlib import Path
-from typing import Union, IO
+from pathlib import _Path
+from typing import _Union, _IO
 import os
 
 # Non standard libraries
@@ -67,7 +67,7 @@ def importConfigFile(file: str) -> None:
     global _header
     if file.startswith('/'):
         file = "."+file
-    with open(Path(file), 'r') as file:
+    with open(_Path(file), 'r') as file:
         f = _json.load(file)
         _org_id = f['org_id']
         _api_key = f['api_key']
@@ -93,7 +93,7 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
     global _pathToKey
     if _pathToKey.startswith('/'):
         _pathToKey = "."+_pathToKey
-    with open(Path(_pathToKey), 'r') as f:
+    with open(_Path(_pathToKey), 'r') as f:
         private_key_unencrypted = f.read()
         header_jwt = {'cache-control': 'no-cache',
                       'content-type': 'application/x-www-form-urlencoded'}
@@ -773,7 +773,7 @@ class Analytics:
         df.columns = cols
         return df
 
-    def getReport(self, json_request: Union[dict, str, IO], n_result: Union[int, str] = 1000, save: bool = False,
+    def getReport(self, json_request: _Union[dict, str, _IO], n_result: _Union[int, str] = 1000, save: bool = False,
                   item_id: bool = False, verbose: bool = False, debug=False) -> object:
         """
         Retrieve data from a JSON request.Returns an object containing meta info and dataframe. 
@@ -799,7 +799,7 @@ class Analytics:
             request = json_request
         elif '.json' in json_request:
             try:
-                with open(Path(json_request), 'r') as file:
+                with open(_Path(json_request), 'r') as file:
                     file_string = file.read()
                 request = _json.loads(file_string)
             except:

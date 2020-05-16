@@ -13,9 +13,17 @@ You can follow this [tutorial](https://www.datanalyst.info/python/adobe-io-user-
 
 ## 2. Download the library
 
-You can directly install the library from here:
-python -m pip install --upgrade git+<https://github.com/pitchmuc/adobe_analytics_api_2.0.git#egg=adobe_analytics_2>
-or by doing the following command line: pip install aanalytics2
+You can directly install the library from the command line:
+
+```cli
+pip install aanalytics2
+```
+
+or
+
+```cli
+python -m pip install --upgrade git+<https://github.com/pitchmuc/adobe_analytics_api_2.0.git#egg=aanalytics2>
+```
 
 or you can copy paste the aanalytics2.py file in your Lib/ folder in your Python installation.
 
@@ -69,3 +77,5 @@ or
 ```python
 myreport = mycompany.getReport('myRequest.json')
 ```
+
+The response that is givent 
