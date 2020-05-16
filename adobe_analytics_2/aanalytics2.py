@@ -360,7 +360,7 @@ class Analytics:
     def getDimensions(self, rsid: str, tags: bool = False, save=False, **kwargs) -> object:
         """
         Retrieve the list of dimensions from a specific reportSuite.Shrink columns to simplify output.
-        Returns the data frame of available dimensions. 
+        Returns the data frame of available dimensions.
         Arguments:
             rsid : REQUIRED : Report Suite ID from which you want the dimensions
             tags : OPTIONAL : If you would like to have additional information, such as tags. (bool : default False)
@@ -392,7 +392,7 @@ class Analytics:
     def getMetrics(self, rsid: str, tags: bool = False, save=False, **kwargs) -> object:
         """
         Retrieve the list of metrics from a specific reportSuite. Shrink columns to simplify output.
-        Returns the data frame of available metrics. 
+        Returns the data frame of available metrics.
         Arguments:
             rsid : REQUIRED : Report Suite ID from which you want the dimensions (str)
             tags : OPTIONAL : If you would like to have additional information, such as tags.(bool : default False)
@@ -641,9 +641,26 @@ class Analytics:
             df_calc_metrics.to_csv('calculated_metrics.csv', sep='\t')
         return df_calc_metrics
 
+    def createCalculatedMetrics(self, metricJSON: dict = None) -> object:
+        """
+        Method that create a specific calculated based on the dictionary passed to it.
+        Arguments:
+            metricJSON : REQUIRED : Calculated Metrics information to create.
+            Required :  name, definition, rsid
+        """
+        if metricJSON is None or type(metricJSON) != dict:
+            raise Exception(
+                "Expected a dictionary to create the calculated metrics")
+        if 'name' not in metricJSON.keys() or 'definition' not in metricJSON.keys() or 'rsid' not in metricJSON.keys():
+            raise KeyError(
+                'Expected "name", "definition" and "rsid" in the data')
+        cm = _postData(self._endpoint_company +
+                       self._getCalcMetrics, headers=self._header, data=metricJSON)
+        return cm
+
     def deleteCalculatedMetrics(self, calcID: str = None) -> object:
         """
-        Method that update a specific segment based on the dictionary passed to it.
+        Method that delete a specific calculated metrics based on the id passed..
         Arguments:
             calcID : REQUIRED : Calculated Metrics ID to be deleted
         """
@@ -656,7 +673,7 @@ class Analytics:
 
     def getDateRanges(self, extended_info: bool = False, save: bool = False, **kwargs) -> object:
         """
-        Get the list of date ranges available for the user. 
+        Get the list of date ranges available for the user.
         Arguments:
             extended_info : OPTIONAL : additional segment metadata fields to include on response
                 additional infos: reportSuiteName, ownerFullName, modified, tags, compatibility, definition
@@ -675,6 +692,18 @@ class Analytics:
         data = dateRanges['content']
         df_dates = _pd.DataFrame(data)
         return df_dates
+
+    def getCalculatedFunctions(self, **kwargs):
+        """
+        Returns the calculated metrics functions.
+        """
+        path = "/calculatedmetrics/functions"
+        limit = int(kwargs.get('limit', 500))
+        params = {'limit': limit}
+        funcs = _getData(self._endpoint_company + path,
+                         params=params, headers=self._header)
+        df = _pd.DataFrame(funcs)
+        return df
 
     def _dataDescriptor(self, json_request: dict):
         """
@@ -770,7 +799,7 @@ class Analytics:
             request = json_request
         elif '.json' in json_request:
             try:
-                with open(json_request, 'r') as file:
+                with open(Path(json_request), 'r') as file:
                     file_string = file.read()
                 request = _json.loads(file_string)
             except:
