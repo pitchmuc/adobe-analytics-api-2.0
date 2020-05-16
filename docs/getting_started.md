@@ -1,6 +1,7 @@
 # Getting Started with the python wrapper for Adobe Analytics API 2.0
 
 On this page, a quick example on how to start with the wrapper.
+More details explanation are available in the [main file](./main.md) or one the [datanalyst.info website](https://www.datanalyst.info/category/python/adobe-analytics-api-2-0/)
 
 ## 1. Create an Adobe IO console account
 
@@ -8,11 +9,13 @@ First you should create an Adobe IO account and connect to a Product Profile.
 You can also create an Adobe IO account and then go to the product Profile in Adobe Admin Console to contect to your Adobe IO account.
 
 When you create your Adobe IO account, you need to set a certificate, keep the key nearby because you will need it.
+You can follow this [tutorial](https://www.datanalyst.info/python/adobe-io-user-management/adobe-io-jwt-authentication-with-python/)
 
 ## 2. Download the library
 
 You can directly install the library from here:
 python -m pip install --upgrade git+<https://github.com/pitchmuc/adobe_analytics_api_2.0.git#egg=adobe_analytics_2>
+or by doing the following command line: pip install aanalytics2
 
 or you can copy paste the aanalytics2.py file in your Lib/ folder in your Python installation.
 
@@ -59,4 +62,10 @@ Example :
 
 ```python
 segments = mycompany.getSegments()
+```
+
+or
+
+```python
+myreport = mycompany.getReport('myRequest.json')
 ```
