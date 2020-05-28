@@ -547,6 +547,35 @@ class Analytics:
                     f'Saving data in file : {os.getcwd()}{os.sep}segments.csv')
         return segments
 
+    def getSegment(self, segment_id: str = None, *args):
+        """
+        Get a specific segment from the ID. Returns the object of the segment.
+        Arguments:
+            segment_id : REQUIRED : the segment id to retrieve.
+        Possible args:
+            - "reportSuiteName" : string : to retrieve reportSuite attached to the segment
+            - "ownerFullName" : string : to retrieve ownerFullName attached to the segment
+            - "modified" : string : to retrieve when segment was modified
+            - "tags" : string : to retrieve tags attached to the segment
+            - "compatibility" : string : to retrieve which tool is compatible
+            - "definition" : string : definition of the segment
+            - "publishingStatus" : string : status for the segment
+            - "definitionLastModified" : string : last definition of the segment
+            - "categories" : string : categories of the segment
+        """
+        ValidArgs = ["reportSuiteName", "ownerFullName", "modified", "tags", "compatibility",
+                     "definition", "publishingStatus", "publishingStatus", "definitionLastModified", "categories"]
+        if segment_id is None:
+            raise Exception("Expected a segment id")
+        path = f"/segments/{segment_id}"
+        for element in args:
+            if element not in ValidArgs:
+                args.remove(element)
+        params = {'expansion': ','.join(args)}
+        res = _getData(self._endpoint_company + path,
+                       params=params, headers=self._header)
+        return res
+
     def createSegment(self, segmentJSON: dict = None) -> object:
         """
         Method that creates a new segment based on the dictionary passed to it.
