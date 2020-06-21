@@ -33,7 +33,8 @@ setup(
         'pathlib',
         'requests',
         'PyJWT[crypto]',
-        'PyJWT'
+        'PyJWT',
+        "dicttoxml"
     ],
     classifiers=CLASSIFIERS,
     python_requires='>=3.6'

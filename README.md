@@ -12,12 +12,19 @@ Most of the documentation for this API will be hosted at [datanalyst.info][1].
 
 Basic Functionality that are covered :
 
+### Reporting API
+
 * Run a report statement
 * Retrieve Users
 * Retrieve Segments
 * Retrieve Metrics
 * Retrieve Dimensions
 * Retrieve Calculated Metrics
+
+### Data Ingestion API
+
+* Data Ingestion API from API 1.4
+* Bulk Data Ingestion API
 
 ## Getting Started
 
@@ -47,6 +54,7 @@ In order to use this API in python, you would need to have those libraries insta
 * PyJWT
 * PyJWT[crypto]
 * pathlib
+* dicttoxml
 
 ## Others Sources
 
