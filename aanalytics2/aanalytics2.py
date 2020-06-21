@@ -2,7 +2,6 @@
 # email : piccini.julien@gmail.com
 # version : 0.0.5
 
-
 import json as _json
 import time as _time
 from concurrent import futures as _futures
@@ -11,23 +10,12 @@ from pathlib import Path as _Path
 from typing import Union as _Union
 from typing import IO as _IO
 import os
+from aanalytics2 import config
 
 # Non standard libraries
 import jwt as _jwt
 import pandas as _pd
 import requests as _requests
-
-# Set up default values
-_org_id, _api_key, _tech_id, _pathToKey, _secret, _companyid = "", "", "", "", "", ""
-_TokenEndpoint = "https://ims-na1.adobelogin.com/ims/exchange/jwt"
-_orga_admin = {'_org_admin', '_deployment_admin', '_support_admin'}
-_date_limit = 0
-_token = ''
-_header = {"Accept": "application/json",
-           "Content-Type": "application/json",
-           "Authorization": "Bearer ",
-           "X-Api-Key": ""
-           }
 
 
 def createConfigFile(verbose: object = False) -> None:
@@ -53,73 +41,58 @@ def importConfigFile(file: str) -> None:
     This function will read the 'config_admin.json' to retrieve the information to be used by this module. 
     Arguments:
         file: REQUIRED : file (if in the same folder) or path to the file and file if in another folder.
-
-
     Example of file value.
     "config.json"
     "./config.json"
     """
-    global _org_id
-    global _api_key
-    global _tech_id
-    global _pathToKey
-    global _secret
-    global _endpoint
-    global _header
     if file.startswith('/'):
         file = "."+file
     with open(_Path(file), 'r') as file:
         f = _json.load(file)
-        _org_id = f['org_id']
-        _api_key = f['api_key']
-        _header["X-Api-Key"] = f['api_key']
-        _tech_id = f['tech_id']
-        _secret = f['secret']
-        _pathToKey = f['pathToKey']
-
-
-# Analytics API Endpoint
-_endpoint = 'https://analytics.adobe.io/api'
+        config.org_id = f['org_id']
+        config.api_key = f['api_key']
+        config.header["X-Api-Key"] = f['api_key']
+        config.tech_id = f['tech_id']
+        config.secret = f['secret']
+        config.pathToKey = f['pathToKey']
 
 
 def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
     """ Retrieve the token by using the information provided by the user during the import importConfigFile function. 
-
     Argument : 
         verbose : OPTIONAL : Default False. If set to True, print information.
         save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt). 
     """
-    global _token
-    global _header
-    global _pathToKey
-    if _pathToKey.startswith('/'):
-        _pathToKey = "."+_pathToKey
-    with open(_Path(_pathToKey), 'r') as f:
+    if config.pathToKey.startswith('/'):
+        config.pathToKey = "."+config.pathToKey
+    with open(_Path(config.pathToKey), 'r') as f:
         private_key_unencrypted = f.read()
         header_jwt = {'cache-control': 'no-cache',
                       'content-type': 'application/x-www-form-urlencoded'}
     jwtPayload = {
         # Expiration set to 24 hours
         "exp": round(24 * 60 * 60 + int(_time.time())),
-        "iss": _org_id,  # org_id
-        "sub": _tech_id,  # technical_account_id
+        "iss": config.org_id,  # org_id
+        "sub": config.tech_id,  # technical_account_id
         "https://ims-na1.adobelogin.com/s/ent_analytics_bulk_ingest_sdk": True,
-        "aud": "https://ims-na1.adobelogin.com/c/" + _api_key
+        "aud": "https://ims-na1.adobelogin.com/c/" + config.api_key
     }
     encoded_jwt = _jwt.encode(
         jwtPayload, private_key_unencrypted, algorithm='RS256')  # working algorithm
     payload = {
-        "client_id": _api_key,
-        "client_secret": _secret,
+        "client_id": config.api_key,
+        "client_secret": config.secret,
         "jwt_token": encoded_jwt.decode("utf-8")
     }
-    response = _requests.post(_TokenEndpoint, headers=header_jwt, data=payload)
+    TokenEndpoint = "https://ims-na1.adobelogin.com/ims/exchange/jwt"
+    response = _requests.post(TokenEndpoint,
+                              headers=header_jwt, data=payload)
     json_response = response.json()
     token = json_response['access_token']
-    _header["Authorization"] = "Bearer "+token
+    config.header["Authorization"] = "Bearer "+token
     expire = json_response['expires_in']
-    global _date_limit  # getting the scope right
-    _date_limit = _time.time() + expire / 1000 - 500  # end of time for the token
+    config.date_limit = _time.time() + expire / 1000 - \
+        500  # end of time for the token
     if save:
         with open('token.txt', 'w') as f:  # save the token
             f.write(token)
@@ -132,13 +105,11 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
 
 def _checkToken(func):
     """decorator that checks that the token is valid before calling the API"""
-
     def checking(*args, **kwargs):  # if function is not wrapped, will fire
-        global _date_limit
         now = _time.time()
-        if now > _date_limit - 1000:
-            global _token
-            _token = retrieveToken(*args, **kwargs)
+        if now > config.date_limit - 1000:
+            config.token = retrieveToken(*args, **kwargs)
+            kwargs['header']['Authorization'] = "Bearer "+config._token
             return func(*args, **kwargs)
         else:  # need to return the function for decorator to return something
             return func(*args, **kwargs)
@@ -147,17 +118,17 @@ def _checkToken(func):
 
 
 @_checkToken
-def _getData(endpoint: str, params: dict = None, data: dict = None, headers: dict = None, *args, **kwargs):
+def getData(endpoint: str, params: dict = None, data: dict = None, headers: dict = None, *args, **kwargs):
     """
     Abstraction for getting data
     """
-    _header = headers
+    header = headers
     if params is not None and data is None:
-        res = _requests.get(endpoint, headers=_header, params=params)
+        res = _requests.get(endpoint, headers=header, params=params)
     elif params is None and data is not None:
-        res = _requests.get(endpoint, headers=_header, data=data)
+        res = _requests.get(endpoint, headers=header, data=data)
     elif params is not None and data is not None:
-        res = _requests.get(endpoint, headers=_header,
+        res = _requests.get(endpoint, headers=header,
                             params=params, data=data)
     try:
         json = res.json()
@@ -169,18 +140,20 @@ def _getData(endpoint: str, params: dict = None, data: dict = None, headers: dic
 
 
 @_checkToken
-def _postData(endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
+def postData(endpoint: str, params: dict = None, data=None, headers: dict = None, file: dict = None, *args, **kwargs):
     """
     Abstraction for getting data
     """
-    _header = headers
-    if params is not None and data is None:
-        res = _requests.post(endpoint, headers=_header, params=params)
-    elif params is None and data is not None:
-        res = _requests.post(endpoint, headers=_header, data=_json.dumps(data))
-    elif params is not None and data is not None:
-        res = _requests.post(endpoint, headers=_header,
+    header = headers
+    if params is not None and data is None and file is None:
+        res = _requests.post(endpoint, headers=header, params=params)
+    elif params is None and data is not None and file is None:
+        res = _requests.post(endpoint, headers=header, data=_json.dumps(data))
+    elif params is not None and data is not None and file is None:
+        res = _requests.post(endpoint, headers=header,
                              params=params, data=_json.dumps(data=data))
+    elif file is not None:
+        res = _requests.post(endpoint, headers=header, files=file)
     try:
         json = res.json()
     except ValueError:
@@ -191,17 +164,17 @@ def _postData(endpoint: str, params: dict = None, data=None, headers: dict = Non
 
 
 @_checkToken
-def _putData(endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
+def putData(endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
     """
     Abstraction for getting data
     """
-    _header = headers
+    header = headers
     if params is not None and data is None:
-        res = _requests.put(endpoint, headers=_header, params=params)
+        res = _requests.put(endpoint, headers=header, params=params)
     elif params is None and data is not None:
-        res = _requests.put(endpoint, headers=_header, data=_json.dumps(data))
+        res = _requests.put(endpoint, headers=header, data=_json.dumps(data))
     elif params is not None and data is not None:
-        res = _requests.put(endpoint, headers=_header,
+        res = _requests.put(endpoint, headers=header,
                             params=params, data=_json.dumps(data=data))
     try:
         json = res.json()
@@ -211,21 +184,21 @@ def _putData(endpoint: str, params: dict = None, data=None, headers: dict = None
 
 
 @_checkToken
-def _deleteData(endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
+def deleteData(endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
     """
     Abstraction for getting data
     """
-    _header = headers
+    header = headers
     if params is not None and data is None:
-        res = _requests.delete(endpoint, headers=_header, params=params)
+        res = _requests.delete(endpoint, headers=header, params=params)
     elif params is None and data is not None:
-        res = _requests.delete(endpoint, headers=_header,
+        res = _requests.delete(endpoint, headers=header,
                                data=_json.dumps(data))
     elif params is not None and data is not None:
-        res = _requests.delete(endpoint, headers=_header,
+        res = _requests.delete(endpoint, headers=header,
                                params=params, data=_json.dumps(data=data))
     elif params is None and data is None:
-        res = _requests.delete(endpoint, headers=_header)
+        res = _requests.delete(endpoint, headers=header)
     try:
         json = res.json()
     except:
@@ -247,7 +220,7 @@ def getCompanyId(infos: str = 'all'):
             You need to already know your position. 
     """
     res = _requests.get(
-        "https://analytics.adobe.io/discovery/me", headers=_header)
+        "https://analytics.adobe.io/discovery/me", headers=config.header)
     json_res = res.json()
     if infos == 'all':
         companies = json_res['imsOrgs'][0]['companies']
@@ -257,19 +230,18 @@ def getCompanyId(infos: str = 'all'):
             infos = '0'  # set to first position
         position = int(infos)
         companies = json_res['imsOrgs'][0]['companies']
-        global _companyid
-        _companyid = companies[position]['globalCompanyId']
-        return _companyid
+        config.companyid = companies[position]['globalCompanyId']
+        return config.companyid
 
 
 class Analytics:
 
     # Endpoints
-    _header = {"Accept": "application/json",
-               "Content-Type": "application/json",
-               "Authorization": "Bearer ",
-               "X-Api-Key": ""
-               }
+    header = {"Accept": "application/json",
+              "Content-Type": "application/json",
+              "Authorization": "Bearer ",
+              "X-Api-Key": ""
+              }
     _endpoint = 'https://analytics.adobe.io/api'
     _endpoint_report = '/companies/'
     _getRS = '/collections/suites'
@@ -285,15 +257,15 @@ class Analytics:
         if company_id is None:
             raise AttributeError(
                 'Expected "company_id" to be referenced.\nPlease ensure you pass the globalCompanyId when instantiating this class.')
-        self._header = _deepcopy(_header)
-        self._header['x-proxy-global-company-id'] = company_id
+        self.header = _deepcopy(config.header)
+        self.header['x-proxy-global-company-id'] = company_id
         self._endpoint_company = f"{self._endpoint}/{company_id}"
 
     def refreshToken(self, token: str = None):
         if token is None:
             raise AttributeError(
                 'Expected "token" to be referenced.\nPlease ensure you pass the token.')
-        self._header['Authorization'] = "Bearer "+token
+        self.header['Authorization'] = "Bearer "+token
 
     def getReportSuites(self, txt: str = None, rsid_list: str = None, limit: int = 100, extended_info: bool = False,
                         save: bool = False) -> list:
@@ -316,8 +288,8 @@ class Analytics:
             params.update({'rsids': str(rsid_list)})
         params.update(
             {"expansion": "name,parentRsid,currency,calendarType,timezoneZoneinfo"})
-        rsids = _getData(self._endpoint_company + self._getRS,
-                         params=params, headers=self._header)
+        rsids = getData(self._endpoint_company + self._getRS,
+                        params=params, headers=self.header)
         content = rsids['content']
         if not extended_info:
             list_content = [{'name': item['name'], 'rsid': item['rsid']}
@@ -333,11 +305,11 @@ class Analytics:
                            for page in range(1, callsToMake)]
             list_urls = [self._endpoint_company +
                          self._getRS for x in range(1, callsToMake)]
-            list_headers = [self._header for x in range(1, callsToMake)]
+            listheaders = [self.header for x in range(1, callsToMake)]
             workers = min(10, total_page)
             with _futures.ThreadPoolExecutor(workers) as executor:
-                res = executor.map(lambda x, y, z: _getData(
-                    x, y, headers=z), list_urls, list_params, list_headers)
+                res = executor.map(lambda x, y, z: getData(
+                    x, y, headers=z), list_urls, list_params, listheaders)
             res = list(res)
             list_data = [val for sublist in [r['content']
                                              for r in res if 'content' in r.keys()] for val in sublist]
@@ -374,8 +346,8 @@ class Analytics:
         if tags:
             params.update({'expansion': 'tags'})
         params.update({'rsid': rsid})
-        dims = _getData(self._endpoint_company +
-                        self._getDimensions, params=params, headers=self._header)
+        dims = getData(self._endpoint_company +
+                       self._getDimensions, params=params, headers=self.header)
         df_dims = _pd.DataFrame(dims)
         columns = ['id', 'name', 'category', 'type',
                    'parent', 'pathable', 'description']
@@ -405,8 +377,8 @@ class Analytics:
         if tags:
             params.update({'expansion': 'tags'})
         params.update({'rsid': rsid})
-        metrics = _getData(self._endpoint_company +
-                           self._getMetrics, params=params, headers=self._header)
+        metrics = getData(self._endpoint_company +
+                          self._getMetrics, params=params, headers=self.header)
         df_metrics = _pd.DataFrame(metrics)
         columns = ['id', 'name', 'category', 'type',
                    'dataGroup', 'precision', 'segmentable']
@@ -429,12 +401,15 @@ class Analytics:
         Arguments:
             save : OPTIONAL : Save the data in a file (bool : default False). 
         Possible kwargs: 
-            limit : OPTIONAL : Nummber of results per requests. Default 100. 
+            limit :  Nummber of results per requests. Default 100.
+            expansion : string list such as "lastAccess,createDate"  
         """
         nb_error, nb_empty = 0, 0  # use for multi-thread loop
         params = {'limit': kwargs.get('limit', 100)}
-        users = _getData(self._endpoint_company +
-                         self._getUsers, params=params, headers=self._header)
+        if kwargs.get("expansion", None) is not None:
+            params["expansion"] = kwargs.get("expansion", None)
+        users = getData(self._endpoint_company +
+                        self._getUsers, params=params, headers=self.header)
         data = users['content']
         lastPage = users['lastPage']
         if not lastPage:  # check if lastpage is inversed of False
@@ -443,12 +418,12 @@ class Analytics:
                            for page in range(1, callsToMake)]
             list_urls = [self._endpoint_company +
                          self._getUsers for x in range(1, callsToMake)]
-            list_headers = [self._header
-                            for x in range(1, callsToMake)]
+            listheaders = [self.header
+                           for x in range(1, callsToMake)]
             workers = min(10, len(list_params))
             with _futures.ThreadPoolExecutor(workers) as executor:
-                res = executor.map(lambda x, y, z: _getData(x, y, headers=z), list_urls,
-                                   list_params, list_headers)
+                res = executor.map(lambda x, y, z: getData(x, y, headers=z), list_urls,
+                                   list_params, listheaders)
             res = list(res)
             users_lists = [elem['content']
                            for elem in res if 'content' in elem.keys()]
@@ -529,8 +504,8 @@ class Analytics:
             print("Starting requesting segments")
         while not lastPage:
             params['page'] = page_nb
-            segs = _getData(self._endpoint_company +
-                            self._getSegments, params=params, headers=self._header)
+            segs = getData(self._endpoint_company +
+                           self._getSegments, params=params, headers=self.header)
             data += segs['content']
             lastPage = segs['lastPage']
             page_nb += 1
@@ -572,8 +547,8 @@ class Analytics:
             if element not in ValidArgs:
                 args.remove(element)
         params = {'expansion': ','.join(args)}
-        res = _getData(self._endpoint_company + path,
-                       params=params, headers=self._header)
+        res = getData(self._endpoint_company + path,
+                      params=params, headers=self.header)
         return res
 
     def createSegment(self, segmentJSON: dict = None) -> object:
@@ -586,8 +561,8 @@ class Analytics:
             print('No segment data has been pushed')
             return None
         data = _deepcopy(segmentJSON)
-        seg = _postData(self._endpoint_company +
-                        self._getSegments, data=data, headers=self._header)
+        seg = postData(self._endpoint_company +
+                       self._getSegments, data=data, headers=self.header)
         return seg
 
     def updateSegment(self, segmentID: str = None, segmentJSON: dict = None) -> object:
@@ -601,8 +576,8 @@ class Analytics:
             print('No segment or segementID data has been pushed')
             return None
         data = _deepcopy(segmentJSON)
-        seg = _putData(self._endpoint_company + self._getSegments +
-                       '/' + segmentID, data=data, headers=self._header)
+        seg = putData(self._endpoint_company + self._getSegments +
+                      '/' + segmentID, data=data, headers=self.header)
         return seg
 
     def deleteSegment(self, segmentID: str = None) -> object:
@@ -614,8 +589,8 @@ class Analytics:
         if segmentID is None:
             print('No segementID data has been pushed')
             return None
-        seg = _deleteData(self._endpoint_company +
-                          self._getSegments + '/' + segmentID, headers=self._header)
+        seg = deleteData(self._endpoint_company +
+                         self._getSegments + '/' + segmentID, headers=self.header)
         return seg
 
     def getCalculatedMetrics(self, name: str = None, tagNames: str = None, inclType: str = 'all', rsids_list: list = None,
@@ -653,8 +628,8 @@ class Analytics:
         if extended_info:
             params.update(
                 {'expansion': 'reportSuiteName,definition,ownerFullName,modified,tags,categories,compatibility'})
-        metrics = _getData(self._endpoint_company +
-                           self._getCalcMetrics, params=params, headers=self._header)
+        metrics = getData(self._endpoint_company +
+                          self._getCalcMetrics, params=params, headers=self.header)
         data = metrics['content']
         lastPage = metrics['lastPage']
         if not lastPage:  # check if lastpage is inversed of False
@@ -662,8 +637,8 @@ class Analytics:
             while not lastPage:
                 page_nb += 1
                 params['page'] = page_nb
-                metrics = _getData(self._endpoint_company +
-                                   self._getCalcMetrics, params=params, headers=self._header)
+                metrics = getData(self._endpoint_company +
+                                  self._getCalcMetrics, params=params, headers=self.header)
                 data += metrics['content']
                 lastPage = metrics['lastPage']
         df_calc_metrics = _pd.DataFrame(data)
@@ -684,8 +659,8 @@ class Analytics:
         if 'name' not in metricJSON.keys() or 'definition' not in metricJSON.keys() or 'rsid' not in metricJSON.keys():
             raise KeyError(
                 'Expected "name", "definition" and "rsid" in the data')
-        cm = _postData(self._endpoint_company +
-                       self._getCalcMetrics, headers=self._header, data=metricJSON)
+        cm = postData(self._endpoint_company +
+                      self._getCalcMetrics, headers=self.header, data=metricJSON)
         return cm
 
     def deleteCalculatedMetrics(self, calcID: str = None) -> object:
@@ -697,8 +672,8 @@ class Analytics:
         if calcID is None:
             print('No calculated metrics data has been pushed')
             return None
-        cm = _deleteData(self._endpoint_company +
-                         self._getCalcMetrics + '/' + calcID, headers=self._header)
+        cm = deleteData(self._endpoint_company +
+                        self._getCalcMetrics + '/' + calcID, headers=self.header)
         return cm
 
     def getDateRanges(self, extended_info: bool = False, save: bool = False, **kwargs) -> object:
@@ -717,8 +692,8 @@ class Analytics:
         if extended_info:
             params.update(
                 {'expansion': 'definition,ownerFullName,modified,tags'})
-        dateRanges = _getData(self._endpoint_company +
-                              self._getDateRanges, params=params, headers=self._header)
+        dateRanges = getData(self._endpoint_company +
+                             self._getDateRanges, params=params, headers=self.header)
         data = dateRanges['content']
         df_dates = _pd.DataFrame(data)
         return df_dates
@@ -730,8 +705,8 @@ class Analytics:
         path = "/calculatedmetrics/functions"
         limit = int(kwargs.get('limit', 500))
         params = {'limit': limit}
-        funcs = _getData(self._endpoint_company + path,
-                         params=params, headers=self._header)
+        funcs = getData(self._endpoint_company + path,
+                        params=params, headers=self.header)
         df = _pd.DataFrame(funcs)
         return df
 
@@ -856,8 +831,8 @@ class Analytics:
         while last_page == False:
             timestamp = round(_time.time())
             request['settings']['page'] = page_nb
-            report = _postData(self._endpoint_company +
-                               self._getReport, data=request, headers=self._header)
+            report = postData(self._endpoint_company +
+                              self._getReport, data=request, headers=self.header)
             if verbose:
                 print('Data received.')
             # Recursion to take care of throttling limit
@@ -869,7 +844,7 @@ class Analytics:
                         f.write(_json.dumps(report, indent=4))
                 _time.sleep(50)
                 obj = getReport(json_request=request, n_result=n_result,
-                                save=save, item_id=item_id, verbose=verbose, headers=self._header)
+                                save=save, item_id=item_id, verbose=verbose, headers=self.header)
                 return obj
             if 'lastPage' not in report:  # checking error when no lastPage key in report
                 if verbose:
