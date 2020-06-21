@@ -8,9 +8,9 @@ This is a python wrapper for the adobe analytics API 2.0.
 
 Most of the documentation for this API will be hosted at [datanalyst.info][1].
 
-## Functionality
+## Functionalities
 
-Basic Functionality that are covered :
+Functionalities that are covered :
 
 ### Reporting API
 
