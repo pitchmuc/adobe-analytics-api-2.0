@@ -160,6 +160,26 @@ class bulkAPI:
                              headers=self.header)
         return res
 
+    def generateTemplate(self, includeAdv: bool = False, returnDF: bool = False, save: bool = True):
+        """
+        Generate a CSV file with minimum fields.
+        Arguments:
+            includeAdv : OPTIONAL : Include advanced fields in the csv (pe & queryString). Not included by default to avoid confusion for new users. (Default False)
+            returnDF : OPTIONAL : Return a pandas dataFrame if you want to work directly with a data frame.(default False)
+            save : OPTIONAL : Save the file created directly in your working folder.
+        """
+        import io
+        string = """timestamp,marketingCloudVisitorID,events,pageName,pageURL,reportSuiteID,userAgent,pe,queryString\ntimestampValue,marketingCloudVisitorIDValue,eventsValue,pageNameValue,pageURLValue,reportSuiteIDValue,userAgentValue,peValue,queryStringValue
+        """
+        data = io.StringIO(string)
+        df = _pd.read_csv(data, sep=',')
+        if includeAdv == False:
+            df.drop(["pe", "queryString"], axis=1, inplace=True)
+        if save:
+            df.to_csv('template.csv', index=False)
+        if returnDF:
+            return df
+
     def _checkFiles(self, file: str = None):
         """
         Internal method that check content and format of the file
