@@ -98,18 +98,17 @@ class DIAPI:
         return res
 
 
-class bulkAPI:
+class Bulkapi:
     """
     This is the bulk API from Adobe Analytics.
     By default, the file are sent to the global endpoints for auto-routing.
     If you wish to select a specific endpoint, you can modify it during instantiation.
     It requires you to upload some adobeio configuration file through the main aanalytics2 module.
     Arguments:
-        apiKey : OPTIONAL : the API Key that you have generated from
         endpoint : OPTIONAL : by default using https://analytics-collection.adobe.io
     """
 
-    def __init__(self, apiKey: str = None, endpoint: str = "https://analytics-collection.adobe.io"):
+    def __init__(self, endpoint: str = "https://analytics-collection.adobe.io"):
         self.endpoint = endpoint
         try:
             import importlib.resources as pkg_resources
@@ -126,7 +125,7 @@ class bulkAPI:
         # if no token has been generated.
         if len(config.header['Authorization']) < 100:
             token = aanalytics2.retrieveToken()
-        self.clientID = apiKey or config.api_key
+        self.clientID = config.api_key
         self.header = {
             "Authorization": config.header['Authorization'],
             "x-api-key": self.clientID,

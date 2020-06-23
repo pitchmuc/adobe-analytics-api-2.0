@@ -7,6 +7,7 @@ This is a python wrapper for the adobe analytics API 2.0.
 ## Documentation
 
 Most of the documentation for this API will be hosted at [datanalyst.info][1].
+[Getting Started details on Github ](./docs/getting_started.md).
 
 ## Functionalities
 
@@ -21,10 +22,14 @@ Functionalities that are covered :
 * Retrieve Dimensions
 * Retrieve Calculated Metrics
 
-### Data Ingestion API
+documentation on reporting [here](./docs/main.md)
+
+### Data Ingestion APIs
 
 * Data Ingestion API from API 1.4
 * Bulk Data Ingestion API
+
+documentation on ingestion APIs [here](./docs/ingestion.md)
 
 ## Getting Started
 
@@ -40,9 +45,6 @@ or
 python -m pip install --upgrade git+<https://github.com/pitchmuc/adobe_analytics_api_2.0.git#egg=aanalytics2>
 ```
 
-[Getting Started details on how to use it](./docs/getting_started.md).
-
-Complete documentation [here](./docs/main.md) (kind of)
 
 ## Dependencies
 
