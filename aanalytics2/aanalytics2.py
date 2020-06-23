@@ -1,6 +1,6 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
-# version : 0.0.5
+# version : 0.0.7
 
 import json as _json
 import time as _time
@@ -109,7 +109,8 @@ def _checkToken(func):
         now = _time.time()
         if now > config.date_limit - 1000:
             config.token = retrieveToken(*args, **kwargs)
-            kwargs['header']['Authorization'] = "Bearer "+config._token
+            if kwargs.get("headers", None) is not None:
+                kwargs['headers']['Authorization'] = "Bearer "+config.token
             return func(*args, **kwargs)
         else:  # need to return the function for decorator to return something
             return func(*args, **kwargs)
@@ -843,8 +844,8 @@ class Analytics:
                     with open(f'limit_reach_{timestamp}.json', 'w') as f:
                         f.write(_json.dumps(report, indent=4))
                 _time.sleep(50)
-                obj = getReport(json_request=request, n_result=n_result,
-                                save=save, item_id=item_id, verbose=verbose, headers=self.header)
+                obj = self.getReport(json_request=request, n_result=n_result,
+                                     save=save, item_id=item_id, verbose=verbose)
                 return obj
             if 'lastPage' not in report:  # checking error when no lastPage key in report
                 if verbose:
