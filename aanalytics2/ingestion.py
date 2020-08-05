@@ -36,10 +36,12 @@ class DIAPI:
         self.tracking_server = tracking_server
         try:
             import importlib.resources as pkg_resources
+            path = pkg_resources.path("aanalytics2", "supported_tags.pickle")
         except ImportError:
-            # Try backported to PY<37 `importlib_resources`.
-            import importlib_resources as pkg_resources
-        path = pkg_resources.path("aanalytics2", "supported_tags.pickle")
+            # Try backported to PY<37 with pkg_resources.
+            import pkg_resources
+            path = pkg_resources.resource_filename(
+                "aanalytics2", "supported_tags.pickle")
         with path as f:
             self.REFERENCE = _pd.read_pickle(f)
 
@@ -112,11 +114,13 @@ class Bulkapi:
         self.endpoint = endpoint
         try:
             import importlib.resources as pkg_resources
+            path = pkg_resources.path(
+                "aanalytics2", "CSV_Column_and_Query_String_Reference.pickle")
         except ImportError:
             # Try backported to PY<37 `importlib_resources`.
-            import importlib_resources as pkg_resources
-        path = pkg_resources.path(
-            "aanalytics2", "CSV_Column_and_Query_String_Reference.pickle")
+            import pkg_resources
+            path = pkg_resources.resource_filename(
+                "aanalytics2", "CSV_Column_and_Query_String_Reference.pickle")
         with path as f:
             self.REFERENCE = _pd.read_pickle(f)
         if config.api_key == "":

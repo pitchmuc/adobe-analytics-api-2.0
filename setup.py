@@ -8,7 +8,6 @@ CLASSIFIERS = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Topic :: Scientific/Engineering :: Information Analysis",
-    "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Development Status :: 4 - Beta"
@@ -16,7 +15,7 @@ CLASSIFIERS = [
 
 setup(
     name='aanalytics2',
-    version="0.0.7",
+    version="0.0.8",
     license='GPL',
     description='Adobe Analytics v2 API wrapper',
     long_description=long_description,

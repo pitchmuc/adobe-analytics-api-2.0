@@ -754,13 +754,14 @@ class Analytics:
         """
         data_rows = _deepcopy(data_rows)
         dict_data = {}
-        dict_data = {row['value']: row['data'] for row in data_rows}
+        dict_data = {row.get('value', 'missing_value')                     : row['data'] for row in data_rows}
         if cols is not None:
             n_metrics = len(cols) - 1
         if item_id:  # adding the itemId in the data returned
             cols.append('item_id')
             for row in data_rows:
-                dict_data[row['value']].append(row['itemId'])
+                dict_data[row.get('value', 'missing_value')
+                          ].append(row['itemId'])
         if anomaly:
             # set full columns
             cols = cols + [f'{metric}-{suffix}' for metric in cols[1:] for suffix in
