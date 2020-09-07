@@ -20,8 +20,8 @@ from aanalytics2 import config
 
 
 def createConfigFile(verbose: object = False) -> None:
-    """
-    This function will create a 'config_admin.json' file where you can store your access data. 
+    """Creates a `config_admin.json` file with the pre-defined configuration format to store
+    the access data in.
     """
     json_data = {
         'org_id': '<orgID>',
@@ -33,22 +33,22 @@ def createConfigFile(verbose: object = False) -> None:
     with open('config_admin.json', 'w') as cf:
         cf.write(_json.dumps(json_data, indent=4))
     if verbose:
-        print(
-            f" file created at this location : {os.getcwd()}{os.sep}config_admin.json")
+        print(f" file created at this location : {os.getcwd()}{os.sep}config_admin.json")
 
 
-def importConfigFile(file: str) -> None:
-    """
-    This function will read the 'config_admin.json' to retrieve the information to be used by this module. 
+def importConfigFile(path: str) -> None:
+    """Reads the file denoted by the supplied `path` and retrieves the configuration information
+    from it.
+
     Arguments:
-        file: REQUIRED : file (if in the same folder) or path to the file and file if in another folder.
+        path: REQUIRED : path to the configuration file. Can be either a fully-qualified or relative.
+
     Example of file value.
     "config.json"
     "./config.json"
+    "/my-folder/config.json"
     """
-    if file.startswith('/'):
-        file = "." + file
-    with open(_Path(file), 'r') as file:
+    with open(_Path(path), 'r') as file:
         f = _json.load(file)
         config.org_id = f['org_id']
         config.api_key = f['api_key']
@@ -59,18 +59,18 @@ def importConfigFile(file: str) -> None:
 
 
 def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
-    """Retrieve the token by using the information provided by the user during the import importConfigFile function.
+    """Retrieves the token by using the information provided by the user during
+    the import importConfigFile function.
+
     Argument : 
         verbose : OPTIONAL : Default False. If set to True, print information.
         save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt). 
     """
-    # if config.pathToKey.startswith('/'):
-    #     config.pathToKey = "."+config.pathToKey
     with open(_Path(config.pathToKey), 'r') as f:
         private_key_unencrypted = f.read()
         header_jwt = {'cache-control': 'no-cache',
                       'content-type': 'application/x-www-form-urlencoded'}
-    jwtPayload = {
+    jwt_payload = {
         # Expiration set to 24 hours
         "exp": round(24 * 60 * 60 + int(_time.time())),
         "iss": config.org_id,  # org_id
@@ -78,15 +78,14 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
         "https://ims-na1.adobelogin.com/s/ent_analytics_bulk_ingest_sdk": True,
         "aud": "https://ims-na1.adobelogin.com/c/" + config.api_key
     }
-    encoded_jwt = _jwt.encode(
-        jwtPayload, private_key_unencrypted, algorithm='RS256')  # working algorithm
+    encoded_jwt = _jwt.encode(jwt_payload, private_key_unencrypted, algorithm='RS256')
     payload = {
         "client_id": config.api_key,
         "client_secret": config.secret,
         "jwt_token": encoded_jwt.decode("utf-8")
     }
-    TokenEndpoint = "https://ims-na1.adobelogin.com/ims/exchange/jwt"
-    response = _requests.post(TokenEndpoint, headers=header_jwt, data=payload)
+    token_endpoint = "https://ims-na1.adobelogin.com/ims/exchange/jwt"
+    response = _requests.post(token_endpoint, headers=header_jwt, data=payload)
     json_response = response.json()
     token = json_response['access_token']
     config.header["Authorization"] = "Bearer " + token
