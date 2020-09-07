@@ -47,7 +47,7 @@ def importConfigFile(file: str) -> None:
     "./config.json"
     """
     if file.startswith('/'):
-        file = "."+file
+        file = "." + file
     with open(_Path(file), 'r') as file:
         f = _json.load(file)
         config.org_id = f['org_id']
@@ -59,7 +59,7 @@ def importConfigFile(file: str) -> None:
 
 
 def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
-    """ Retrieve the token by using the information provided by the user during the import importConfigFile function. 
+    """Retrieve the token by using the information provided by the user during the import importConfigFile function.
     Argument : 
         verbose : OPTIONAL : Default False. If set to True, print information.
         save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt). 
@@ -86,32 +86,30 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
         "jwt_token": encoded_jwt.decode("utf-8")
     }
     TokenEndpoint = "https://ims-na1.adobelogin.com/ims/exchange/jwt"
-    response = _requests.post(TokenEndpoint,
-                              headers=header_jwt, data=payload)
+    response = _requests.post(TokenEndpoint, headers=header_jwt, data=payload)
     json_response = response.json()
     token = json_response['access_token']
-    config.header["Authorization"] = "Bearer "+token
+    config.header["Authorization"] = "Bearer " + token
     expire = json_response['expires_in']
-    config.date_limit = _time.time() + expire / 1000 - \
-        500  # end of time for the token
+    config.date_limit = _time.time() + expire / 1000 - 500  # end of time for the token
     if save:
         with open('token.txt', 'w') as f:  # save the token
             f.write(token)
         if verbose:
-            print('token valid till : ' +
-                  _time.ctime(_time.time() + expire / 1000))
+            print(f"token valid till : {_time.ctime(_time.time() + expire / 1000)}")
             print(f"token has been saved here: {os.getcwd()}{os.sep}token.txt")
     return token
 
 
 def _checkToken(func):
     """decorator that checks that the token is valid before calling the API"""
+
     def checking(*args, **kwargs):  # if function is not wrapped, will fire
         now = _time.time()
         if now > config.date_limit - 1000:
             config.token = retrieveToken(*args, **kwargs)
             if kwargs.get("headers", None) is not None:
-                kwargs['headers']['Authorization'] = "Bearer "+config.token
+                kwargs['headers']['Authorization'] = "Bearer " + config.token
             return func(*args, **kwargs)
         else:  # need to return the function for decorator to return something
             return func(*args, **kwargs)
@@ -237,7 +235,6 @@ def getCompanyId(infos: str = 'all'):
 
 
 class Analytics:
-
     # Endpoints
     header = {"Accept": "application/json",
               "Content-Type": "application/json",
@@ -267,7 +264,7 @@ class Analytics:
         if token is None:
             raise AttributeError(
                 'Expected "token" to be referenced.\nPlease ensure you pass the token.')
-        self.header['Authorization'] = "Bearer "+token
+        self.header['Authorization'] = "Bearer " + token
 
     def getReportSuites(self, txt: str = None, rsid_list: str = None, limit: int = 100, extended_info: bool = False,
                         save: bool = False) -> list:
@@ -329,7 +326,7 @@ class Analytics:
             df_rsids.to_csv('RSIDS.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
             print(
-                f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls)+1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
+                f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
         return df_rsids
 
     def getDimensions(self, rsid: str, tags: bool = False, save=False, **kwargs) -> object:
@@ -445,11 +442,12 @@ class Analytics:
             df_users.to_csv('users.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
             print(
-                f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls)+1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve users or increase limit')
+                f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve users or increase limit')
         return df_users
 
     def getSegments(self, name: str = None, tagNames: str = None, inclType: str = 'all', rsids_list: list = None,
-                    sidFilter: list = None, extended_info: bool = False, format: str = "df", save: bool = False, verbose: bool = False, **kwargs) -> object:
+                    sidFilter: list = None, extended_info: bool = False, format: str = "df", save: bool = False,
+                    verbose: bool = False, **kwargs) -> object:
         """
         Retrieve the list of segments. Returns a data frame. 
         Arguments:
@@ -512,7 +510,7 @@ class Analytics:
             lastPage = segs['lastPage']
             page_nb += 1
             if verbose and page_nb % 10 == 0:
-                print(f"request #{page_nb/10}")
+                print(f"request #{page_nb / 10}")
         if format == "df":
             segments = _pd.DataFrame(data)
         else:
@@ -595,7 +593,8 @@ class Analytics:
                          self._getSegments + '/' + segmentID, headers=self.header)
         return seg
 
-    def getCalculatedMetrics(self, name: str = None, tagNames: str = None, inclType: str = 'all', rsids_list: list = None,
+    def getCalculatedMetrics(self, name: str = None, tagNames: str = None, inclType: str = 'all',
+                             rsids_list: list = None,
                              extended_info: bool = False, save=False, **kwargs) -> object:
         """
         Retrieve the list of calculated metrics. Returns a data frame. 
@@ -755,14 +754,14 @@ class Analytics:
         """
         data_rows = _deepcopy(data_rows)
         dict_data = {}
-        dict_data = {row.get('value', 'missing_value')                     : row['data'] for row in data_rows}
+        dict_data = {row.get('value', 'missing_value'): row['data'] for row in data_rows}
         if cols is not None:
             n_metrics = len(cols) - 1
         if item_id:  # adding the itemId in the data returned
             cols.append('item_id')
             for row in data_rows:
                 dict_data[row.get('value', 'missing_value')
-                          ].append(row['itemId'])
+                ].append(row['itemId'])
         if anomaly:
             # set full columns
             cols = cols + [f'{metric}-{suffix}' for metric in cols[1:] for suffix in
@@ -884,11 +883,11 @@ class Analytics:
                         f.write(_json.dumps(report, indent=4))
                 if verbose:
                     print(
-                        f'% of total elements retrieved. TotalElements: {report.get("totalElements","no data")}')
+                        f'% of total elements retrieved. TotalElements: {report.get("totalElements", "no data")}')
                 return obj  # in case loop happening with empty data, returns empty data
             if verbose and total_elements != 0:
                 print(
-                    f'% of total elements retrieved: {round((count_elements/total_elements)*100,2)} %')
+                    f'% of total elements retrieved: {round((count_elements / total_elements) * 100, 2)} %')
             if last_page == False and n_result != float('inf'):
                 if count_elements >= n_result:
                     last_page = True
