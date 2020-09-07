@@ -3,19 +3,20 @@
 # version : 0.0.7
 
 import json as _json
+import os
 import time as _time
 from concurrent import futures as _futures
-from copy import deepcopy as _deepcopy
 from pathlib import Path as _Path
-from typing import Union as _Union
-from typing import IO as _IO
-import os
-from aanalytics2 import config
 
 # Non standard libraries
 import jwt as _jwt
 import pandas as _pd
 import requests as _requests
+from copy import deepcopy as _deepcopy
+from typing import IO as _IO
+from typing import Union as _Union
+
+from aanalytics2 import config
 
 
 def createConfigFile(verbose: object = False) -> None:
@@ -63,8 +64,8 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
         verbose : OPTIONAL : Default False. If set to True, print information.
         save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt). 
     """
-    if config.pathToKey.startswith('/'):
-        config.pathToKey = "."+config.pathToKey
+    # if config.pathToKey.startswith('/'):
+    #     config.pathToKey = "."+config.pathToKey
     with open(_Path(config.pathToKey), 'r') as f:
         private_key_unencrypted = f.read()
         header_jwt = {'cache-control': 'no-cache',
