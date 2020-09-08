@@ -33,7 +33,8 @@ def createConfigFile(verbose: object = False) -> None:
     with open('config_admin.json', 'w') as cf:
         cf.write(_json.dumps(json_data, indent=4))
     if verbose:
-        print(f" file created at this location : {os.getcwd()}{os.sep}config_admin.json")
+        print(
+            f" file created at this location : {os.getcwd()}{os.sep}config_admin.json")
 
 
 def importConfigFile(path: str) -> None:
@@ -48,6 +49,10 @@ def importConfigFile(path: str) -> None:
     "./config.json"
     "/my-folder/config.json"
     """
+    test_path = _Path(path).exists()
+    if test_path == False:
+        if path.startswith('/'):
+            path = "."+path
     with open(_Path(path), 'r') as file:
         f = _json.load(file)
         config.org_id = f['org_id']
@@ -78,7 +83,8 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
         "https://ims-na1.adobelogin.com/s/ent_analytics_bulk_ingest_sdk": True,
         "aud": "https://ims-na1.adobelogin.com/c/" + config.api_key
     }
-    encoded_jwt = _jwt.encode(jwt_payload, private_key_unencrypted, algorithm='RS256')
+    encoded_jwt = _jwt.encode(
+        jwt_payload, private_key_unencrypted, algorithm='RS256')
     payload = {
         "client_id": config.api_key,
         "client_secret": config.secret,
@@ -90,12 +96,14 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
     token = json_response['access_token']
     config.header["Authorization"] = "Bearer " + token
     expire = json_response['expires_in']
-    config.date_limit = _time.time() + expire / 1000 - 500  # end of time for the token
+    config.date_limit = _time.time() + expire / 1000 - \
+        500  # end of time for the token
     if save:
         with open('token.txt', 'w') as f:  # save the token
             f.write(token)
         if verbose:
-            print(f"token valid till : {_time.ctime(_time.time() + expire / 1000)}")
+            print(
+                f"token valid till : {_time.ctime(_time.time() + expire / 1000)}")
             print(f"token has been saved here: {os.getcwd()}{os.sep}token.txt")
     return token
 
@@ -760,7 +768,7 @@ class Analytics:
             cols.append('item_id')
             for row in data_rows:
                 dict_data[row.get('value', 'missing_value')
-                ].append(row['itemId'])
+                          ].append(row['itemId'])
         if anomaly:
             # set full columns
             cols = cols + [f'{metric}-{suffix}' for metric in cols[1:] for suffix in
