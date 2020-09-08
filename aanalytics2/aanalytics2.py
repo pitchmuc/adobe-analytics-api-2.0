@@ -45,8 +45,10 @@ def importConfigFile(file: str) -> None:
     "config.json"
     "./config.json"
     """
-    if file.startswith('/'):
-        file = "."+file
+    test_path = _Path(file).exists()
+    if test_path == False:
+        if file.startswith('/'):
+            file = "."+file
     with open(_Path(file), 'r') as file:
         f = _json.load(file)
         config.org_id = f['org_id']
