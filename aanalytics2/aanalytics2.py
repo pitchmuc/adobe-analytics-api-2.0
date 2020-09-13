@@ -13,7 +13,7 @@ import jwt as _jwt
 import pandas as _pd
 import requests as _requests
 from copy import deepcopy as _deepcopy
-from typing import IO as _IO
+from typing import IO as _IO, Optional
 from typing import Union as _Union
 
 from aanalytics2 import config
@@ -36,6 +36,23 @@ def createConfigFile(verbose: object = False) -> None:
         print(f" file created at this location : {os.getcwd()}{os.sep}config_admin.json")
 
 
+def _find_path(path: str) -> Optional[_Path]:
+    """Checks if the file denoted by the specified `path` exists and returns the Path object
+    for the file.
+
+    If the file under the `path` does not exist and the path denotes an absolute path, tries
+    to find the file by converting the absolute path to a relative path.
+
+    If the file does not exist with either the absolute and the relative path, returns `None`.
+    """
+    if _Path(path).exists():
+        return _Path(path)
+    elif path.startswith('/') and _Path('.' + path).exists():
+        return _Path('.' + path)
+    else:
+        return None
+
+
 def importConfigFile(path: str) -> None:
     """Reads the file denoted by the supplied `path` and retrieves the configuration information
     from it.
@@ -48,7 +65,10 @@ def importConfigFile(path: str) -> None:
     "./config.json"
     "/my-folder/config.json"
     """
-    with open(_Path(path), 'r') as file:
+    config_file_path: Optional[_Path] = _find_path(path)
+    if config_file_path is None:
+        raise FileNotFoundError(f"Unable to find the configuration file under path `{path}`.")
+    with open(config_file_path, 'r') as file:
         f = _json.load(file)
         config.org_id = f['org_id']
         config.api_key = f['api_key']
@@ -66,10 +86,15 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
         verbose : OPTIONAL : Default False. If set to True, print information.
         save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt). 
     """
-    with open(_Path(config.pathToKey), 'r') as f:
+    private_key_path: Optional[_Path] = _find_path(config.pathToKey)
+    if private_key_path is None:
+        raise FileNotFoundError(f"Unable to find the private key under the path `{config.pathToKey}`.")
+    with open(private_key_path, 'r') as f:
         private_key_unencrypted = f.read()
-        header_jwt = {'cache-control': 'no-cache',
-                      'content-type': 'application/x-www-form-urlencoded'}
+    header_jwt = {
+        'cache-control': 'no-cache',
+        'content-type': 'application/x-www-form-urlencoded'
+    }
     jwt_payload = {
         # Expiration set to 24 hours
         "exp": round(24 * 60 * 60 + int(_time.time())),
