@@ -50,6 +50,8 @@ def _find_path(path: str) -> Optional[_Path]:
         return _Path(path)
     elif path.startswith('/') and _Path('.' + path).exists():
         return _Path('.' + path)
+    elif path.startswith('\\') and _Path('.' + path).exists():
+        return _Path('.' + path)
     else:
         return None
 
