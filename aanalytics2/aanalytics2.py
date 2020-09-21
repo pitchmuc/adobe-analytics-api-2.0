@@ -447,7 +447,7 @@ class Analytics:
             name : REQUIRED : name of the virtual reportSuite
             parentRsid : REQUIRED : Parent reportSuite ID for the VRS
             segmentLists : REQUIRED : list of segment id to be applied on the ReportSuite.
-            dataSchema : REQUIRED : Type of schema used for the VRSID.
+            dataSchema : REQUIRED : Type of schema used for the VRSID. (default "Cache")
             data_dict : OPTIONAL : you can pass directly the dictionary.
         """
         path = f"{self._endpoint_company}/reportsuites/virtualreportsuites"
@@ -735,7 +735,8 @@ class Analytics:
         """
         Method that creates a new segment based on the dictionary passed to it.
         Arguments:
-            segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment. 
+            segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment.
+            More information at this address <https://adobedocs.github.io/analytics-2.0-apis/#/segments/segments_createSegment>
         """
         if segmentJSON is None:
             print('No segment data has been pushed')
@@ -831,8 +832,8 @@ class Analytics:
         """
         Method that create a specific calculated based on the dictionary passed to it.
         Arguments:
-            metricJSON : REQUIRED : Calculated Metrics information to create.
-            Required :  name, definition, rsid
+            metricJSON : REQUIRED : Calculated Metrics information to create. (Required: name, definition, rsid)
+            More information can be found at this address https://adobedocs.github.io/analytics-2.0-apis/#/calculatedmetrics/calculatedmetrics_createCalculatedMetric
         """
         if metricJSON is None or type(metricJSON) != dict:
             raise Exception(
