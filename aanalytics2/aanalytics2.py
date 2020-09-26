@@ -442,6 +442,22 @@ class Analytics:
             data = _pd.DataFrame({vrsid: data})
         return data
 
+    def getVirtualReportSuiteComponents(self, vrsid, nan_value=""):
+        """
+        uses the getVirtualReportSuite function to get a VRS and returns
+        the VRS components for a VRS as a dataframe. VRS must have Component Curation enabled.
+        Arguments:
+            :param vrsid : REQUIRED : Virtual Report Suite ID
+            :type vrsid : str
+            :param nan_value : OPTIONAL : how to handle empty cells, default = ""
+            :type nan_value : *
+            :return: dataframe with components
+            :rtype: pandas.DataFrame
+        """
+        vrs_data = self.getVirtualReportSuite(extended_info=True, vrsid=vrsid)
+        components_cell = vrs_data[vrs_data.index == "curatedComponents"].iloc[0, 0]
+        return pd.DataFrame(components_cell).fillna(value=nan_value)
+
     def createVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None, dataSchema: str = "Cache", data_dict: dict = None, **kwargs)->dict:
         """
         Create a new virtual report suite based on the information provided.
