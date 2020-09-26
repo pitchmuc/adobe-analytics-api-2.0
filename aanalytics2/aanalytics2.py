@@ -456,7 +456,7 @@ class Analytics:
         """
         vrs_data = self.getVirtualReportSuite(extended_info=True, vrsid=vrsid)
         components_cell = vrs_data[vrs_data.index == "curatedComponents"].iloc[0, 0]
-        return pd.DataFrame(components_cell).fillna(value=nan_value)
+        return _pd.DataFrame(components_cell).fillna(value=nan_value)
 
     def createVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None, dataSchema: str = "Cache", data_dict: dict = None, **kwargs)->dict:
         """
