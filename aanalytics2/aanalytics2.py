@@ -540,7 +540,8 @@ class Analytics:
             df_dims = new_df
         else:
             df_dims = df_dims[columns]
-        df_dims.to_csv(f'dimensions_{rsid}.csv')
+        if save:
+            df_dims.to_csv(f'dimensions_{rsid}.csv')
         return df_dims
 
     def getMetrics(self, rsid: str, tags: bool = False, save=False, **kwargs) -> object:
