@@ -160,6 +160,21 @@ There are several get methods.
   * limit : OPTIONAL : How many reportSuite retrieves per serverCall
   * save : OPTIONAL : if set to True, it will save the list in a file. (Default False)
 
+* getVirtualReportSuites : Retrieve all the Virtual reportSuite for a login company.
+  Arguments:
+  * extended_info : OPTIONAL : boolean to retrieve the maximum of information.
+  * limit : OPTIONAL : How many reportSuite retrieves per serverCall
+  * filterIds : OPTIONAL : comma delimited list of virtual reportSuite ID  to be retrieved.
+  * idContains : OPTIONAL : element that should be contained in the Virtual ReportSuite Id
+  * segmentIds : OPTIONAL : comma delimited list of segmentId contained in the VRSID
+  * save : OPTIONAL : if set to True, it will save the list in a file. (Default False)
+
+* getVirtualReportSuite : Get a specific reportSuite based on the id.
+  Arguments:
+  * vrsid : REQUIRED : The virtual reportSuite to be retrieved
+  * extended_info : OPTIONAL : boolean to add more information
+  * format : OPTIONAL : format of the output. 2 values "df" for dataframe and "raw" for raw json.
+
 * getSegments: Retrieve the list of segments. Returns a data frame.
     Arguments:
   * name : OPTIONAL : Filter to only include segments that contains the name (str)
@@ -228,6 +243,54 @@ Example of getDimensions usage:
 ```python
 mydims = mycompany.getDimensions('rsid')
 ```
+
+### Create
+
+The Adobe Analytics API 2.0 provides some endpoint to create elements in your Analytics setup.
+Here is the list of the possible create options.
+
+* createVirtualReportSuite: Create a new virtual report suite based on the information provided.
+  Arguments:
+  * name : REQUIRED : name of the virtual reportSuite
+  * parentRsid : REQUIRED : Parent reportSuite ID for the VRS
+  * segmentLists : REQUIRED : list of segment id to be applied on the ReportSuite.
+  * dataSchema : REQUIRED : Type of schema used for the VRSID. (default : "Cache")
+  * data_dict : OPTIONAL : you can pass directly the dictionary.
+  In this case, you dictionary should looks like this:
+  ```python
+  data_dict = {
+    'name' : 'xxxx',
+    'parentRsid':'',
+    'segmentLists':'',
+    'dataSchema':'Cache',
+  }
+  ```
+
+* createSegment: This method create segment based on the information provided in the dictionary passed as parameter.
+  Arguments:
+  * segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment.
+  The segmentJSON is referenced on this [Swagger reference](https://adobedocs.github.io/analytics-2.0-apis/#/segments/segments_createSegment)
+
+* createCalculatedMetrics: This method create a calculated metrics within your Login Company with the provided dictionary.
+  Arguments:
+  * metricJSON : REQUIRED : Calculated Metrics information to create. Required :  name, definition, rsid
+    more information can be found on the [Swagger refrence](https://adobedocs.github.io/analytics-2.0-apis/#/calculatedmetrics/calculatedmetrics_createCalculatedMetric)
+
+### Delete
+
+There is a possibility to delete some elements with the Adobe Analytics API 2.0. Please find below the different options that you can delete.
+
+* deleteVirtualReportSuite: delete a Virtual reportSuite based on its ID.
+  Arguments:
+  * vrsid : REQUIRED : The id of the virtual reportSuite to delete.
+
+* deleteSegment: delete a segment based on the ID.
+  Arguments:
+  * segmentID : the ID of the segment to be deleted.
+
+* deleteCalculatedMetrics: Delete a calculated metrics based on its ID.
+  Arguments:
+  * calcID : REQUIRED : Calculated Metrics ID to be deleted
 
 ### Get report
 
