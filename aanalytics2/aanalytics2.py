@@ -255,15 +255,23 @@ def getCompanyId(infos: str = 'all'):
         "https://analytics.adobe.io/discovery/me", headers=config.header)
     json_res = res.json()
     if infos == 'all':
-        companies = json_res['imsOrgs'][0]['companies']
-        return companies
+        try:
+            companies = json_res['imsOrgs'][0]['companies']
+            return companies
+        except:
+            print("exception when trying to get companies with parameter 'all'")
+            return None
     elif infos != 'all':
-        if infos == 'first':
-            infos = '0'  # set to first position
-        position = int(infos)
-        companies = json_res['imsOrgs'][0]['companies']
-        config.companyid = companies[position]['globalCompanyId']
-        return config.companyid
+        try:
+            if infos == 'first':
+                infos = '0'  # set to first position
+            position = int(infos)
+            companies = json_res['imsOrgs'][0]['companies']
+            config.companyid = companies[position]['globalCompanyId']
+            return config.companyid
+        except:
+            print("exception when trying to get companies with parameter != 'all'")
+            return None
 
 
 class Analytics:
