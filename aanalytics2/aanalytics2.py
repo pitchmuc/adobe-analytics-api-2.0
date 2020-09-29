@@ -3,16 +3,15 @@
 # version : 0.0.9
 
 import json as _json
-import os
-import time as _time
-from concurrent import futures as _futures
-from pathlib import Path as _Path
-
 # Non standard libraries
 import jwt as _jwt
+import os
 import pandas as _pd
 import requests as _requests
+import time as _time
+from concurrent import futures as _futures
 from copy import deepcopy as _deepcopy
+from pathlib import Path as _Path
 from typing import IO as _IO, Optional
 from typing import Union as _Union
 
@@ -774,13 +773,13 @@ class Analytics:
 
     def updateSegment(self, segmentID: str = None, segmentJSON: dict = None) -> object:
         """
-        Method that update a specific segment based on the dictionary passed to it.
+        Method that updates a specific segment based on the dictionary passed to it.
         Arguments:
-            segmentID : REQUIRED : Segment ID to be deleted
+            segmentID : REQUIRED : Segment ID to be updated
             segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment. 
         """
         if segmentJSON is None or segmentID is None:
-            print('No segment or segementID data has been pushed')
+            print('No segment or segmentID data has been pushed')
             return None
         data = _deepcopy(segmentJSON)
         seg = putData(self._endpoint_company + self._getSegments +
@@ -789,12 +788,12 @@ class Analytics:
 
     def deleteSegment(self, segmentID: str = None) -> object:
         """
-        Method that update a specific segment based on the dictionary passed to it.
+        Method that updates a specific segment based on the dictionary passed to it.
         Arguments:
             segmentID : REQUIRED : Segment ID to be deleted
         """
         if segmentID is None:
-            print('No segementID data has been pushed')
+            print('No segmentID data has been pushed')
             return None
         seg = deleteData(self._endpoint_company +
                          self._getSegments + '/' + segmentID, headers=self.header)
@@ -869,6 +868,21 @@ class Analytics:
                 'Expected "name", "definition" and "rsid" in the data')
         cm = postData(self._endpoint_company +
                       self._getCalcMetrics, headers=self.header, data=metricJSON)
+        return cm
+
+    def updateCalculatedMetric(self, calcID: str = None, calcJSON: dict = None) -> object:
+        """
+        Method that updates a specific Calculated Metrics based on the dictionary passed to it.
+        Arguments:
+            calcID : REQUIRED : Calculated Metric ID to be updated
+            calcJSON : REQUIRED : the dictionary that represents the JSON statement for the calculated metric.
+        """
+        if calcJSON is None or calcID is None:
+            print('No calcMetric or calcMetric JSON data has been pushed')
+            return None
+        data = _deepcopy(calcJSON)
+        cm = putData(self._endpoint_company + self._getCalcMetrics +
+                      '/' + calcID, data=data, headers=self.header)
         return cm
 
     def deleteCalculatedMetrics(self, calcID: str = None) -> object:

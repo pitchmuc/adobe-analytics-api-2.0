@@ -175,6 +175,11 @@ There are several get methods.
   * extended_info : OPTIONAL : boolean to add more information
   * format : OPTIONAL : format of the output. 2 values "df" for dataframe and "raw" for raw json.
 
+* getVirtualReportSuiteComponents: Get the curated components for a VRS (needs Curation enabled in this VRS) and returns them as a DataFrame
+  Arguments:
+  * vrsid: Virtual Report Suite ID
+  * nan_value: how to treat missing values. Default: "" 
+
 * getSegments: Retrieve the list of segments. Returns a data frame.
     Arguments:
   * name : OPTIONAL : Filter to only include segments that contains the name (str)
