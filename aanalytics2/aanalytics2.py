@@ -63,7 +63,7 @@ def importConfigFile(path: str) -> None:
     Arguments:
         path: REQUIRED : path to the configuration file. Can be either a fully-qualified or relative.
 
-    Example of file value.
+    Example of path value.
     "config.json"
     "./config.json"
     "/my-folder/config.json"
