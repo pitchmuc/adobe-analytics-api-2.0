@@ -62,11 +62,11 @@ def importConfigFile(path: str) -> None:
         f = modules.json.load(file)
         config.config_object["org_id"] = f['org_id']
         if 'api_key' in f.keys():
-            config.config_object["api_key"] = f['api_key']
-            config.header["X-Api-Key"] = f['api_key']
+            config.config_object["client_id"] = f['api_key']
+            config.header["x-api-key"] = f['api_key']
         elif 'client_id' in f.keys():
-            config.config_object["api_key"] = f['client_id']
-            config.header["X-Api-Key"] = f['client_id']
+            config.config_object["client_id"] = f['client_id']
+            config.header["x-api-key"] = f['client_id']
         config.config_object["tech_id"] = f['tech_id']
         config.config_object["secret"] = f['secret']
         config.config_object["pathToKey"] = f['pathToKey']
@@ -97,12 +97,12 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
         "iss": config.config_object["org_id"],  # org_id
         "sub": config.config_object["tech_id"],  # technical_account_id
         "https://ims-na1.adobelogin.com/s/ent_analytics_bulk_ingest_sdk": True,
-        "aud": "https://ims-na1.adobelogin.com/c/" + config.config_object["api_key"]
+        "aud": "https://ims-na1.adobelogin.com/c/" + config.config_object["client_id"]
     }
     encoded_jwt = modules.jwt.encode(
         jwt_payload, private_key_unencrypted, algorithm='RS256')
     payload = {
-        "client_id": config.config_object["api_key"],
+        "client_id": config.config_object["client_id"],
         "client_secret": config.config_object["secret"],
         "jwt_token": encoded_jwt.decode("utf-8")
     }
@@ -290,41 +290,22 @@ class Loggin:
         self.COMPANY_IDS = {}
         self.retry = retry
 
-    def getCompanyId(self, infos: str = 'all'):
+    def getCompanyId(self)->dict:
         """
-        Retrieve the company id for later call for the properties.
-        Can return a string or a json object.
-        Arguments:
-            infos : OPTIONAL: returns the company id(s) specified. 
-            Possible values:
-                - all : returns the list of companies data (default value)
-                - first : returns the first id (string returned)
-                - <X> : number that gives the position of the id we want to return (string)
-                You need to already know your position. 
+        Retrieve the company ids for later call for the properties.
         """
         res = modules.requests.get(
-            "https://analytics.adobe.io/discovery/me", headers=config.header)
+            "https://analytics.adobe.io/discovery/me", headers=self.header)
         json_res = res.json()
-        self.COMPANY_IDS = json_res['imsOrgs'][0]['companies']
-        if infos == 'all':
-            try:
-                companies = json_res['imsOrgs'][0]['companies']
-                return companies
-            except:
-                print("exception when trying to get companies with parameter 'all'")
-                return None
-        elif infos != 'all':
-            try:
-                if infos == 'first':
-                    infos = '0'  # set to first position
-                position = int(infos)
-                companies = json_res['imsOrgs'][0]['companies']
-                config.companyid = companies[position]['globalCompanyId']
-                return config.companyid
-            except:
-                print(
-                    "exception when trying to get companies with parameter != 'all'.\nReturning everything")
-                return json_res
+        try:
+            companies = json_res['imsOrgs'][0]['companies']
+            self.COMPANY_IDS = json_res['imsOrgs'][0]['companies']
+            return companies
+        except:
+            print("exception when trying to get companies with parameter 'all'")
+            print(json_res)
+            return None
+
 
     def createAnalyticsConnection(self, companyId: str = None)->object:
         """

@@ -1,12 +1,13 @@
 config_object = {
     "org_id": "",
-    "api_key": "",
+    "client_id": "",
     "tech_id": "",
     "pathToKey": "",
     "secret": "",
     "companyid": "",
     "date_limit": 0,
-    "token": ""
+    "token": "",
+    "tokenEndpoint": "https://ims-na1.adobelogin.com/ims/exchange/jwt"
 }
 orga_admin = {'_org_admin', '_deployment_admin', '_support_admin'}
 header = {"Accept": "application/json",

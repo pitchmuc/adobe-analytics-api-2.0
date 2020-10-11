@@ -2,7 +2,7 @@ import json
 # Non standard libraries
 import jwt
 import os
-import pandas
+import pandas as pd
 import requests
 import time
 from concurrent import futures
