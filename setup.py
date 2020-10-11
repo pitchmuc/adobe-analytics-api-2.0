@@ -15,9 +15,9 @@ CLASSIFIERS = [
 
 setup(
     name='aanalytics2',
-    version="0.0.10",
+    version="0.1.0",
     license='GPL',
-    description='Adobe Analytics v2 API wrapper',
+    description='Adobe Analytics API 2.0 python wrapper',
     long_description=long_description,
     long_description_content_type='text/markdown',
     author='Julien Piccini',
@@ -33,8 +33,9 @@ setup(
         'requests',
         'PyJWT[crypto]',
         'PyJWT',
-        "dicttoxml"
+        "dicttoxml",
+        "pytest"
     ],
     classifiers=CLASSIFIERS,
-    python_requires='>=3.6'
+    python_requires='>=3.7'
 )

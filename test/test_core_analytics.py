@@ -2,6 +2,7 @@ import pytest
 import os
 import sys
 import inspect
+## changing current_dir to ensure you are running test on your version of the aanalytics2 module.
 current_dir = os.path.dirname(os.path.abspath(
     inspect.getfile(inspect.currentframe())))
 parent_dir = os.path.dirname(current_dir)
@@ -50,6 +51,7 @@ def test_Logger():
     assert len(logger.COMPANY_IDS) == 0
 
 def test_LoggerConnect():
+    global logger
     logger.getCompanyId()
     assert len(logger.COMPANY_IDS) >= 0
 
