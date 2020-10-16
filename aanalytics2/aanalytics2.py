@@ -271,7 +271,7 @@ def getCompanyId(infos: str = 'all'):
             return None
 
 
-class Loggin:
+class Login:
     """
     Class to connect to the the login company.
     """
@@ -312,6 +312,7 @@ class Loggin:
         Returns an instance of the Analytics class so you can query the different elements from that instance.
         Arguments:
             companyId: REQUIRED : The globalCompanyId that you want to use in your connection
+        the retry parameter set in the previous class instantiation will be used here.
         """
         analytics = Analytics(company_id=companyId,
                               config_object=self.connector.config, header=self.header, retry=self.retry)
@@ -1057,12 +1058,13 @@ class Analytics:
         df.columns = cols
         return df
 
-    def getReport(self, json_request: modules.Union[dict, str, modules.IO], n_result: modules.Union[int, str] = 1000, save: bool = False,
+    def getReport(self, json_request: modules.Union[dict, str, modules.IO], limit:int = 1000, n_result: modules.Union[int, str] = 1000, save: bool = False,
                   item_id: bool = False, verbose: bool = False, debug=False) -> object:
         """
         Retrieve data from a JSON request.Returns an object containing meta info and dataframe. 
         Arguments:
             json_request: REQUIRED : JSON statement that contains your request for Analytics API 2.0.
+            limit : OPTIONAL : number of result per request (defaut 1000)
             The argument can be : 
                 - a dictionary : It will be used as it is.
                 - a string that is a dictionary : It will be transformed to a dictionary / JSON.
@@ -1088,7 +1090,7 @@ class Analytics:
                 request = modules.json.loads(file_string)
             except:
                 raise TypeError("expected a parsable string")
-        request['settings']['limit'] = 1000
+        request['settings']['limit'] = limit
         # info for creating report
         data_info = self._dataDescriptor(request)
         if verbose:

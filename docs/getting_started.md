@@ -62,6 +62,32 @@ cid = cids[0]['globalCompanyId'] ## using the first one
 mycompany = api2.Analytics(cid)
 ```
 
+Starting version 0.1.1 a new class (Login) is avalabile in order to retrieve the login company.
+
+```python
+import aanalytics2 as api2
+api2.importConfigFile('myconfig.json')
+
+login = api2.Login()
+cids = login.getCompanyId()
+
+#you can also access the login return through the instance
+login.COMPANY_IDS
+## returns the same result that cids.
+```
+
+Form there, 2 methods can be used to create the Analytics class instance.
+
+```python
+
+#old method
+mycompany = api2.Analytics(cid)
+
+# new method directly in the Login class
+mycompany = loggin.createAnalyticsConnection(cid)
+
+```
+
 ## 6. Use the methods
 
 Once you have the instance created, you can use the different methods available to them.
@@ -78,4 +104,9 @@ or
 myreport = mycompany.getReport('myRequest.json')
 ```
 
-The response that is givent 
+The response that is given is a dictionary with the relevant information from your request (timeframe, segments used, etc...)\
+You can access the data directly with the "data" keyword.
+
+```python
+data = myreport['data']
+```
