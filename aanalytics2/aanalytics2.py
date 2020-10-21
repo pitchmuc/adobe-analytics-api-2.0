@@ -62,7 +62,7 @@ def importConfigFile(path: str) -> None:
     Arguments:
         path: REQUIRED : path to the configuration file. Can be either a fully-qualified or relative.
 
-    Example of file value.
+    Example of path value.
     "config.json"
     "./config.json"
     "/my-folder/config.json"
@@ -121,7 +121,7 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
     config.header["Authorization"] = "Bearer " + token
     expire = json_response['expires_in']
     config.date_limit = _time.time() + expire / 1000 - \
-        500  # end of time for the token
+                        500  # end of time for the token
     if save:
         with open('token.txt', 'w') as f:  # save the token
             f.write(token)
@@ -367,7 +367,8 @@ class Analytics:
                 f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
         return df_rsids
 
-    def getVirtualReportSuites(self, extended_info: bool = False, limit: int = 100, filterIds: str = None, idContains: str = None, segmentIds: str = None, save: bool = True)->list:
+    def getVirtualReportSuites(self, extended_info: bool = False, limit: int = 100, filterIds: str = None,
+                               idContains: str = None, segmentIds: str = None, save: bool = True) -> list:
         """
         return a lit of virtual reportSuites and their id. It can contain more information if expansion is selected.
         Arguments:
@@ -426,10 +427,10 @@ class Analytics:
             df_vrsids.to_csv('VRSIDS.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
             print(
-                f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls)+1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
+                f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
         return df_vrsids
 
-    def getVirtualReportSuite(self, vrsid: str = None, extended_info: bool = False, format: str = 'df')->object:
+    def getVirtualReportSuite(self, vrsid: str = None, extended_info: bool = False, format: str = 'df') -> object:
         """
         return a single virtual report suite ID information as dataframe.
         Arguments:
@@ -464,7 +465,8 @@ class Analytics:
                                    "curatedComponents"].iloc[0, 0]
         return _pd.DataFrame(components_cell).fillna(value=nan_value)
 
-    def createVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None, dataSchema: str = "Cache", data_dict: dict = None, **kwargs)->dict:
+    def createVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None,
+                                 dataSchema: str = "Cache", data_dict: dict = None, **kwargs) -> dict:
         """
         Create a new virtual report suite based on the information provided.
         Arguments:
@@ -493,7 +495,22 @@ class Analytics:
         res = postData(path, params=params, data=body, headers=self.header)
         return res
 
-    def deleteVirtualReportSuite(self, vrsid: str = None)->str:
+
+    def updateVirtualReportSuite(self, vrsid: str = None, data_dict: dict = None, **kwargs) -> dict:
+        """
+        Updates a Virtual Report Suite based on a JSON-like dictionary (same structure as createVirtualReportSuite)
+        Note that to update components, you need to supply ALL components currently associated with this suite.
+        Supplying only the components you want to change will remove all others from the VR Suite!
+        Arguments:
+            vrsid : REQUIRED : The id of the virtual report suite to update
+            data_dict : a json-like dictionary of the vrs data to update
+        """
+        path = f"{self._endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
+        body = data_dict
+        res = putData(path, data=body, headers=self.header)
+
+
+    def deleteVirtualReportSuite(self, vrsid: str = None) -> str:
         """
         Delete a Virtual Report Suite based on the id passed.
         Arguments:
@@ -505,7 +522,8 @@ class Analytics:
         res = deleteData(path, headers=self.header)
         return res
 
-    def validateVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None,  dataSchema: str = "Cache", data_dict: dict = None, **kwargs)->dict:
+    def validateVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None,
+                                   dataSchema: str = "Cache", data_dict: dict = None, **kwargs) -> dict:
         """
         Validate the object to create a new virtual report suite based on the information provided.
         Arguments:
@@ -882,7 +900,7 @@ class Analytics:
             return None
         data = _deepcopy(calcJSON)
         cm = putData(self._endpoint_company + self._getCalcMetrics +
-                      '/' + calcID, data=data, headers=self.header)
+                     '/' + calcID, data=data, headers=self.header)
         return cm
 
     def deleteCalculatedMetrics(self, calcID: str = None) -> object:
@@ -976,14 +994,14 @@ class Analytics:
         data_rows = _deepcopy(data_rows)
         dict_data = {}
         dict_data = {row.get('value', 'missing_value')
-                             : row['data'] for row in data_rows}
+                     : row['data'] for row in data_rows}
         if cols is not None:
             n_metrics = len(cols) - 1
         if item_id:  # adding the itemId in the data returned
             cols.append('item_id')
             for row in data_rows:
                 dict_data[row.get('value', 'missing_value')
-                          ].append(row['itemId'])
+                ].append(row['itemId'])
         if anomaly:
             # set full columns
             cols = cols + [f'{metric}-{suffix}' for metric in cols[1:] for suffix in
