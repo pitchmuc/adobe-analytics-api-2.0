@@ -85,9 +85,9 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
     """Retrieves the token by using the information provided by the user during
     the import importConfigFile function.
 
-    Argument : 
+    Argument :
         verbose : OPTIONAL : Default False. If set to True, print information.
-        save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt). 
+        save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt).
     """
     private_key_path: Optional[_Path] = _find_path(config.pathToKey)
     if private_key_path is None:
@@ -243,12 +243,12 @@ def getCompanyId(infos: str = 'all'):
     Retrieve the company id for later call for the properties.
     Can return a string or a json object.
     Arguments:
-        infos : OPTIONAL: returns the company id(s) specified. 
+        infos : OPTIONAL: returns the company id(s) specified.
         Possible values:
             - all : returns the list of companies data (default value)
             - first : returns the first id (string returned)
             - <X> : number that gives the position of the id we want to return (string)
-            You need to already know your position. 
+            You need to already know your position.
     """
     res = _requests.get(
         "https://analytics.adobe.io/discovery/me", headers=config.header)
@@ -308,10 +308,10 @@ class Analytics:
                         save: bool = False) -> list:
         """
         Get the reportSuite IDs data. Returns a dataframe of reportSuite name and report suite id.
-        Arguments: 
+        Arguments:
             txt : OPTIONAL : returns the reportSuites that matches a speific text field
             rsid_list : OPTIONAL : returns the reportSuites that matches the list of rsids set
-            limit : OPTIONAL : How many reportSuite retrieves per serverCall 
+            limit : OPTIONAL : How many reportSuite retrieves per serverCall
             save : OPTIONAL : if set to True, it will save the list in a file. (Default False)
 
         """
@@ -603,10 +603,10 @@ class Analytics:
         """
         Retrieve the list of users for a login company.Returns a data frame.
         Arguments:
-            save : OPTIONAL : Save the data in a file (bool : default False). 
-        Possible kwargs: 
+            save : OPTIONAL : Save the data in a file (bool : default False).
+        Possible kwargs:
             limit :  Nummber of results per requests. Default 100.
-            expansion : string list such as "lastAccess,createDate"  
+            expansion : string list such as "lastAccess,createDate"
         """
         nb_error, nb_empty = 0, 0  # use for multi-thread loop
         params = {'limit': kwargs.get('limit', 100)}
@@ -654,11 +654,11 @@ class Analytics:
                     sidFilter: list = None, extended_info: bool = False, format: str = "df", save: bool = False,
                     verbose: bool = False, **kwargs) -> object:
         """
-        Retrieve the list of segments. Returns a data frame. 
+        Retrieve the list of segments. Returns a data frame.
         Arguments:
             name : OPTIONAL : Filter to only include segments that contains the name (str)
             tagNames : OPTIONAL : Filter list to only include segments that contains one of the tags (string delimited with comma, can be list as well)
-            inclType : OPTIONAL : type of segments to be retrieved.(str) Possible values: 
+            inclType : OPTIONAL : type of segments to be retrieved.(str) Possible values:
                 - all : Default value (all segments possibles)
                 - shared : shared segments
                 - template : template segments
@@ -670,7 +670,7 @@ class Analytics:
             extended_info : OPTIONAL : additional segment metadata fields to include on response (bool : default False)
                 if set to true, returns reportSuiteName, ownerFullName, modified, tags, compatibility, definition
             format : OPTIONAL : defined the format returned by the query. (Default df)
-                possibe values : 
+                possibe values :
                     "df" : default value that return a dataframe
                     "raw": return a list of value. More or less what is return from server.
             save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
@@ -679,7 +679,7 @@ class Analytics:
         Possible kwargs:
             limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.
 
-        NOTE : Segment Endpoint doesn't support multi-threading. Default to 500. 
+        NOTE : Segment Endpoint doesn't support multi-threading. Default to 500.
         """
         limit = int(kwargs.get('limit', 500))
         params = {'includeType': 'all', 'limit': limit}
@@ -776,7 +776,7 @@ class Analytics:
         Method that updates a specific segment based on the dictionary passed to it.
         Arguments:
             segmentID : REQUIRED : Segment ID to be updated
-            segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment. 
+            segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment.
         """
         if segmentJSON is None or segmentID is None:
             print('No segment or segmentID data has been pushed')
@@ -803,11 +803,11 @@ class Analytics:
                              rsids_list: list = None,
                              extended_info: bool = False, save=False, **kwargs) -> object:
         """
-        Retrieve the list of calculated metrics. Returns a data frame. 
+        Retrieve the list of calculated metrics. Returns a data frame.
         Arguments:
             name : OPTIONAL : Filter to only include calculated metrics that contains the name (str)
             tagNames : OPTIONAL : Filter list to only include calculated metrics that contains one of the tags (string delimited with comma, can be list as well)
-            inclType : OPTIONAL : type of calculated Metrics to be retrieved. (str) Possible values: 
+            inclType : OPTIONAL : type of calculated Metrics to be retrieved. (str) Possible values:
                 - all : Default value (all calculated metrics possibles)
                 - shared : shared calculated metrics
                 - template : template calculated metrics
@@ -967,10 +967,10 @@ class Analytics:
 
     def _readData(self, data_rows: list, anomaly: bool = False, cols: list = None, item_id: bool = False):
         """
-        read the data from the requests and returns a dataframe. 
+        read the data from the requests and returns a dataframe.
         Parameters:
             data_rows : REQUIRED : Rows that have been returned by the request.
-            anomaly : OPTIONAL : Boolean to tell if the anomaly detection has been used. 
+            anomaly : OPTIONAL : Boolean to tell if the anomaly detection has been used.
             cols : OPTIONAL : list of columns names
         """
         data_rows = _deepcopy(data_rows)
