@@ -938,6 +938,23 @@ class Analytics:
         df_dates = _pd.DataFrame(data)
         return df_dates
 
+
+    def updateDateRange(self, dateRangeID: str = None, dateRangeJSON: dict = None) -> object:
+        """
+        Method that updates a specific Date Range based on the dictionary passed to it.
+        Arguments:
+            dateRangeID : REQUIRED : Calculated Metric ID to be updated
+            dateRangeJSON : REQUIRED : the dictionary that represents the JSON statement for the calculated metric.
+        """
+        if dateRangeJSON is None or dateRangeID is None:
+            print('No calcMetric or calcMetric JSON data has been pushed')
+            return None
+        data = _deepcopy(dateRangeJSON)
+        dr = putData(self._endpoint_company + self._getDateRanges +
+                     '/' + dateRangeID, data=data, headers=self.header)
+        return dr
+
+
     def getCalculatedFunctions(self, **kwargs):
         """
         Returns the calculated metrics functions.
