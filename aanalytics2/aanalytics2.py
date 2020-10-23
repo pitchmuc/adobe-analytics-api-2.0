@@ -837,15 +837,13 @@ class Analytics:
             limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.(int)
         """
         limit = int(kwargs.get('limit', 500))
-        params = {'includeType': 'all', 'limit': limit}
+        params = {'includeType': inclType, 'limit': limit}
         if name is not None:
             params.update({'name': str(name)})
         if tagNames is not None:
             if type(tagNames) == list:
                 tagNames = ','.join(tagNames)
             params.update({'tagNames': tagNames})
-        if inclType != 'all':
-            params['includeType'] = inclType
         if rsids_list is not None:
             if type(rsids_list) == list:
                 rsids_list = ','.join(rsids_list)
@@ -916,7 +914,7 @@ class Analytics:
                         self._getCalcMetrics + '/' + calcID, headers=self.header)
         return cm
 
-    def getDateRanges(self, extended_info: bool = False, save: bool = False, **kwargs) -> object:
+    def getDateRanges(self, extended_info: bool = False, inclType: str = 'all', save: bool = False, **kwargs) -> object:
         """
         Get the list of date ranges available for the user.
         Arguments:
@@ -928,7 +926,7 @@ class Analytics:
             full : Boolean : Doesn't shrink the number of columns if set to true
         """
         limit = int(kwargs.get('limit', 500))
-        params = {'limit': limit, 'includeType': ['all']}
+        params = {'limit': limit, 'includeType': inclType}
         if extended_info:
             params.update(
                 {'expansion': 'definition,ownerFullName,modified,tags'})
@@ -937,7 +935,6 @@ class Analytics:
         data = dateRanges['content']
         df_dates = _pd.DataFrame(data)
         return df_dates
-
 
     def updateDateRange(self, dateRangeID: str = None, dateRangeJSON: dict = None) -> object:
         """
@@ -953,7 +950,6 @@ class Analytics:
         dr = putData(self._endpoint_company + self._getDateRanges +
                      '/' + dateRangeID, data=data, headers=self.header)
         return dr
-
 
     def getCalculatedFunctions(self, **kwargs):
         """
