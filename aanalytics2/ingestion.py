@@ -127,7 +127,7 @@ class Bulkapi:
         self.connector = connector.AdobeRequest()
         self.header = self.connector.header
         self.header["x-adobe-vgid"] = "ingestion"
-        self.header["content-type"] = "multipart/form-data"
+        del self.header["Content-Type"]
         self._createdFiles = []
 
     def validation(self, file: modules.IO = None, **kwargs):
