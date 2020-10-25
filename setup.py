@@ -8,14 +8,16 @@ CLASSIFIERS = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Topic :: Scientific/Engineering :: Information Analysis",
+    "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
     "Development Status :: 4 - Beta"
 ]
 
 setup(
     name='aanalytics2',
-    version="0.1.0",
+    version="0.1.2",
     license='GPL',
     description='Adobe Analytics API 2.0 python wrapper',
     long_description=long_description,
@@ -37,5 +39,5 @@ setup(
         "pytest"
     ],
     classifiers=CLASSIFIERS,
-    python_requires='>=3.7'
+    python_requires='>=3.6'
 )

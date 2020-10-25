@@ -106,6 +106,9 @@ class Bulkapi:
         Initialize the Bulk API connection. Returns an object with methods to send data to Analytics.
         Arguments:
             endpoint : REQUIRED : Endpoint to send data to. Default to analytics-collection.adobe.io
+                possible values, on top of the default choice are:
+                    - https://analytics-collection-va7.adobe.io	(US)
+                    - https://analytics-collection-nld2.adobe.io (EU)
             config_object : REQUIRED : config object containing the different information to send data.
         """
         self.endpoint = endpoint
@@ -120,18 +123,14 @@ class Bulkapi:
                 "aanalytics2", "CSV_Column_and_Query_String_Reference.pickle")
         with path as f:
             self.REFERENCE = modules.pd.read_pickle(f)
-        if config.api_key == "":
-            raise Exception(
-                "Import config file.\n Authentication is required for this endpoint.")
         # if no token has been generated.
-        if len(config.header['Authorization']) < 100:
-            token = aanalytics2.retrieveToken()
         self.connector = connector.AdobeRequest()
         self.header = self.connector.header
-        self.header['"x-adobe-vgid"'] = "ingestion"
+        self.header["x-adobe-vgid"] = "ingestion"
+        self.header["content-type"] = "multipart/form-data"
         self._createdFiles = []
 
-    def validation(self, file: typing.IO = None, **kwargs):
+    def validation(self, file: modules.IO = None, **kwargs):
         """
         Send the file to a validation endpoint. Return the response object from requests.
         Argument:
@@ -166,7 +165,8 @@ class Bulkapi:
             save : OPTIONAL : Save the file created directly in your working folder.
         """
         import io
-        string = """timestamp,marketingCloudVisitorID,events,pageName,pageURL,reportSuiteID,userAgent,pe,queryString\ntimestampValue,marketingCloudVisitorIDValue,eventsValue,pageNameValue,pageURLValue,reportSuiteIDValue,userAgentValue,peValue,queryStringValue
+        ## 2 rows being created
+        string = """timestamp,marketingCloudVisitorID,events,pageName,pageURL,reportSuiteID,userAgent,pe,queryString\ntimestampValuePOSIX/Epoch Time (e.g. 1486769029) or ISO-8601 (e.g. 2017-02-10T16:23:49-07:00),marketingCloudVisitorIDValue,eventsValue,pageNameValue,pageURLValue,reportSuiteIDValue,userAgentValue,peValue,queryStringValue
         """
         data = io.StringIO(string)
         df = modules.pd.read_csv(data, sep=',')
@@ -195,7 +195,7 @@ class Bulkapi:
                 self._createdFiles.append(new_path)
             return new_path
 
-    def sendFiles(self, files: typing.Union[list, typing.IO] = None, **kwargs):
+    def sendFiles(self, files: modules.Union[list, modules.IO] = None, **kwargs):
         """
         Method to send the file(s) through the Bulk API. Returns a list with the different status file sent.
         Arguments:

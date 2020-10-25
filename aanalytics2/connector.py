@@ -11,7 +11,9 @@ class AdobeRequest:
         Set the connector to be used for handling request to AAM
         Arguments:
             config_object : OPTIONAL : Require the importConfig file to have been used.
-            config_object : OPTIONAL : Require the importConfig file to have been used.
+            header : OPTIONAL : header of the config modules
+            verbose : OPTIONAL : display comment on the request.
+            retry : OPTIONAL : If you wish to retry failed GET requests
         """
         if config_object['org_id'] == "":
             raise Exception(

@@ -1,6 +1,6 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
-# version : 0.1.0
+# version : 0.1.2
 
 from aanalytics2 import config, connector, modules
 
@@ -54,7 +54,7 @@ def importConfigFile(path: str) -> None:
     "./config.json"
     "/my-folder/config.json"
     """
-    config_file_path: Optional[_Path] = _find_path(path)
+    config_file_path: Optional[modules.Path] = _find_path(path)
     if config_file_path is None:
         raise FileNotFoundError(
             f"Unable to find the configuration file under path `{path}`.")
@@ -75,12 +75,11 @@ def importConfigFile(path: str) -> None:
 def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
     """Retrieves the token by using the information provided by the user during
     the import importConfigFile function.
-
     Argument : 
         verbose : OPTIONAL : Default False. If set to True, print information.
         save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt). 
     """
-    private_key_path: Optional[_Path] = _find_path(
+    private_key_path: Optional[modules.Path] = _find_path(
         config.config_object["pathToKey"])
     if private_key_path is None:
         raise FileNotFoundError(
@@ -549,6 +548,19 @@ class Analytics:
         res = self.connector.postData(
             path, params=params, data=body, headers=self.header)
         return res
+    
+    def updateVirtualReportSuite(self, vrsid: str = None, data_dict: dict = None, **kwargs) -> dict:
+        """
+        Updates a Virtual Report Suite based on a JSON-like dictionary (same structure as createVirtualReportSuite)
+        Note that to update components, you need to supply ALL components currently associated with this suite.
+        Supplying only the components you want to change will remove all others from the VR Suite!
+        Arguments:
+            vrsid : REQUIRED : The id of the virtual report suite to update
+            data_dict : a json-like dictionary of the vrs data to update
+        """
+        path = f"{self._endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
+        body = data_dict
+        res = putData(path, data=body, headers=self.header)
 
     def deleteVirtualReportSuite(self, vrsid: str = None)->str:
         """
@@ -955,19 +967,22 @@ class Analytics:
                                        self._getCalcMetrics + '/' + calcID, headers=self.header)
         return cm
 
-    def getDateRanges(self, extended_info: bool = False, save: bool = False, **kwargs) -> object:
+    def getDateRanges(self, extended_info: bool = False, save: bool = False,includeType:str='all',**kwargs) -> object:
         """
         Get the list of date ranges available for the user.
         Arguments:
             extended_info : OPTIONAL : additional segment metadata fields to include on response
                 additional infos: reportSuiteName, ownerFullName, modified, tags, compatibility, definition
             save : OPTIONAL : If set to True, it will save the info in a csv file (Default False)
+            includeType : Include additional date ranges not owned by user. The "all" option takes precedence over "shared"
+                Possible values are all, shared, templates. You can add all of them as comma separated string. 
         Possible kwargs:
             limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.
             full : Boolean : Doesn't shrink the number of columns if set to true
         """
         limit = int(kwargs.get('limit', 500))
-        params = {'limit': limit, 'includeType': ['all']}
+        includeType = includeType.split(',')
+        params = {'limit': limit, 'includeType': includeType}
         if extended_info:
             params.update(
                 {'expansion': 'definition,ownerFullName,modified,tags'})
@@ -975,7 +990,24 @@ class Analytics:
                                             self._getDateRanges, params=params, headers=self.header)
         data = dateRanges['content']
         df_dates = modules.pd.DataFrame(data)
+        if save:
+            df_dates.to_csv('date_range.csv',index=False)
         return df_dates
+
+    def updateDateRange(self, dateRangeID: str = None, dateRangeJSON: dict = None) -> object:
+        """
+        Method that updates a specific Date Range based on the dictionary passed to it.
+        Arguments:
+            dateRangeID : REQUIRED : Calculated Metric ID to be updated
+            dateRangeJSON : REQUIRED : the dictionary that represents the JSON statement for the calculated metric.
+        """
+        if dateRangeJSON is None or dateRangeID is None:
+            print('No calcMetric or calcMetric JSON data has been pushed')
+            return None
+        data = modules.deepcopy(dateRangeJSON)
+        dr = putData(self._endpoint_company + self._getDateRanges +
+                     '/' + dateRangeID, data=data, headers=self.header)
+        return dr
 
     def getCalculatedFunctions(self, **kwargs):
         """
