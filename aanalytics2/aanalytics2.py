@@ -888,7 +888,7 @@ class Analytics:
             limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.(int)
         """
         limit = int(kwargs.get('limit', 500))
-        params = {'includeType': 'all', 'limit': limit}
+        params = {'includeType': inclType, 'limit': limit}
         if name is not None:
             params.update({'name': str(name)})
         if tagNames is not None:
@@ -954,7 +954,7 @@ class Analytics:
                                     '/' + calcID, data=data, headers=self.header)
         return cm
 
-    def deleteCalculatedMetrics(self, calcID: str = None) -> object:
+    def deleteCalculatedMetric(self, calcID: str = None) -> object:
         """
         Method that delete a specific calculated metrics based on the id passed..
         Arguments:

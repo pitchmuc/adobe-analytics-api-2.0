@@ -3,6 +3,16 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.1.2
+
+* adding the updateVirtualReportSuite method
+* adding the updateCalculatedMetrics method
+* update deleteCalculatedMetrics to deleteCalculatedMetric
+* update getCalculatedMetrics to respect the inclType as parameter.
+* update getVirtualReportSuites to add the inclType parameter
+* fix modules importing in the ingestion module
+* fix header on Bulk Ingestion API class.
+
 ## version 0.1.1
 
 * update the getReport method with limit parameter
