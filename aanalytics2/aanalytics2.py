@@ -1,8 +1,10 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
 # version : 0.1.2
+from typing import Optional
 
 from aanalytics2 import config, connector, modules
+from aanalytics2.paths import find_path
 
 
 def createConfigFile(verbose: object = False) -> None:
@@ -23,25 +25,6 @@ def createConfigFile(verbose: object = False) -> None:
             f" file created at this location : {modules.os.getcwd()}{modules.os.sep}config_analytics.json")
 
 
-def _find_path(path: str) -> modules.Optional[modules.Path]:
-    """Checks if the file denoted by the specified `path` exists and returns the Path object
-    for the file.
-
-    If the file under the `path` does not exist and the path denotes an absolute path, tries
-    to find the file by converting the absolute path to a relative path.
-
-    If the file does not exist with either the absolute and the relative path, returns `None`.
-    """
-    if modules.Path(path).exists():
-        return modules.Path(path)
-    elif path.startswith('/') and modules.Path('.' + path).exists():
-        return modules.Path('.' + path)
-    elif path.startswith('\\') and modules.Path('.' + path).exists():
-        return modules.Path('.' + path)
-    else:
-        return None
-
-
 def importConfigFile(path: str) -> None:
     """Reads the file denoted by the supplied `path` and retrieves the configuration information
     from it.
@@ -54,7 +37,7 @@ def importConfigFile(path: str) -> None:
     "./config.json"
     "/my-folder/config.json"
     """
-    config_file_path: Optional[modules.Path] = _find_path(path)
+    config_file_path: Optional[modules.Path] = find_path(path)
     if config_file_path is None:
         raise FileNotFoundError(
             f"Unable to find the configuration file under path `{path}`.")
@@ -79,7 +62,7 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
         verbose : OPTIONAL : Default False. If set to True, print information.
         save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt). 
     """
-    private_key_path: Optional[modules.Path] = _find_path(
+    private_key_path: Optional[modules.Path] = find_path(
         config.config_object["pathToKey"])
     if private_key_path is None:
         raise FileNotFoundError(
@@ -548,7 +531,7 @@ class Analytics:
         res = self.connector.postData(
             path, params=params, data=body, headers=self.header)
         return res
-    
+
     def updateVirtualReportSuite(self, vrsid: str = None, data_dict: dict = None, **kwargs) -> dict:
         """
         Updates a Virtual Report Suite based on a JSON-like dictionary (same structure as createVirtualReportSuite)

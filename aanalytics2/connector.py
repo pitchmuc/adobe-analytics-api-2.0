@@ -1,12 +1,13 @@
-import aanalytics2 as api2
-from aanalytics2 import config,modules
+from aanalytics2 import config, modules, find_path
+
 
 class AdobeRequest:
     """
     Handle request to Audience Manager and taking care that the request have a valid token set each time.
     """
 
-    def __init__(self, config_object: dict = config.config_object, header: dict = config.header, verbose: bool = False, retry: int = 0)->None:
+    def __init__(self, config_object: dict = config.config_object, header: dict = config.header, verbose: bool = False,
+                 retry: int = 0) -> None:
         """
         Set the connector to be used for handling request to AAM
         Arguments:
@@ -23,31 +24,13 @@ class AdobeRequest:
         self.retry = retry
         if self.config['token'] == "" or modules.time.time() > self.config['date_limit']:
             self.token = self.retrieveToken(verbose=verbose)
-    
-    def _find_path(self,path: str) -> modules.Optional[modules.Path]:
-        """Checks if the file denoted by the specified `path` exists and returns the Path object
-        for the file.
-
-        If the file under the `path` does not exist and the path denotes an absolute path, tries
-        to find the file by converting the absolute path to a relative path.
-
-        If the file does not exist with either the absolute and the relative path, returns `None`.
-        """
-        if modules.Path(path).exists():
-            return modules.Path(path)
-        elif path.startswith('/') and modules.Path('.' + path).exists():
-            return modules.Path('.' + path)
-        elif path.startswith('\\') and modules.Path('.' + path).exists():
-            return modules.Path('.' + path)
-        else:
-            return None
 
     def retrieveToken(self, verbose: bool = False, **kwargs)->str:
         """ Retrieve the token by using the information provided by the user during the import importConfigFile function. 
         Argument : 
             verbose : OPTIONAL : Default False. If set to True, print information.
         """
-        private_key_path = self._find_path(self.config['pathToKey'])
+        private_key_path = find_path(self.config['pathToKey'])
         if private_key_path is None:
             raise FileNotFoundError(
                 f"Unable to find the configuration file under path `{self.config['pathToKey']}`.")
