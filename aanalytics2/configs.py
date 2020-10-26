@@ -10,8 +10,9 @@ from .paths import find_path
 
 def create_config_file(verbose: bool = False, destination: str = 'config_analytics_template.json') -> None:
     """Creates a `config_admin.json` file with the pre-defined configuration format
-        to store the access data in under the specified `destination`.
-        """
+    to store the access data in under the specified `destination`.
+    """
+
     json_data = {
         'org_id': '<orgID>',
         'client_id': "<APIkey>",
@@ -31,6 +32,7 @@ def createConfigFile(verbose: bool = False, destination: str = 'config_analytics
     """Creates a `config_admin.json` file with the pre-defined configuration format
     to store the access data in under the specified `destination`.
     """
+
     create_config_file(verbose, destination)
 
 
@@ -46,6 +48,7 @@ def importConfigFile(path: str) -> None:
     "./config.json"
     "/my-folder/config.json"
     """
+
     import_config_file(path)
 
 
@@ -61,6 +64,7 @@ def import_config_file(path: str) -> None:
     "./config.json"
     "/my-folder/config.json"
     """
+
     config_file_path: Optional[Path] = find_path(path)
     if config_file_path is None:
         raise FileNotFoundError(
@@ -88,6 +92,7 @@ def configure(org_id: str,
               path_to_key: str,
               client_id: str):
     """Performs programmatic configuration of the API using provided values."""
+
     if not org_id:
         raise ValueError("`org_id` must be specified in the configuration.")
     if not client_id:
