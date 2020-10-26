@@ -4,7 +4,7 @@ from pathlib import Path
 
 from typing import Optional
 
-from .config import config_object, header
+from .config import config_object
 from .paths import find_path
 
 
@@ -69,13 +69,38 @@ def import_config_file(path: str) -> None:
     with open(config_file_path, 'r') as file:
         provided_config = json.load(file)
         provided_keys = provided_config.keys()
-        config_object["org_id"] = provided_config['org_id']
         if 'api_key' in provided_keys:
-            config_object["client_id"] = provided_config['api_key']
-            header["x-api-key"] = provided_config['api_key']
+            client_id = provided_config['api_key']
         elif 'client_id' in provided_keys:
-            config_object["client_id"] = provided_config['client_id']
-            header["x-api-key"] = provided_config['client_id']
-        config_object["tech_id"] = provided_config['tech_id']
-        config_object["secret"] = provided_config['secret']
-        config_object["pathToKey"] = provided_config['pathToKey']
+            client_id = provided_config['client_id']
+        else:
+            raise RuntimeError(f"Either an `api_key` or a `client_id` should be provided.")
+        configure(org_id=provided_config['org_id'],
+                  tech_id=provided_config['tech_id'],
+                  secret=provided_config['secret'],
+                  path_to_key=provided_config['pathToKey'],
+                  client_id=client_id)
+
+
+def configure(org_id: str,
+              tech_id: str,
+              secret: str,
+              path_to_key: str,
+              client_id: str):
+    """Performs programmatic configuration of the API using provided values."""
+    if not org_id:
+        raise ValueError("`org_id` must be specified in the configuration.")
+    if not client_id:
+        raise ValueError("`client_id` must be specified in the configuration.")
+    if not tech_id:
+        raise ValueError("`tech_id` must be specified in the configuration.")
+    if not secret:
+        raise ValueError("`secret` must be specified in the configuration.")
+    if not path_to_key:
+        raise ValueError("`pathToKey` must be specified in the configuration.")
+    config_object["org_id"] = org_id
+    config_object["client_id"] = client_id
+    config_object["x-api-key"] = client_id
+    config_object["tech_id"] = tech_id
+    config_object["secret"] = secret
+    config_object["pathToKey"] = path_to_key
