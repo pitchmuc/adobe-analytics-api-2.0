@@ -1,4 +1,5 @@
-from aanalytics2 import config, modules, find_path
+from aanalytics2 import config, modules
+from .paths import find_path
 
 
 class AdobeRequest:

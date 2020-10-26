@@ -4,7 +4,7 @@
 from typing import Optional
 
 from aanalytics2 import config, connector, modules
-from aanalytics2.paths import find_path
+from .paths import find_path
 
 
 def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
