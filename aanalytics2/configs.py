@@ -8,10 +8,10 @@ from .config import config_object, header
 from .paths import find_path
 
 
-def createConfigFile(verbose: bool = False, destination: str = 'config_analytics_template.json') -> None:
+def create_config_file(verbose: bool = False, destination: str = 'config_analytics_template.json') -> None:
     """Creates a `config_admin.json` file with the pre-defined configuration format
-    to store the access data in under the specified `destination`.
-    """
+        to store the access data in under the specified `destination`.
+        """
     json_data = {
         'org_id': '<orgID>',
         'client_id': "<APIkey>",
@@ -27,7 +27,29 @@ def createConfigFile(verbose: bool = False, destination: str = 'config_analytics
         )
 
 
+def createConfigFile(verbose: bool = False, destination: str = 'config_analytics_template.json') -> None:
+    """Creates a `config_admin.json` file with the pre-defined configuration format
+    to store the access data in under the specified `destination`.
+    """
+    create_config_file(verbose, destination)
+
+
 def importConfigFile(path: str) -> None:
+    """Reads the file denoted by the supplied `path` and retrieves the configuration information
+    from it.
+
+    Arguments:
+        path: REQUIRED : path to the configuration file. Can be either a fully-qualified or relative.
+
+    Example of path value.
+    "config.json"
+    "./config.json"
+    "/my-folder/config.json"
+    """
+    import_config_file(path)
+
+
+def import_config_file(path: str) -> None:
     """Reads the file denoted by the supplied `path` and retrieves the configuration information
     from it.
 
