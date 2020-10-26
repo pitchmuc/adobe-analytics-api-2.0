@@ -1,6 +1,6 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
-# version : 0.1.2
+# version : 0.1.3
 from typing import Optional
 
 from aanalytics2 import config, connector, modules
