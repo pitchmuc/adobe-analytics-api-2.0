@@ -1,12 +1,6 @@
-import json
-import os
-from pathlib import Path
-
-from typing import Optional
-
+from aanalytics2 import modules
 from .config import config_object, header
 from .paths import find_path
-
 
 def create_config_file(verbose: bool = False, destination: str = 'config_analytics_template.json') -> None:
     """Creates a `config_admin.json` file with the pre-defined configuration format
@@ -21,10 +15,10 @@ def create_config_file(verbose: bool = False, destination: str = 'config_analyti
         'pathToKey': '<path/to/your/privatekey.key>',
     }
     with open(destination, 'w') as cf:
-        cf.write(json.dumps(json_data, indent=4))
+        cf.write(modules.json.dumps(json_data, indent=4))
     if verbose:
         print(
-            f" file created at this location : {os.getcwd()}{os.sep}config_analytics.json"
+            f" file created at this location : {modules.os.getcwd()}{modules.os.sep}config_analytics.json"
         )
 
 
@@ -65,13 +59,13 @@ def import_config_file(path: str) -> None:
     "/my-folder/config.json"
     """
 
-    config_file_path: Optional[Path] = find_path(path)
+    config_file_path: modules.Optional[modules.Path] = find_path(path)
     if config_file_path is None:
         raise FileNotFoundError(
             f"Unable to find the configuration file under path `{path}`."
         )
     with open(config_file_path, 'r') as file:
-        provided_config = json.load(file)
+        provided_config = modules.json.load(file)
         provided_keys = provided_config.keys()
         if 'api_key' in provided_keys:
             client_id = provided_config['api_key']
@@ -109,3 +103,7 @@ def configure(org_id: str,
     config_object["tech_id"] = tech_id
     config_object["secret"] = secret
     config_object["pathToKey"] = path_to_key
+    ## ensure the reset of the state by overwritting possible values from previous import.
+    config_object["date_limit"] = 0
+    config_object["token"] = ""
+

@@ -7,7 +7,9 @@ This is a python wrapper for the adobe analytics API 2.0.
 ## Documentation
 
 Most of the documentation for this API will be hosted at [datanalyst.info][1].
-[Getting Started details on Github ](./docs/getting_started.md).
+[Getting Started details on Github](./docs/getting_started.md).
+
+[Appendix for running on a server](./docs/authenticating_without_config_json.md)
 
 ## Versions
 
