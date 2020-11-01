@@ -369,6 +369,9 @@ class Analytics:
         """
         expansion_values = "globalCompanyKey,parentRsid,parentRsidName,timezone,timezoneZoneinfo,currentTimezoneOffset,segmentList,description,modified,isDeleted,dataCurrentAsOf,compatibility,dataSchema,sessionDefinition,curatedComponents,type"
         params = {"limit": limit}
+        nb_error = 0
+        nb_empty = 0
+        list_urls = []
         if extended_info:
             params['expansion'] = expansion_values
         if filterIds is not None:
@@ -495,7 +498,7 @@ class Analytics:
         """
         path = f"{self._endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
         body = data_dict
-        res = putData(path, data=body, headers=self.header)
+        res = self.connector.putData(path, data=body, headers=self.header)
 
     def deleteVirtualReportSuite(self, vrsid: str = None)->str:
         """
@@ -612,6 +615,7 @@ class Analytics:
             limit :  Nummber of results per requests. Default 100.
             expansion : string list such as "lastAccess,createDate"  
         """
+        list_urls = []
         nb_error, nb_empty = 0, 0  # use for multi-thread loop
         params = {'limit': kwargs.get('limit', 100)}
         if kwargs.get("expansion", None) is not None:
@@ -940,7 +944,7 @@ class Analytics:
             print('No calcMetric or calcMetric JSON data has been pushed')
             return None
         data = modules.deepcopy(dateRangeJSON)
-        dr = putData(self._endpoint_company + self._getDateRanges +
+        dr = self.connector.putData(self._endpoint_company + self._getDateRanges +
                      '/' + dateRangeID, data=data, headers=self.header)
         return dr
 
@@ -955,6 +959,178 @@ class Analytics:
                                        params=params, headers=self.header)
         df = modules.pd.DataFrame(funcs)
         return df
+    
+    def getTags(self,limit:int=100,**kwargs)->list:
+        """
+        Return the list of tags
+        Arguments:
+            limit : OPTIONAL : Amount of tag to be returned by request. Default 100
+        """
+        path = "/componentmetadata/tags"
+        params = {'limit':limit}
+        if kwargs.get('page',False):
+            params['page'] = kwargs.get('page',0)
+        res = self.connector.getData(self.endpoint_company + path,params=params,headers = self.header)
+        data = res['content']
+        if res['lastPage'] == False:
+            page = res['number'] +1
+            data += self.getTags(limit=limit,page=page)
+        return data
+    
+    def getTag(self,tagId:str=None)->dict:
+        """
+        Return the a tag by its ID.
+        Arguments:
+            tagId : REQUIRED : the Tag ID to be retrieved.
+        """
+        if tagId is None:
+            raise Exception("Require a tag ID for this method.")
+        path = f"/componentmetadata/tags/{tagId}"
+        res = self.connector.getData(self.endpoint_company+path,headers=self.header)
+        return res
+    
+    def getComponentTagName(self,tagNames:str=None,componentType:str=None)->dict:
+        """
+        Given a comma separated list of tag names, return component ids associated with them.
+        Arguments:
+            tagNames : REQUIRED : Comma separated list of tag names.
+            componentType : REQUIRED : The component type to operate on.
+                Available values : segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
+        """
+        path = "/componentmetadata/tags/tagnames"
+        if tagNames is None:
+            raise Exception("Requires tag names to be provided")
+        if componentType is None:
+            raise Exception("Requires a Component Type to be provided")
+        params = {
+            "tagNames" : tagNames,
+            "componentType" : componentType
+        }
+        res = self.connector.getData(self.endpoint_company + path,params=params,headers = self.header)
+        return res
+    
+    def searchComponentsTags(self,componentType:str=None,componentIds:list=None)->dict:
+        """
+        Search for the tags of a list of component by their ids.
+        Arguments:
+            componentType : REQUIRED : The component type to use in the search.
+                Available values : segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
+            componentIds : REQUIRED : List of components Ids to use.
+        """
+        if componentType is None:
+            raise Exception("ComponentType is required")
+        if componentIds is None or type(componentIds) != list:
+            raise Exception("componentIds is required as a list of ids")
+        path = "/componentmetadata/tags/component/search"
+        obj = {
+            "componentType":componentType,
+            "componentIds" : componentIds
+        }
+        res = self.connector.postData(self.endpoint_company+path,data=obj,headers=self.header)
+        return res
+    
+    def createTags(self,data:list=None)->dict:
+        """
+        Create a new tag and applies that new tag to the passed components.
+        Arguments:
+            data : REQUIRED : list of the tag to be created with their component relation.
+        
+        Example of data :
+        [
+            {
+                "id": 0,
+                "name": "string",
+                "description": "string",
+                "components": [
+                {
+                    "componentType": "string",
+                    "componentId": "string",
+                    "tags": [
+                    "Unknown Type: Tag"
+                    ]
+                }
+                ]
+            }
+        ]
+
+        """
+        if data is None:
+            raise Exception("Requires a list of tags to be created")
+        path = "​/componentmetadata​/tags"
+        res = self.connector.postData(self.endpoint_company+path,data=data,headers=self.header)
+        return res
+
+    def deleteTags(self,componentType:str=None,componentIds:str=None)->str:
+        """
+        Delete all tags from the component Type and the component ids specified.
+        Arguments:
+            componentIds : REQUIRED : the Comma-separated list of componentIds to operate on.
+            componentType : REQUIRED : The component type to operate on.
+                Available values : segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
+        """
+        if componentType is None:
+            raise Exception("require a component type")
+        if componentIds is None:
+            raise Exception("require component ID(s)")
+        path = "/componentmetadata/tags"
+        params = {
+            "componentType" : componentType,
+            "componentIds" : componentIds
+        }
+        res = self.connector.deleteData(self.endpoint_company+path,params=params,headers=self.header)
+        return res
+
+    def deleteTag(self,tagId:str=None)->str:
+        """
+        Delete a Tag based on its id.
+        Arguments:
+            tagId : REQUIRED : The tag ID to be deleted.
+        """
+        if tagId is None:
+            raise Exception("A tag ID is required")
+        path = "​/componentmetadata​/tags​/{tagId}"
+        res = self.connector.deleteData(self.endpoint_company+path,headers=self.header)
+        return res
+    
+    def getComponentTags(self,componentId:str=None,componentType:str=None)->list:
+        """
+        Given a componentId, return all tags associated with that component.
+        Arguments:
+            componentId : REQUIRED : The componentId to operate on. Currently this is just the segmentId.
+            componentType : REQUIRED : The component type to operate on.
+                segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
+        """
+        path = "/componentmetadata/tags/search"
+        if componentType is None:
+            raise Exception("require a component type")
+        if componentId is None:
+            raise Exception("require a component ID")
+        params = {"componentId":componentId,"componentType":componentType}
+        res = self.connector.getData(self.endpoint_company+path, params=params,headers=self.header)
+        return res
+
+    def updateComponentTags(self,data:list=None):
+        """
+        Overwrite the component Tags with the list send.
+        Arguments:
+            data : REQUIRED : list of the components to be udpated with their respective list of tag names.
+
+        Object looks like the following:
+        [
+            {
+                "componentType": "string",
+                "componentId": "string",
+                "tags": [
+                    "Unknown Type: Tag"
+                ]
+            }
+        ]
+        """
+        if data is None or type(data) != list:
+            raise Exception("require list of update to be sent.")
+        path = "/componentmetadata/tags/tagitems"
+        res = self.connector.putData(self.endpoint_company+path,data=data,headers=self.header)
+        return res
 
     def _dataDescriptor(self, json_request: dict):
         """
@@ -997,6 +1173,8 @@ class Analytics:
             anomaly : OPTIONAL : Boolean to tell if the anomaly detection has been used. 
             cols : OPTIONAL : list of columns names
         """
+        if cols is None:
+            raise ValueError("list of columns must be specified")
         data_rows = modules.deepcopy(data_rows)
         dict_data = {}
         dict_data = {row.get('value', 'missing_value'): row['data'] for row in data_rows}
@@ -1146,10 +1324,11 @@ class Analytics:
         df = self._readData(data_list, anomaly=anomaly,
                             cols=columns, item_id=item_id)
         if save:
-            df.to_csv(f'report-{timestamp}.csv', index=False)
+            timestampReport = round(modules.time.time())
+            df.to_csv(f'report-{timestampReport}.csv', index=False)
             if verbose:
                 print(
-                    f'Saving data in file : {modules.os.getcwd()}{modules.os.sep}report-{timestamp}.csv')
+                    f'Saving data in file : {modules.os.getcwd()}{modules.os.sep}report-{timestampReport}.csv')
         obj['data'] = df
         if verbose:
             print(

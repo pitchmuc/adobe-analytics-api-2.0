@@ -237,6 +237,23 @@ There are several get methods.
   * limit : number of segments retrieved by request. default 500: Limited to 1000 by the Analytics API.
   * full : Boolean : Doesn't shrink the number of columns if set to true
 
+* getTags : Retrieve the list of Tags used on the company Login.
+  Arguments:
+  * limit : OPTIONAL : Amount of tag to be returned by request. Default 100
+
+* getComponentTagName : Given a comma separated list of tag names, return component ids associated with them
+  Arguments:
+  * tagNames : REQUIRED : Comma separated list of tag names.
+  * componentType : REQUIRED : The component type to operate on.\
+      Available values : segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
+
+* getComponentTags : Given a componentId, return all tags associated with that component.
+  Arguments:
+  * componentId : REQUIRED : The componentId to operate on. Currently this is just the segmentId.
+  * componentType : REQUIRED : The component type to operate on.
+
+\
+
 Example of getSegments usage:
 
 ```python
@@ -262,6 +279,7 @@ Here is the list of the possible create options.
   * dataSchema : REQUIRED : Type of schema used for the VRSID. (default : "Cache")
   * data_dict : OPTIONAL : you can pass directly the dictionary.
   In this case, you dictionary should looks like this:
+
   ```python
   data_dict = {
     'name' : 'xxxx',
@@ -281,6 +299,30 @@ Here is the list of the possible create options.
   * metricJSON : REQUIRED : Calculated Metrics information to create. Required :  name, definition, rsid
     more information can be found on the [Swagger refrence](https://adobedocs.github.io/analytics-2.0-apis/#/calculatedmetrics/calculatedmetrics_createCalculatedMetric)
 
+* createTags : This method creates a tag and associate it with a component.
+  Arguments:
+  * data : REQUIRED : The list of the tag to be created with their component relation.
+  It looks like the following:
+
+  ```JSON
+  [
+    {
+        "id": 0,
+        "name": "string",
+        "description": "string",
+        "components": [
+        {
+            "componentType": "string",
+            "componentId": "string",
+            "tags": [
+            "Unknown Type: Tag"
+            ]
+        }
+        ]
+    }
+  ]
+  ```
+
 ### Delete
 
 There is a possibility to delete some elements with the Adobe Analytics API 2.0. Please find below the different options that you can delete.
@@ -296,6 +338,16 @@ There is a possibility to delete some elements with the Adobe Analytics API 2.0.
 * deleteCalculatedMetrics: Delete a calculated metrics based on its ID.
   Arguments:
   * calcID : REQUIRED : Calculated Metrics ID to be deleted
+
+* deleteTags: Delete all tags from the component Type and the component ids specified.
+  Arguments:
+  * componentIds : REQUIRED : the Comma-separated list of componentIds to operate on.
+  * componentType : REQUIRED : The component type to operate on.\
+    Available values : segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
+
+* deleteTag : Delete a Tag based on its id.
+  Arguments:
+  * tagId : REQUIRED : The tag ID to be deleted.
 
 ### Get report
 

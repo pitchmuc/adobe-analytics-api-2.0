@@ -29,8 +29,10 @@ Functionalities that are covered :
 * Retrieve Calculated Metrics
 * Retrieve Virtual Report Suites
 * Retrieve Virtual Report Suite Curated Components
+* Retrieve Tags
 * Update Segments
 * Update Calculated Metrics
+* Update Tags
 
 documentation on reporting [here](./docs/main.md)
 
