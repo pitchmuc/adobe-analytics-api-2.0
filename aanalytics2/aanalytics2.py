@@ -1,9 +1,20 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
 # version : 0.1.3
-from typing import Optional
+import json
+import os
+import time
+from concurrent import futures
+from copy import deepcopy
+from pathlib import Path
+from typing import IO, Union, Optional
 
-from aanalytics2 import config, connector, modules
+# Non standard libraries
+import jwt
+import pandas as pd
+import requests
+
+from aanalytics2 import config, connector
 from .paths import find_path
 
 
@@ -14,7 +25,7 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
         verbose : OPTIONAL : Default False. If set to True, print information.
         save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt). 
     """
-    private_key_path: Optional[modules.Path] = find_path(
+    private_key_path: Optional[Path] = find_path(
         config.config_object["pathToKey"])
     if private_key_path is None:
         raise FileNotFoundError(
@@ -27,13 +38,13 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
     }
     jwt_payload = {
         # Expiration set to 24 hours
-        "exp": round(24 * 60 * 60 + int(modules.time.time())),
+        "exp": round(24 * 60 * 60 + int(time.time())),
         "iss": config.config_object["org_id"],  # org_id
         "sub": config.config_object["tech_id"],  # technical_account_id
         "https://ims-na1.adobelogin.com/s/ent_analytics_bulk_ingest_sdk": True,
         "aud": "https://ims-na1.adobelogin.com/c/" + config.config_object["client_id"]
     }
-    encoded_jwt = modules.jwt.encode(
+    encoded_jwt = jwt.encode(
         jwt_payload, private_key_unencrypted, algorithm='RS256')
     payload = {
         "client_id": config.config_object["client_id"],
@@ -41,23 +52,23 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
         "jwt_token": encoded_jwt.decode("utf-8")
     }
     token_endpoint = "https://ims-na1.adobelogin.com/ims/exchange/jwt"
-    response = modules.requests.post(
+    response = requests.post(
         token_endpoint, headers=header_jwt, data=payload)
     json_response = response.json()
     token = json_response['access_token']
     config.header["Authorization"] = "Bearer " + token
     config.config_object["token"] = token
     expire = json_response['expires_in']
-    config.config_object["date_limit"] = modules.time.time() + expire / 1000 - \
-        500  # end of time for the token
+    config.config_object["date_limit"] = time.time() + expire / 1000 - \
+                                         500  # end of time for the token
     if save:
         with open('token.txt', 'w') as f:  # save the token
             f.write(token)
         if verbose:
             print(
-                f"token valid till : {modules.time.ctime(modules.time.time() + expire / 1000)}")
+                f"token valid till : {time.ctime(time.time() + expire / 1000)}")
             print(
-                f"token has been saved here: {modules.os.getcwd()}{modules.os.sep}token.txt")
+                f"token has been saved here: {os.getcwd()}{os.sep}token.txt")
     return token
 
 
@@ -65,7 +76,7 @@ def _checkToken(func):
     """decorator that checks that the token is valid before calling the API"""
 
     def checking(*args, **kwargs):  # if function is not wrapped, will fire
-        now = modules.time.time()
+        now = time.time()
         if now > config.config_object["date_limit"] - 1000:
             config.config_object["token"] = retrieveToken(*args, **kwargs)
             if kwargs.get("headers", None) is not None:
@@ -85,19 +96,18 @@ def getData(endpoint: str, params: dict = None, data: dict = None, headers: dict
     """
     header = headers
     if params is not None and data is None:
-        res = modules.requests.get(endpoint, headers=header, params=params)
+        res = requests.get(endpoint, headers=header, params=params)
     elif params is None and data is not None:
-        res = modules.requests.get(endpoint, headers=header, data=data)
+        res = requests.get(endpoint, headers=header, data=data)
     elif params is not None and data is not None:
-        res = modules.requests.get(endpoint, headers=header,
-                                   params=params, data=data)
+        res = requests.get(endpoint, headers=header, params=params, data=data)
     try:
-        json = res.json()
+        result = res.json()
     except ValueError:
-        json = {'error': ['Request Error']}
+        result = {'error': ['Request Error']}
     if res.status_code == 429:
-        json['status_code'] = 429
-    return json
+        result['status_code'] = 429
+    return result
 
 
 @_checkToken
@@ -107,22 +117,22 @@ def postData(endpoint: str, params: dict = None, data=None, headers: dict = None
     """
     header = headers
     if params is not None and data is None and file is None:
-        res = modules.requests.post(endpoint, headers=header, params=params)
+        res = requests.post(endpoint, headers=header, params=params)
     elif params is None and data is not None and file is None:
-        res = modules.requests.post(
-            endpoint, headers=header, data=modules.json.dumps(data))
+        res = requests.post(
+            endpoint, headers=header, data=json.dumps(data))
     elif params is not None and data is not None and file is None:
-        res = modules.requests.post(endpoint, headers=header,
-                                    params=params, data=modules.json.dumps(data=data))
+        res = requests.post(endpoint, headers=header,
+                            params=params, data=json.dumps(data=data))
     elif file is not None:
-        res = modules.requests.post(endpoint, headers=header, files=file)
+        res = requests.post(endpoint, headers=header, files=file)
     try:
-        json = res.json()
+        result = res.json()
     except ValueError:
-        json = {'error': ['Request Error']}
+        result = {'error': ['Request Error']}
     if res.status_code == 429:
-        json['status_code'] = 429
-    return json
+        result['status_code'] = 429
+    return result
 
 
 @_checkToken
@@ -132,18 +142,17 @@ def putData(endpoint: str, params: dict = None, data=None, headers: dict = None,
     """
     header = headers
     if params is not None and data is None:
-        res = modules.requests.put(endpoint, headers=header, params=params)
+        res = requests.put(endpoint, headers=header, params=params)
     elif params is None and data is not None:
-        res = modules.requests.put(
-            endpoint, headers=header, data=modules.json.dumps(data))
+        res = requests.put(
+            endpoint, headers=header, data=json.dumps(data))
     elif params is not None and data is not None:
-        res = modules.requests.put(endpoint, headers=header,
-                                   params=params, data=modules.json.dumps(data=data))
+        res = requests.put(endpoint, headers=header, params=params, data=json.dumps(data=data))
     try:
-        json = res.json()
+        result = res.json()
     except ValueError:
-        json = {'error': ['Request Error']}
-    return json
+        result = {'error': ['Request Error']}
+    return result
 
 
 @_checkToken
@@ -153,20 +162,18 @@ def deleteData(endpoint: str, params: dict = None, data=None, headers: dict = No
     """
     header = headers
     if params is not None and data is None:
-        res = modules.requests.delete(endpoint, headers=header, params=params)
+        res = requests.delete(endpoint, headers=header, params=params)
     elif params is None and data is not None:
-        res = modules.requests.delete(endpoint, headers=header,
-                                      data=modules.json.dumps(data))
+        res = requests.delete(endpoint, headers=header, data=json.dumps(data))
     elif params is not None and data is not None:
-        res = modules.requests.delete(endpoint, headers=header,
-                                      params=params, data=modules.json.dumps(data=data))
+        res = requests.delete(endpoint, headers=header, params=params, data=json.dumps(data=data))
     elif params is None and data is None:
-        res = modules.requests.delete(endpoint, headers=header)
+        res = requests.delete(endpoint, headers=header)
     try:
-        json = res.json()
+        result = res.json()
     except:
-        json = {'error': ['Request Error']}
-    return json
+        result = {'error': ['Request Error']}
+    return result
 
 
 @_checkToken
@@ -182,7 +189,7 @@ def getCompanyId(infos: str = 'all'):
             - <X> : number that gives the position of the id we want to return (string)
             You need to already know your position. 
     """
-    res = modules.requests.get(
+    res = requests.get(
         "https://analytics.adobe.io/discovery/me", headers=config.header)
     json_res = res.json()
     if infos == 'all':
@@ -228,7 +235,7 @@ class Login:
         """
         Retrieve the company ids for later call for the properties.
         """
-        res = modules.requests.get(
+        res = requests.get(
             "https://analytics.adobe.io/discovery/me", headers=self.header)
         json_res = res.json()
         try:
@@ -282,7 +289,7 @@ class Analytics:
                 'Expected "company_id" to be referenced.\nPlease ensure you pass the globalCompanyId when instantiating this class.')
         self.connector = connector.AdobeRequest(
             config_object=config_object, header=header, retry=retry)
-        self.header = modules.deepcopy(self.connector.header)
+        self.header = deepcopy(self.connector.header)
         self.header['x-proxy-global-company-id'] = company_id
         self.connector.header['x-proxy-global-company-id'] = company_id
         self.endpoint_company = f"{self._endpoint}/{company_id}"
@@ -320,9 +327,9 @@ class Analytics:
         if not extended_info:
             list_content = [{'name': item['name'], 'rsid': item['rsid']}
                             for item in content]
-            df_rsids = modules.pd.DataFrame(list_content)
+            df_rsids = pd.DataFrame(list_content)
         else:
-            df_rsids = modules.pd.DataFrame(content)
+            df_rsids = pd.DataFrame(content)
         total_page = rsids['totalPages']
         last_page = rsids['lastPage']
         if not last_page:  # if last_page =False
@@ -333,7 +340,7 @@ class Analytics:
                          self._getRS for x in range(1, callsToMake)]
             listheaders = [self.header for x in range(1, callsToMake)]
             workers = min(10, total_page)
-            with modules.futures.ThreadPoolExecutor(workers) as executor:
+            with futures.ThreadPoolExecutor(workers) as executor:
                 res = executor.map(lambda x, y, z: self.connector.getData(
                     x, y, headers=z), list_urls, list_params, listheaders)
             res = list(res)
@@ -345,9 +352,9 @@ class Analytics:
             if not extended_info:
                 list_append = [{'name': item['name'], 'rsid': item['rsid']}
                                for item in list_data]
-                df_append = modules.pd.DataFrame(list_append)
+                df_append = pd.DataFrame(list_append)
             else:
-                df_append = modules.pd.DataFrame(list_data)
+                df_append = pd.DataFrame(list_data)
             df_rsids = df_rsids.append(df_append, ignore_index=True)
         if save:
             df_rsids.to_csv('RSIDS.csv', sep='\t')
@@ -387,9 +394,9 @@ class Analytics:
         if not extended_info:
             list_content = [{'name': item['name'], 'vrsid': item['id']}
                             for item in content]
-            df_vrsids = modules.pd.DataFrame(list_content)
+            df_vrsids = pd.DataFrame(list_content)
         else:
-            df_vrsids = modules.pd.DataFrame(content)
+            df_vrsids = pd.DataFrame(content)
         total_page = vrsid['totalPages']
         last_page = vrsid['lastPage']
         if not last_page:  # if last_page =False
@@ -399,7 +406,7 @@ class Analytics:
             list_urls = [path for x in range(1, callsToMake)]
             listheaders = [self.header for x in range(1, callsToMake)]
             workers = min(10, total_page)
-            with modules.futures.ThreadPoolExecutor(workers) as executor:
+            with futures.ThreadPoolExecutor(workers) as executor:
                 res = executor.map(lambda x, y, z: self.connector.getData(
                     x, y, headers=z), list_urls, list_params, listheaders)
             res = list(res)
@@ -411,9 +418,9 @@ class Analytics:
             if not extended_info:
                 list_append = [{'name': item['name'], 'vrsid': item['id']}
                                for item in list_data]
-                df_append = modules.pd.DataFrame(list_append)
+                df_append = pd.DataFrame(list_append)
             else:
-                df_append = modules.pd.DataFrame(list_data)
+                df_append = pd.DataFrame(list_data)
             df_vrsids = df_vrsids.append(df_append, ignore_index=True)
         if save:
             df_vrsids.to_csv('VRSIDS.csv', sep='\t')
@@ -439,7 +446,7 @@ class Analytics:
         path = f"{self.endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
         data = self.connector.getData(path, params=params, headers=self.header)
         if format == "df":
-            data = modules.pd.DataFrame({vrsid: data})
+            data = pd.DataFrame({vrsid: data})
         return data
 
     def getVirtualReportSuiteComponents(self, vrsid: str = None, nan_value=""):
@@ -452,10 +459,10 @@ class Analytics:
         """
         vrs_data = self.getVirtualReportSuite(extended_info=True, vrsid=vrsid)
         if "curatedComponents" not in vrs_data.index:
-            return modules.pd.DataFrame()
+            return pd.DataFrame()
         components_cell = vrs_data[vrs_data.index ==
                                    "curatedComponents"].iloc[0, 0]
-        return modules.pd.DataFrame(components_cell).fillna(value=nan_value)
+        return pd.DataFrame(components_cell).fillna(value=nan_value)
 
     def createVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None, dataSchema: str = "Cache", data_dict: dict = None, **kwargs)->dict:
         """
@@ -558,12 +565,12 @@ class Analytics:
         params.update({'rsid': rsid})
         dims = self.connector.getData(self.endpoint_company +
                                       self._getDimensions, params=params, headers=self.header)
-        df_dims = modules.pd.DataFrame(dims)
+        df_dims = pd.DataFrame(dims)
         columns = ['id', 'name', 'category', 'type',
                    'parent', 'pathable', 'description']
         if kwargs.get('full', False):
-            new_cols = modules.pd.DataFrame(df_dims.support.values.tolist(),
-                                            columns=['support_oberon', 'support_dw'])  # extract list in column
+            new_cols = pd.DataFrame(df_dims.support.values.tolist(),
+                                    columns=['support_oberon', 'support_dw'])  # extract list in column
             new_df = df_dims.merge(new_cols, right_index=True, left_index=True)
             new_df.drop(['reportable', 'support'], axis=1, inplace=True)
             df_dims = new_df
@@ -590,11 +597,11 @@ class Analytics:
         params.update({'rsid': rsid})
         metrics = self.connector.getData(self.endpoint_company +
                                          self._getMetrics, params=params, headers=self.header)
-        df_metrics = modules.pd.DataFrame(metrics)
+        df_metrics = pd.DataFrame(metrics)
         columns = ['id', 'name', 'category', 'type',
                    'dataGroup', 'precision', 'segmentable']
         if kwargs.get('full', False):
-            new_cols = modules.pd.DataFrame(df_metrics.support.values.tolist(), columns=[
+            new_cols = pd.DataFrame(df_metrics.support.values.tolist(), columns=[
                 'support_oberon', 'support_dw'])
             new_df = df_metrics.merge(
                 new_cols, right_index=True, left_index=True)
@@ -633,7 +640,7 @@ class Analytics:
             listheaders = [self.header
                            for x in range(1, callsToMake)]
             workers = min(10, len(list_params))
-            with modules.futures.ThreadPoolExecutor(workers) as executor:
+            with futures.ThreadPoolExecutor(workers) as executor:
                 res = executor.map(lambda x, y, z: self.connector.getData(x, y, headers=z), list_urls,
                                    list_params, listheaders)
             res = list(res)
@@ -645,12 +652,12 @@ class Analytics:
             append_data = [val for sublist in [data for data in users_lists]
                            for val in sublist]  # flatten list of list
             data = data + append_data
-        df_users = modules.pd.DataFrame(data)
+        df_users = pd.DataFrame(data)
         columns = ['email', 'login', 'fullName', 'firstName', 'lastName', 'admin', 'loginId', 'imsUserId', 'login',
                    'createDate', 'lastAccess', 'title', 'disabled', 'phoneNumber', 'companyid']
         df_users = df_users[columns]
-        df_users['createDate'] = modules.pd.to_datetime(df_users['createDate'])
-        df_users['lastAccess'] = modules.pd.to_datetime(df_users['lastAccess'])
+        df_users['createDate'] = pd.to_datetime(df_users['createDate'])
+        df_users['lastAccess'] = pd.to_datetime(df_users['lastAccess'])
         if save:
             df_users.to_csv('users.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
@@ -725,14 +732,14 @@ class Analytics:
             if verbose and page_nb % 10 == 0:
                 print(f"request #{page_nb / 10}")
         if format == "df":
-            segments = modules.pd.DataFrame(data)
+            segments = pd.DataFrame(data)
         else:
             segments = data
         if save and format == "df":
             segments.to_csv('segments.csv', sep='\t')
             if verbose:
                 print(
-                    f'Saving data in file : {modules.os.getcwd()}{modules.os.sep}segments.csv')
+                    f'Saving data in file : {os.getcwd()}{os.sep}segments.csv')
         return segments
 
     def getSegment(self, segment_id: str = None, *args):
@@ -774,7 +781,7 @@ class Analytics:
         if segmentJSON is None:
             print('No segment data has been pushed')
             return None
-        data = modules.deepcopy(segmentJSON)
+        data = deepcopy(segmentJSON)
         seg = self.connector.postData(self.endpoint_company +
                                       self._getSegments, data=data, headers=self.header)
         return seg
@@ -789,7 +796,7 @@ class Analytics:
         if segmentJSON is None or segmentID is None:
             print('No segment or segmentID data has been pushed')
             return None
-        data = modules.deepcopy(segmentJSON)
+        data = deepcopy(segmentJSON)
         seg = self.connector.putData(self.endpoint_company + self._getSegments +
                                      '/' + segmentID, data=data, headers=self.header)
         return seg
@@ -856,7 +863,7 @@ class Analytics:
                                                  self._getCalcMetrics, params=params, headers=self.header)
                 data += metrics['content']
                 lastPage = metrics['lastPage']
-        df_calc_metrics = modules.pd.DataFrame(data)
+        df_calc_metrics = pd.DataFrame(data)
         if save:
             df_calc_metrics.to_csv('calculated_metrics.csv', sep='\t')
         return df_calc_metrics
@@ -888,7 +895,7 @@ class Analytics:
         if calcJSON is None or calcID is None:
             print('No calcMetric or calcMetric JSON data has been pushed')
             return None
-        data = modules.deepcopy(calcJSON)
+        data = deepcopy(calcJSON)
         cm = self.connector.putData(self.endpoint_company + self._getCalcMetrics +
                                     '/' + calcID, data=data, headers=self.header)
         return cm
@@ -928,7 +935,7 @@ class Analytics:
         dateRanges = self.connector.getData(self.endpoint_company +
                                             self._getDateRanges, params=params, headers=self.header)
         data = dateRanges['content']
-        df_dates = modules.pd.DataFrame(data)
+        df_dates = pd.DataFrame(data)
         if save:
             df_dates.to_csv('date_range.csv',index=False)
         return df_dates
@@ -943,9 +950,9 @@ class Analytics:
         if dateRangeJSON is None or dateRangeID is None:
             print('No calcMetric or calcMetric JSON data has been pushed')
             return None
-        data = modules.deepcopy(dateRangeJSON)
+        data = deepcopy(dateRangeJSON)
         dr = self.connector.putData(self._endpoint_company + self._getDateRanges +
-                     '/' + dateRangeID, data=data, headers=self.header)
+                                    '/' + dateRangeID, data=data, headers=self.header)
         return dr
 
     def getCalculatedFunctions(self, **kwargs):
@@ -957,7 +964,7 @@ class Analytics:
         params = {'limit': limit}
         funcs = self.connector.getData(self.endpoint_company + path,
                                        params=params, headers=self.header)
-        df = modules.pd.DataFrame(funcs)
+        df = pd.DataFrame(funcs)
         return df
     
     def getTags(self,limit:int=100,**kwargs)->list:
@@ -1175,7 +1182,7 @@ class Analytics:
         """
         if cols is None:
             raise ValueError("list of columns must be specified")
-        data_rows = modules.deepcopy(data_rows)
+        data_rows = deepcopy(data_rows)
         dict_data = {}
         dict_data = {row.get('value', 'missing_value'): row['data'] for row in data_rows}
         if cols is not None:
@@ -1198,12 +1205,13 @@ class Analytics:
                         row.get('dataUpperBound', [0 for i in range(n_metrics)])[item])
                     dict_data[row['value']].append(
                         row.get('dataLowerBound', [0 for i in range(n_metrics)])[item])
-        df = modules.pd.DataFrame(dict_data).T  # require to transform the data
+        df = pd.DataFrame(dict_data).T  # require to transform the data
         df.reset_index(inplace=True, )
         df.columns = cols
         return df
 
-    def getReport(self, json_request: modules.Union[dict, str, modules.IO], limit:int = 1000, n_result: modules.Union[int, str] = 1000, save: bool = False,
+    def getReport(self, json_request: Union[dict, str, IO], limit: int = 1000, n_result: Union[int, str] = 1000,
+                  save: bool = False,
                   item_id: bool = False, verbose: bool = False, debug=False) -> object:
         """
         Retrieve data from a JSON request.Returns an object containing meta info and dataframe. 
@@ -1223,16 +1231,16 @@ class Analytics:
         obj = {}
         if type(json_request) == str and '.json' not in json_request:
             try:
-                request = modules.json.loads(json_request)
+                request = json.loads(json_request)
             except:
                 raise TypeError("expected a parsable string")
         elif type(json_request) == dict:
             request = json_request
         elif '.json' in json_request:
             try:
-                with open(modules.Path(json_request), 'r') as file:
+                with open(Path(json_request), 'r') as file:
                     file_string = file.read()
-                request = modules.json.loads(file_string)
+                request = json.loads(file_string)
             except:
                 raise TypeError("expected a parsable string")
         request['settings']['limit'] = limit
@@ -1255,7 +1263,7 @@ class Analytics:
         if verbose:
             print('Starting to fetch the data...')
         while last_page == False:
-            timestamp = round(modules.time.time())
+            timestamp = round(time.time())
             request['settings']['page'] = page_nb
             report = self.connector.postData(self.endpoint_company +
                                              self._getReport, data=request, headers=self.header)
@@ -1267,25 +1275,25 @@ class Analytics:
                     print('reaching the limit : pause for 60 s and entering recursion.')
                 if debug:
                     with open(f'limit_reach_{timestamp}.json', 'w') as f:
-                        f.write(modules.json.dumps(report, indent=4))
-                modules.time.sleep(50)
+                        f.write(json.dumps(report, indent=4))
+                time.sleep(50)
                 obj = self.getReport(json_request=request, n_result=n_result,
                                      save=save, item_id=item_id, verbose=verbose)
                 return obj
             if 'lastPage' not in report:  # checking error when no lastPage key in report
                 if verbose:
-                    print(modules.json.dumps(report, indent=2))
+                    print(json.dumps(report, indent=2))
                 print('Warning : Server Error - no save file & empty dataframe.')
                 if debug:
                     with open(f'server_failure_request_{timestamp}.json', 'w') as f:
-                        f.write(modules.json.dumps(request, indent=4))
+                        f.write(json.dumps(request, indent=4))
                     with open(f'server_failure_response_{timestamp}.json', 'w') as f:
-                        f.write(modules.json.dumps(report, indent=4))
+                        f.write(json.dumps(report, indent=4))
                     print(
                         f'Warning : Save JSON request : server_failure_request_{timestamp}.json')
                     print(
                         f'Warning : Save JSON response : server_failure_response_{timestamp}.json')
-                obj['data'] = modules.pd.DataFrame()
+                obj['data'] = pd.DataFrame()
                 return obj
             # fallback when no lastPage in report
             last_page = report.get('lastPage', True)
@@ -1299,12 +1307,12 @@ class Analytics:
             total_elements = report.get(
                 'totalElements', request['settings']['limit'])
             if total_elements == 0:
-                obj['data'] = modules.pd.DataFrame()
+                obj['data'] = pd.DataFrame()
                 print(
                     'Warning : No data returned & lastPage is False.\nExit the loop - no save file & empty dataframe.')
                 if debug:
                     with open(f'report_no_element_{timestamp}.json', 'w') as f:
-                        f.write(modules.json.dumps(report, indent=4))
+                        f.write(json.dumps(report, indent=4))
                 if verbose:
                     print(
                         f'% of total elements retrieved. TotalElements: {report.get("totalElements", "no data")}')
@@ -1316,7 +1324,7 @@ class Analytics:
                 if count_elements >= n_result:
                     last_page = True
             data = report['rows']
-            data_list += modules.deepcopy(data)  # do a deepcopy
+            data_list += deepcopy(data)  # do a deepcopy
             page_nb += 1
             if verbose:
                 print(f'# of requests : {page_nb}')
@@ -1324,11 +1332,11 @@ class Analytics:
         df = self._readData(data_list, anomaly=anomaly,
                             cols=columns, item_id=item_id)
         if save:
-            timestampReport = round(modules.time.time())
+            timestampReport = round(time.time())
             df.to_csv(f'report-{timestampReport}.csv', index=False)
             if verbose:
                 print(
-                    f'Saving data in file : {modules.os.getcwd()}{modules.os.sep}report-{timestampReport}.csv')
+                    f'Saving data in file : {os.getcwd()}{os.sep}report-{timestampReport}.csv')
         obj['data'] = df
         if verbose:
             print(
