@@ -3,6 +3,12 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.1.3
+
+* adding support for the Tags components
+* adding new API for connecting without a config file
+* update documentation for server connection
+
 ## version 0.1.2
 
 * adding the updateVirtualReportSuite method
