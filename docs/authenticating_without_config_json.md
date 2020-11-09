@@ -1,35 +1,60 @@
+[Back to README](../README.md)
+
 # How to authenticate without using a config.json file
 
 This is necessary when you run scripts with the aanalytics2 library on certain server environments (e.g. Google Cloud) instead of locally (e.g. in a Jupyter Notebook).
 In such environments, referring to config.json may not work.
 
+In that case, you can pass the variables to the configure method available.
 
-1. Create a configuration module (a folder) within your repository, e.g. `config/cfg.py`: \
-There you write something like this:
-```
-from os import path
+## 1. Create your different environment variables
 
-import aanalytics2 as aa2
+In windows command line:
 
-# Needed so the path to the private key works wherever your repository is hosted.
-# In this case, it is in the same folder as this cfg.py module: 'config/private.key'
-AA_PRIVATE_KEY_PATH = path.dirname(__file__) + path.sep + 'private.key'
-
-def aaconfig2():
-    aa2.config.org_id = 'YOUR_ORGID@AdobeOrg'
-    aa2.config.tech_id = 'YOUR_TECH_ID@techacct.adobe.com'
-    aa2.config.api_key = 'YOUR_API_KEY-aka-CLIENT_KEY'
-    aa2.config.header["X-Api-Key"] = aa2.config.api_key
-    aa2.config.secret = 'YOUR-CLIENT-SECRET'
-    aa2.config.pathToKey = AA_PRIVATE_KEY_PATH
-    return aa2
-
+```shell
+setx NEWVAR SOMETHING
 ```
 
-2. Include this in whatever Python script that uses the aanalytics2 API: \
-```
-from config import cfg
-cfg.aaconfig2()
+In Powershell:
+
+```shell
+$Env:<variable-name> = "<new-value>"
 ```
 
-3. Now you can work with the Adobe Analytics API V2 Wrapper exactly like in the demo videos at datanalyst.info.
+Linux / Unix / iOS shells:
+
+```shell
+export NAME=VALUE
+```
+
+## 2. Accessing the variable in your python script
+
+You can then access the different values in your python script by realizing the following command:
+
+```python
+import os
+
+USER = os.getenv('API_USER')
+PASSWORD = os.environ.get('API_PASSWORD')
+```
+
+## 3. using the configure method
+
+The aanalytics2 module provide a configure method that will set the correct value to be used in the module.
+
+```python
+import os
+
+my_org_id = os.getenv('org_id')
+my_tech_id = os.environ.get('tech_id')
+my_secret = os.environ.get('secret')
+my_path_to_key = os.environ.get('path_to_key')
+my_client_id = os.environ.get('client_id')
+
+import aanalytics2 as api2
+
+api2.configure(org_id=my_org_id,tech_id=my_tech_id, secret=my_secret,path_to_key=my_path_to_key,client_id=my_client_id)
+
+```
+
+Starting this point, you can use the aanalytics2 module as explained in the documentation.

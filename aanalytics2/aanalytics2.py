@@ -10,9 +10,9 @@ from .paths import find_path
 def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
     """Retrieves the token by using the information provided by the user during
     the import importConfigFile function.
-    Argument :
+    Argument : 
         verbose : OPTIONAL : Default False. If set to True, print information.
-        save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt).
+        save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt). 
     """
     private_key_path: Optional[modules.Path] = find_path(
         config.config_object["pathToKey"])
@@ -49,7 +49,7 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
     config.config_object["token"] = token
     expire = json_response['expires_in']
     config.config_object["date_limit"] = modules.time.time() + expire / 1000 - \
-                                         500  # end of time for the token
+        500  # end of time for the token
     if save:
         with open('token.txt', 'w') as f:  # save the token
             f.write(token)
@@ -70,7 +70,7 @@ def _checkToken(func):
             config.config_object["token"] = retrieveToken(*args, **kwargs)
             if kwargs.get("headers", None) is not None:
                 kwargs['headers']['Authorization'] = "Bearer " + \
-                                                     config.config_object["token"]
+                    config.config_object["token"]
             return func(*args, **kwargs)
         else:  # need to return the function for decorator to return something
             return func(*args, **kwargs)
@@ -175,12 +175,12 @@ def getCompanyId(infos: str = 'all'):
     Retrieve the company id for later call for the properties.
     Can return a string or a json object.
     Arguments:
-        infos : OPTIONAL: returns the company id(s) specified.
+        infos : OPTIONAL: returns the company id(s) specified. 
         Possible values:
             - all : returns the list of companies data (default value)
             - first : returns the first id (string returned)
             - <X> : number that gives the position of the id we want to return (string)
-            You need to already know your position.
+            You need to already know your position. 
     """
     res = modules.requests.get(
         "https://analytics.adobe.io/discovery/me", headers=config.header)
@@ -210,7 +210,7 @@ class Login:
     Class to connect to the the login company.
     """
 
-    def __init__(self, config: dict = config.config_object, header: dict = config.header, retry: int = 0) -> None:
+    def __init__(self, config: dict = config.config_object, header: dict = config.header, retry: int = 0)->None:
         """
         Instantiate the Loggin class.
         Arguments:
@@ -224,7 +224,7 @@ class Login:
         self.COMPANY_IDS = {}
         self.retry = retry
 
-    def getCompanyId(self) -> dict:
+    def getCompanyId(self)->dict:
         """
         Retrieve the company ids for later call for the properties.
         """
@@ -240,7 +240,8 @@ class Login:
             print(json_res)
             return None
 
-    def createAnalyticsConnection(self, companyId: str = None) -> object:
+
+    def createAnalyticsConnection(self, companyId: str = None)->object:
         """
         Returns an instance of the Analytics class so you can query the different elements from that instance.
         Arguments:
@@ -272,10 +273,9 @@ class Analytics:
     _getDateRanges = '/dateranges'
     _getReport = '/reports'
 
-    def __init__(self, company_id: str = None, config_object: dict = config.config_object, header: dict = config.header,
-                 retry: int = 0):
+    def __init__(self, company_id: str = None, config_object: dict = config.config_object, header: dict = config.header, retry: int = 0):
         """
-        Instantiate the
+        Instantiate the 
         """
         if company_id is None:
             raise AttributeError(
@@ -297,10 +297,10 @@ class Analytics:
                         save: bool = False) -> list:
         """
         Get the reportSuite IDs data. Returns a dataframe of reportSuite name and report suite id.
-        Arguments:
+        Arguments: 
             txt : OPTIONAL : returns the reportSuites that matches a speific text field
             rsid_list : OPTIONAL : returns the reportSuites that matches the list of rsids set
-            limit : OPTIONAL : How many reportSuite retrieves per serverCall
+            limit : OPTIONAL : How many reportSuite retrieves per serverCall 
             save : OPTIONAL : if set to True, it will save the list in a file. (Default False)
 
         """
@@ -356,8 +356,7 @@ class Analytics:
                 f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
         return df_rsids
 
-    def getVirtualReportSuites(self, extended_info: bool = False, limit: int = 100, filterIds: str = None,
-                               idContains: str = None, segmentIds: str = None, save: bool = True) -> list:
+    def getVirtualReportSuites(self, extended_info: bool = False, limit: int = 100, filterIds: str = None, idContains: str = None, segmentIds: str = None, save: bool = True)->list:
         """
         return a lit of virtual reportSuites and their id. It can contain more information if expansion is selected.
         Arguments:
@@ -420,10 +419,10 @@ class Analytics:
             df_vrsids.to_csv('VRSIDS.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
             print(
-                f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
+                f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls)+1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
         return df_vrsids
 
-    def getVirtualReportSuite(self, vrsid: str = None, extended_info: bool = False, format: str = 'df') -> object:
+    def getVirtualReportSuite(self, vrsid: str = None, extended_info: bool = False, format: str = 'df')->object:
         """
         return a single virtual report suite ID information as dataframe.
         Arguments:
@@ -458,8 +457,7 @@ class Analytics:
                                    "curatedComponents"].iloc[0, 0]
         return modules.pd.DataFrame(components_cell).fillna(value=nan_value)
 
-    def createVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None,
-                                 dataSchema: str = "Cache", data_dict: dict = None, **kwargs) -> dict:
+    def createVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None, dataSchema: str = "Cache", data_dict: dict = None, **kwargs)->dict:
         """
         Create a new virtual report suite based on the information provided.
         Arguments:
@@ -502,7 +500,7 @@ class Analytics:
         body = data_dict
         res = self.connector.putData(path, data=body, headers=self.header)
 
-    def deleteVirtualReportSuite(self, vrsid: str = None) -> str:
+    def deleteVirtualReportSuite(self, vrsid: str = None)->str:
         """
         Delete a Virtual Report Suite based on the id passed.
         Arguments:
@@ -514,8 +512,7 @@ class Analytics:
         res = self.connector.deleteData(path, headers=self.header)
         return res
 
-    def validateVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None,
-                                   dataSchema: str = "Cache", data_dict: dict = None, **kwargs) -> dict:
+    def validateVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None,  dataSchema: str = "Cache", data_dict: dict = None, **kwargs)->dict:
         """
         Validate the object to create a new virtual report suite based on the information provided.
         Arguments:
@@ -613,10 +610,10 @@ class Analytics:
         """
         Retrieve the list of users for a login company.Returns a data frame.
         Arguments:
-            save : OPTIONAL : Save the data in a file (bool : default False).
-        Possible kwargs:
+            save : OPTIONAL : Save the data in a file (bool : default False). 
+        Possible kwargs: 
             limit :  Nummber of results per requests. Default 100.
-            expansion : string list such as "lastAccess,createDate"
+            expansion : string list such as "lastAccess,createDate"  
         """
         list_urls = []
         nb_error, nb_empty = 0, 0  # use for multi-thread loop
@@ -665,11 +662,11 @@ class Analytics:
                     sidFilter: list = None, extended_info: bool = False, format: str = "df", save: bool = False,
                     verbose: bool = False, **kwargs) -> object:
         """
-        Retrieve the list of segments. Returns a data frame.
+        Retrieve the list of segments. Returns a data frame. 
         Arguments:
             name : OPTIONAL : Filter to only include segments that contains the name (str)
             tagNames : OPTIONAL : Filter list to only include segments that contains one of the tags (string delimited with comma, can be list as well)
-            inclType : OPTIONAL : type of segments to be retrieved.(str) Possible values:
+            inclType : OPTIONAL : type of segments to be retrieved.(str) Possible values: 
                 - all : Default value (all segments possibles)
                 - shared : shared segments
                 - template : template segments
@@ -681,7 +678,7 @@ class Analytics:
             extended_info : OPTIONAL : additional segment metadata fields to include on response (bool : default False)
                 if set to true, returns reportSuiteName, ownerFullName, modified, tags, compatibility, definition
             format : OPTIONAL : defined the format returned by the query. (Default df)
-                possibe values :
+                possibe values : 
                     "df" : default value that return a dataframe
                     "raw": return a list of value. More or less what is return from server.
             save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
@@ -690,7 +687,7 @@ class Analytics:
         Possible kwargs:
             limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.
 
-        NOTE : Segment Endpoint doesn't support multi-threading. Default to 500.
+        NOTE : Segment Endpoint doesn't support multi-threading. Default to 500. 
         """
         limit = int(kwargs.get('limit', 500))
         params = {'includeType': 'all', 'limit': limit}
@@ -787,7 +784,7 @@ class Analytics:
         Method that updates a specific segment based on the dictionary passed to it.
         Arguments:
             segmentID : REQUIRED : Segment ID to be updated
-            segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment.
+            segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment. 
         """
         if segmentJSON is None or segmentID is None:
             print('No segment or segmentID data has been pushed')
@@ -814,11 +811,11 @@ class Analytics:
                              rsids_list: list = None,
                              extended_info: bool = False, save=False, **kwargs) -> object:
         """
-        Retrieve the list of calculated metrics. Returns a data frame.
+        Retrieve the list of calculated metrics. Returns a data frame. 
         Arguments:
             name : OPTIONAL : Filter to only include calculated metrics that contains the name (str)
             tagNames : OPTIONAL : Filter list to only include calculated metrics that contains one of the tags (string delimited with comma, can be list as well)
-            inclType : OPTIONAL : type of calculated Metrics to be retrieved. (str) Possible values:
+            inclType : OPTIONAL : type of calculated Metrics to be retrieved. (str) Possible values: 
                 - all : Default value (all calculated metrics possibles)
                 - shared : shared calculated metrics
                 - template : template calculated metrics
@@ -909,8 +906,7 @@ class Analytics:
                                        self._getCalcMetrics + '/' + calcID, headers=self.header)
         return cm
 
-    def getDateRanges(self, extended_info: bool = False, save: bool = False, includeType: str = 'all',
-                      **kwargs) -> object:
+    def getDateRanges(self, extended_info: bool = False, save: bool = False,includeType:str='all',**kwargs) -> object:
         """
         Get the list of date ranges available for the user.
         Arguments:
@@ -918,7 +914,7 @@ class Analytics:
                 additional infos: reportSuiteName, ownerFullName, modified, tags, compatibility, definition
             save : OPTIONAL : If set to True, it will save the info in a csv file (Default False)
             includeType : Include additional date ranges not owned by user. The "all" option takes precedence over "shared"
-                Possible values are all, shared, templates. You can add all of them as comma separated string.
+                Possible values are all, shared, templates. You can add all of them as comma separated string. 
         Possible kwargs:
             limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.
             full : Boolean : Doesn't shrink the number of columns if set to true
@@ -934,7 +930,7 @@ class Analytics:
         data = dateRanges['content']
         df_dates = modules.pd.DataFrame(data)
         if save:
-            df_dates.to_csv('date_range.csv', index=False)
+            df_dates.to_csv('date_range.csv',index=False)
         return df_dates
 
     def updateDateRange(self, dateRangeID: str = None, dateRangeJSON: dict = None) -> object:
@@ -949,7 +945,7 @@ class Analytics:
             return None
         data = modules.deepcopy(dateRangeJSON)
         dr = self.connector.putData(self.endpoint_company + self._getDateRanges +
-                                    '/' + dateRangeID, data=data, headers=self.header)
+                     '/' + dateRangeID, data=data, headers=self.header)
         return dr
 
     def getCalculatedFunctions(self, **kwargs):
@@ -963,25 +959,25 @@ class Analytics:
                                        params=params, headers=self.header)
         df = modules.pd.DataFrame(funcs)
         return df
-
-    def getTags(self, limit: int = 100, **kwargs) -> list:
+    
+    def getTags(self,limit:int=100,**kwargs)->list:
         """
         Return the list of tags
         Arguments:
             limit : OPTIONAL : Amount of tag to be returned by request. Default 100
         """
         path = "/componentmetadata/tags"
-        params = {'limit': limit}
-        if kwargs.get('page', False):
-            params['page'] = kwargs.get('page', 0)
-        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
+        params = {'limit':limit}
+        if kwargs.get('page',False):
+            params['page'] = kwargs.get('page',0)
+        res = self.connector.getData(self.endpoint_company + path,params=params,headers = self.header)
         data = res['content']
         if res['lastPage'] == False:
-            page = res['number'] + 1
-            data += self.getTags(limit=limit, page=page)
+            page = res['number'] +1
+            data += self.getTags(limit=limit,page=page)
         return data
-
-    def getTag(self, tagId: str = None) -> dict:
+    
+    def getTag(self,tagId:str=None)->dict:
         """
         Return the a tag by its ID.
         Arguments:
@@ -990,10 +986,10 @@ class Analytics:
         if tagId is None:
             raise Exception("Require a tag ID for this method.")
         path = f"/componentmetadata/tags/{tagId}"
-        res = self.connector.getData(self.endpoint_company + path, headers=self.header)
+        res = self.connector.getData(self.endpoint_company+path,headers=self.header)
         return res
-
-    def getComponentTagName(self, tagNames: str = None, componentType: str = None) -> dict:
+    
+    def getComponentTagName(self,tagNames:str=None,componentType:str=None)->dict:
         """
         Given a comma separated list of tag names, return component ids associated with them.
         Arguments:
@@ -1007,13 +1003,13 @@ class Analytics:
         if componentType is None:
             raise Exception("Requires a Component Type to be provided")
         params = {
-            "tagNames": tagNames,
-            "componentType": componentType
+            "tagNames" : tagNames,
+            "componentType" : componentType
         }
-        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
+        res = self.connector.getData(self.endpoint_company + path,params=params,headers = self.header)
         return res
-
-    def searchComponentsTags(self, componentType: str = None, componentIds: list = None) -> dict:
+    
+    def searchComponentsTags(self,componentType:str=None,componentIds:list=None)->dict:
         """
         Search for the tags of a list of component by their ids.
         Arguments:
@@ -1027,18 +1023,18 @@ class Analytics:
             raise Exception("componentIds is required as a list of ids")
         path = "/componentmetadata/tags/component/search"
         obj = {
-            "componentType": componentType,
-            "componentIds": componentIds
+            "componentType":componentType,
+            "componentIds" : componentIds
         }
-        res = self.connector.postData(self.endpoint_company + path, data=obj, headers=self.header)
+        res = self.connector.postData(self.endpoint_company+path,data=obj,headers=self.header)
         return res
-
-    def createTags(self, data: list = None) -> dict:
+    
+    def createTags(self,data:list=None)->dict:
         """
         Create a new tag and applies that new tag to the passed components.
         Arguments:
             data : REQUIRED : list of the tag to be created with their component relation.
-
+        
         Example of data :
         [
             {
@@ -1061,10 +1057,10 @@ class Analytics:
         if data is None:
             raise Exception("Requires a list of tags to be created")
         path = "​/componentmetadata​/tags"
-        res = self.connector.postData(self.endpoint_company + path, data=data, headers=self.header)
+        res = self.connector.postData(self.endpoint_company+path,data=data,headers=self.header)
         return res
 
-    def deleteTags(self, componentType: str = None, componentIds: str = None) -> str:
+    def deleteTags(self,componentType:str=None,componentIds:str=None)->str:
         """
         Delete all tags from the component Type and the component ids specified.
         Arguments:
@@ -1078,13 +1074,13 @@ class Analytics:
             raise Exception("require component ID(s)")
         path = "/componentmetadata/tags"
         params = {
-            "componentType": componentType,
-            "componentIds": componentIds
+            "componentType" : componentType,
+            "componentIds" : componentIds
         }
-        res = self.connector.deleteData(self.endpoint_company + path, params=params, headers=self.header)
+        res = self.connector.deleteData(self.endpoint_company+path,params=params,headers=self.header)
         return res
 
-    def deleteTag(self, tagId: str = None) -> str:
+    def deleteTag(self,tagId:str=None)->str:
         """
         Delete a Tag based on its id.
         Arguments:
@@ -1093,10 +1089,10 @@ class Analytics:
         if tagId is None:
             raise Exception("A tag ID is required")
         path = "​/componentmetadata​/tags​/{tagId}"
-        res = self.connector.deleteData(self.endpoint_company + path, headers=self.header)
+        res = self.connector.deleteData(self.endpoint_company+path,headers=self.header)
         return res
-
-    def getComponentTags(self, componentId: str = None, componentType: str = None) -> list:
+    
+    def getComponentTags(self,componentId:str=None,componentType:str=None)->list:
         """
         Given a componentId, return all tags associated with that component.
         Arguments:
@@ -1109,11 +1105,11 @@ class Analytics:
             raise Exception("require a component type")
         if componentId is None:
             raise Exception("require a component ID")
-        params = {"componentId": componentId, "componentType": componentType}
-        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
+        params = {"componentId":componentId,"componentType":componentType}
+        res = self.connector.getData(self.endpoint_company+path, params=params,headers=self.header)
         return res
 
-    def updateComponentTags(self, data: list = None):
+    def updateComponentTags(self,data:list=None):
         """
         Overwrite the component Tags with the list send.
         Arguments:
@@ -1133,7 +1129,7 @@ class Analytics:
         if data is None or type(data) != list:
             raise Exception("require list of update to be sent.")
         path = "/componentmetadata/tags/tagitems"
-        res = self.connector.putData(self.endpoint_company + path, data=data, headers=self.header)
+        res = self.connector.putData(self.endpoint_company+path,data=data,headers=self.header)
         return res
 
     def _dataDescriptor(self, json_request: dict):
@@ -1188,7 +1184,7 @@ class Analytics:
             cols.append('item_id')
             for row in data_rows:
                 dict_data[row.get('value', 'missing_value')
-                ].append(row['itemId'])
+                          ].append(row['itemId'])
         if anomaly:
             # set full columns
             cols = cols + [f'{metric}-{suffix}' for metric in cols[1:] for suffix in
@@ -1207,8 +1203,7 @@ class Analytics:
         df.columns = cols
         return df
 
-    def getReport(self, json_request: modules.Union[dict, str, modules.IO], limit: int = 1000,
-                  n_result: modules.Union[int, str] = 1000, save: bool = False,
+    def getReport(self, json_request: modules.Union[dict, str, modules.IO], limit:int = 1000, n_result: modules.Union[int, str] = 1000, save: bool = False,
                   item_id: bool = False, verbose: bool = False, debug=False) -> object:
         """
         Retrieve data from a JSON request.Returns an object containing meta info and dataframe. 

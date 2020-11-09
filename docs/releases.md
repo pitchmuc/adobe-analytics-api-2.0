@@ -1,0 +1,39 @@
+# Release info
+
+This page will give you the change that are occuring when a new version has been published on pypi.
+The changes have been tracked starting version 0.1.0
+
+## version 0.1.3
+
+* adding support for the Tags components
+* adding new API for connecting without a config file
+* update documentation for server connection
+
+## version 0.1.2
+
+* adding the updateVirtualReportSuite method
+* adding the updateCalculatedMetrics method
+* update deleteCalculatedMetrics to deleteCalculatedMetric
+* update getCalculatedMetrics to respect the inclType as parameter.
+* update getVirtualReportSuites to add the inclType parameter
+* fix modules importing in the ingestion module
+* fix header on Bulk Ingestion API class.
+
+## version 0.1.1
+
+* update the getReport method with limit parameter
+* rename "Loggin" class to "Login" class.
+* update documentation
+
+## Version 0.1.0
+
+* Changing Architecture on the requests to Adobe Analytics API for the main class.
+  This add the following functionalities:
+  * retry parameter : a parameter that set the number of time you want to retry a GET method if the first one fails.
+  * independance between Analytics instances : possibility to use the same script for 2 loggins company or even 2 experiences clouds API access.
+  * Possibility to start directly with Analytics class if you already know you companyId.
+* Adding a new class Loggin that enables you to retrive the companyId
+* Ensuring that legacy methods (getCompanyId) is still available from the main module.
+* Adding test for GET methods of the core library (Analytics class)
+* Adding test documentation for setting tests
+* Adding release information

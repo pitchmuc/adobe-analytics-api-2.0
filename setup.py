@@ -1,4 +1,7 @@
 from setuptools import setup, find_packages
+
+from aanalytics2 import __version__
+
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
@@ -8,16 +11,18 @@ CLASSIFIERS = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Topic :: Scientific/Engineering :: Information Analysis",
+    "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
     "Development Status :: 4 - Beta"
 ]
 
 setup(
     name='aanalytics2',
-    version="0.0.9",
+    version=__version__,
     license='GPL',
-    description='Adobe Analytics v2 API wrapper',
+    description='Adobe Analytics API 2.0 python wrapper',
     long_description=long_description,
     long_description_content_type='text/markdown',
     author='Julien Piccini',
@@ -33,7 +38,8 @@ setup(
         'requests',
         'PyJWT[crypto]',
         'PyJWT',
-        "dicttoxml"
+        "dicttoxml",
+        "pytest"
     ],
     classifiers=CLASSIFIERS,
     python_requires='>=3.6'
