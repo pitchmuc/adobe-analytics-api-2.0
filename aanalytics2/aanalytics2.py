@@ -1,6 +1,6 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
-# version : 0.1.3
+# version : 0.1.4
 import json
 import os
 import time
