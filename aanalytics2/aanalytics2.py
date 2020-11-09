@@ -1,98 +1,24 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
-# version : 0.0.9
+# version : 0.1.3
+from typing import Optional
 
-import json as _json
-# Non standard libraries
-import jwt as _jwt
-import os
-import pandas as _pd
-import requests as _requests
-import time as _time
-from concurrent import futures as _futures
-from copy import deepcopy as _deepcopy
-from pathlib import Path as _Path
-from typing import IO as _IO, Optional
-from typing import Union as _Union
-
-from aanalytics2 import config
-
-
-def createConfigFile(verbose: object = False) -> None:
-    """Creates a `config_admin.json` file with the pre-defined configuration format to store
-    the access data in.
-    """
-    json_data = {
-        'org_id': '<orgID>',
-        'api_key': "<APIkey>",
-        'tech_id': "<something>@techacct.adobe.com",
-        'secret': "<YourSecret>",
-        'pathToKey': '<path/to/your/privatekey.key>',
-    }
-    with open('config_admin.json', 'w') as cf:
-        cf.write(_json.dumps(json_data, indent=4))
-    if verbose:
-        print(
-            f" file created at this location : {os.getcwd()}{os.sep}config_admin.json")
-
-
-def _find_path(path: str) -> Optional[_Path]:
-    """Checks if the file denoted by the specified `path` exists and returns the Path object
-    for the file.
-
-    If the file under the `path` does not exist and the path denotes an absolute path, tries
-    to find the file by converting the absolute path to a relative path.
-
-    If the file does not exist with either the absolute and the relative path, returns `None`.
-    """
-    if _Path(path).exists():
-        return _Path(path)
-    elif path.startswith('/') and _Path('.' + path).exists():
-        return _Path('.' + path)
-    elif path.startswith('\\') and _Path('.' + path).exists():
-        return _Path('.' + path)
-    else:
-        return None
-
-
-def importConfigFile(path: str) -> None:
-    """Reads the file denoted by the supplied `path` and retrieves the configuration information
-    from it.
-
-    Arguments:
-        path: REQUIRED : path to the configuration file. Can be either a fully-qualified or relative.
-
-    Example of path value.
-    "config.json"
-    "./config.json"
-    "/my-folder/config.json"
-    """
-    config_file_path: Optional[_Path] = _find_path(path)
-    if config_file_path is None:
-        raise FileNotFoundError(
-            f"Unable to find the configuration file under path `{path}`.")
-    with open(config_file_path, 'r') as file:
-        f = _json.load(file)
-        config.org_id = f['org_id']
-        config.api_key = f['api_key']
-        config.header["X-Api-Key"] = f['api_key']
-        config.tech_id = f['tech_id']
-        config.secret = f['secret']
-        config.pathToKey = f['pathToKey']
+from aanalytics2 import config, connector, modules
+from .paths import find_path
 
 
 def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
     """Retrieves the token by using the information provided by the user during
     the import importConfigFile function.
-
-    Argument :
+    Argument : 
         verbose : OPTIONAL : Default False. If set to True, print information.
-        save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt).
+        save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt). 
     """
-    private_key_path: Optional[_Path] = _find_path(config.pathToKey)
+    private_key_path: Optional[modules.Path] = find_path(
+        config.config_object["pathToKey"])
     if private_key_path is None:
         raise FileNotFoundError(
-            f"Unable to find the private key under the path `{config.pathToKey}`.")
+            f"Unable to find the private key under the path `{config.config_object['pathToKey']}`.")
     with open(private_key_path, 'r') as f:
         private_key_unencrypted = f.read()
     header_jwt = {
@@ -101,34 +27,37 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
     }
     jwt_payload = {
         # Expiration set to 24 hours
-        "exp": round(24 * 60 * 60 + int(_time.time())),
-        "iss": config.org_id,  # org_id
-        "sub": config.tech_id,  # technical_account_id
+        "exp": round(24 * 60 * 60 + int(modules.time.time())),
+        "iss": config.config_object["org_id"],  # org_id
+        "sub": config.config_object["tech_id"],  # technical_account_id
         "https://ims-na1.adobelogin.com/s/ent_analytics_bulk_ingest_sdk": True,
-        "aud": "https://ims-na1.adobelogin.com/c/" + config.api_key
+        "aud": "https://ims-na1.adobelogin.com/c/" + config.config_object["client_id"]
     }
-    encoded_jwt = _jwt.encode(
+    encoded_jwt = modules.jwt.encode(
         jwt_payload, private_key_unencrypted, algorithm='RS256')
     payload = {
-        "client_id": config.api_key,
-        "client_secret": config.secret,
+        "client_id": config.config_object["client_id"],
+        "client_secret": config.config_object["secret"],
         "jwt_token": encoded_jwt.decode("utf-8")
     }
     token_endpoint = "https://ims-na1.adobelogin.com/ims/exchange/jwt"
-    response = _requests.post(token_endpoint, headers=header_jwt, data=payload)
+    response = modules.requests.post(
+        token_endpoint, headers=header_jwt, data=payload)
     json_response = response.json()
     token = json_response['access_token']
     config.header["Authorization"] = "Bearer " + token
+    config.config_object["token"] = token
     expire = json_response['expires_in']
-    config.date_limit = _time.time() + expire / 1000 - \
-                        500  # end of time for the token
+    config.config_object["date_limit"] = modules.time.time() + expire / 1000 - \
+        500  # end of time for the token
     if save:
         with open('token.txt', 'w') as f:  # save the token
             f.write(token)
         if verbose:
             print(
-                f"token valid till : {_time.ctime(_time.time() + expire / 1000)}")
-            print(f"token has been saved here: {os.getcwd()}{os.sep}token.txt")
+                f"token valid till : {modules.time.ctime(modules.time.time() + expire / 1000)}")
+            print(
+                f"token has been saved here: {modules.os.getcwd()}{modules.os.sep}token.txt")
     return token
 
 
@@ -136,11 +65,12 @@ def _checkToken(func):
     """decorator that checks that the token is valid before calling the API"""
 
     def checking(*args, **kwargs):  # if function is not wrapped, will fire
-        now = _time.time()
-        if now > config.date_limit - 1000:
-            config.token = retrieveToken(*args, **kwargs)
+        now = modules.time.time()
+        if now > config.config_object["date_limit"] - 1000:
+            config.config_object["token"] = retrieveToken(*args, **kwargs)
             if kwargs.get("headers", None) is not None:
-                kwargs['headers']['Authorization'] = "Bearer " + config.token
+                kwargs['headers']['Authorization'] = "Bearer " + \
+                    config.config_object["token"]
             return func(*args, **kwargs)
         else:  # need to return the function for decorator to return something
             return func(*args, **kwargs)
@@ -155,12 +85,12 @@ def getData(endpoint: str, params: dict = None, data: dict = None, headers: dict
     """
     header = headers
     if params is not None and data is None:
-        res = _requests.get(endpoint, headers=header, params=params)
+        res = modules.requests.get(endpoint, headers=header, params=params)
     elif params is None and data is not None:
-        res = _requests.get(endpoint, headers=header, data=data)
+        res = modules.requests.get(endpoint, headers=header, data=data)
     elif params is not None and data is not None:
-        res = _requests.get(endpoint, headers=header,
-                            params=params, data=data)
+        res = modules.requests.get(endpoint, headers=header,
+                                   params=params, data=data)
     try:
         json = res.json()
     except ValueError:
@@ -177,14 +107,15 @@ def postData(endpoint: str, params: dict = None, data=None, headers: dict = None
     """
     header = headers
     if params is not None and data is None and file is None:
-        res = _requests.post(endpoint, headers=header, params=params)
+        res = modules.requests.post(endpoint, headers=header, params=params)
     elif params is None and data is not None and file is None:
-        res = _requests.post(endpoint, headers=header, data=_json.dumps(data))
+        res = modules.requests.post(
+            endpoint, headers=header, data=modules.json.dumps(data))
     elif params is not None and data is not None and file is None:
-        res = _requests.post(endpoint, headers=header,
-                             params=params, data=_json.dumps(data=data))
+        res = modules.requests.post(endpoint, headers=header,
+                                    params=params, data=modules.json.dumps(data=data))
     elif file is not None:
-        res = _requests.post(endpoint, headers=header, files=file)
+        res = modules.requests.post(endpoint, headers=header, files=file)
     try:
         json = res.json()
     except ValueError:
@@ -201,12 +132,13 @@ def putData(endpoint: str, params: dict = None, data=None, headers: dict = None,
     """
     header = headers
     if params is not None and data is None:
-        res = _requests.put(endpoint, headers=header, params=params)
+        res = modules.requests.put(endpoint, headers=header, params=params)
     elif params is None and data is not None:
-        res = _requests.put(endpoint, headers=header, data=_json.dumps(data))
+        res = modules.requests.put(
+            endpoint, headers=header, data=modules.json.dumps(data))
     elif params is not None and data is not None:
-        res = _requests.put(endpoint, headers=header,
-                            params=params, data=_json.dumps(data=data))
+        res = modules.requests.put(endpoint, headers=header,
+                                   params=params, data=modules.json.dumps(data=data))
     try:
         json = res.json()
     except ValueError:
@@ -221,15 +153,15 @@ def deleteData(endpoint: str, params: dict = None, data=None, headers: dict = No
     """
     header = headers
     if params is not None and data is None:
-        res = _requests.delete(endpoint, headers=header, params=params)
+        res = modules.requests.delete(endpoint, headers=header, params=params)
     elif params is None and data is not None:
-        res = _requests.delete(endpoint, headers=header,
-                               data=_json.dumps(data))
+        res = modules.requests.delete(endpoint, headers=header,
+                                      data=modules.json.dumps(data))
     elif params is not None and data is not None:
-        res = _requests.delete(endpoint, headers=header,
-                               params=params, data=_json.dumps(data=data))
+        res = modules.requests.delete(endpoint, headers=header,
+                                      params=params, data=modules.json.dumps(data=data))
     elif params is None and data is None:
-        res = _requests.delete(endpoint, headers=header)
+        res = modules.requests.delete(endpoint, headers=header)
     try:
         json = res.json()
     except:
@@ -243,14 +175,14 @@ def getCompanyId(infos: str = 'all'):
     Retrieve the company id for later call for the properties.
     Can return a string or a json object.
     Arguments:
-        infos : OPTIONAL: returns the company id(s) specified.
+        infos : OPTIONAL: returns the company id(s) specified. 
         Possible values:
             - all : returns the list of companies data (default value)
             - first : returns the first id (string returned)
             - <X> : number that gives the position of the id we want to return (string)
-            You need to already know your position.
+            You need to already know your position. 
     """
-    res = _requests.get(
+    res = modules.requests.get(
         "https://analytics.adobe.io/discovery/me", headers=config.header)
     json_res = res.json()
     if infos == 'all':
@@ -273,7 +205,58 @@ def getCompanyId(infos: str = 'all'):
             return None
 
 
+class Login:
+    """
+    Class to connect to the the login company.
+    """
+
+    def __init__(self, config: dict = config.config_object, header: dict = config.header, retry: int = 0)->None:
+        """
+        Instantiate the Loggin class.
+        Arguments:
+            config : REQUIRED : dictionary with your configuration information.
+            header : REQUIRED : dictionary of your header.
+            retry : OPTIONAL : if you want to retry, the number of time to retry
+        """
+        self.connector = connector.AdobeRequest(
+            config_object=config, header=header, retry=retry)
+        self.header = self.connector.header
+        self.COMPANY_IDS = {}
+        self.retry = retry
+
+    def getCompanyId(self)->dict:
+        """
+        Retrieve the company ids for later call for the properties.
+        """
+        res = modules.requests.get(
+            "https://analytics.adobe.io/discovery/me", headers=self.header)
+        json_res = res.json()
+        try:
+            companies = json_res['imsOrgs'][0]['companies']
+            self.COMPANY_IDS = json_res['imsOrgs'][0]['companies']
+            return companies
+        except:
+            print("exception when trying to get companies with parameter 'all'")
+            print(json_res)
+            return None
+
+
+    def createAnalyticsConnection(self, companyId: str = None)->object:
+        """
+        Returns an instance of the Analytics class so you can query the different elements from that instance.
+        Arguments:
+            companyId: REQUIRED : The globalCompanyId that you want to use in your connection
+        the retry parameter set in the previous class instantiation will be used here.
+        """
+        analytics = Analytics(company_id=companyId,
+                              config_object=self.connector.config, header=self.header, retry=self.retry)
+        return analytics
+
+
 class Analytics:
+    """
+    Class that instantiate a connection to a single login company.
+    """
     # Endpoints
     header = {"Accept": "application/json",
               "Content-Type": "application/json",
@@ -290,13 +273,19 @@ class Analytics:
     _getDateRanges = '/dateranges'
     _getReport = '/reports'
 
-    def __init__(self, company_id: str = None):
+    def __init__(self, company_id: str = None, config_object: dict = config.config_object, header: dict = config.header, retry: int = 0):
+        """
+        Instantiate the 
+        """
         if company_id is None:
             raise AttributeError(
                 'Expected "company_id" to be referenced.\nPlease ensure you pass the globalCompanyId when instantiating this class.')
-        self.header = _deepcopy(config.header)
+        self.connector = connector.AdobeRequest(
+            config_object=config_object, header=header, retry=retry)
+        self.header = modules.deepcopy(self.connector.header)
         self.header['x-proxy-global-company-id'] = company_id
-        self._endpoint_company = f"{self._endpoint}/{company_id}"
+        self.connector.header['x-proxy-global-company-id'] = company_id
+        self.endpoint_company = f"{self._endpoint}/{company_id}"
 
     def refreshToken(self, token: str = None):
         if token is None:
@@ -308,10 +297,10 @@ class Analytics:
                         save: bool = False) -> list:
         """
         Get the reportSuite IDs data. Returns a dataframe of reportSuite name and report suite id.
-        Arguments:
+        Arguments: 
             txt : OPTIONAL : returns the reportSuites that matches a speific text field
             rsid_list : OPTIONAL : returns the reportSuites that matches the list of rsids set
-            limit : OPTIONAL : How many reportSuite retrieves per serverCall
+            limit : OPTIONAL : How many reportSuite retrieves per serverCall 
             save : OPTIONAL : if set to True, it will save the list in a file. (Default False)
 
         """
@@ -325,27 +314,27 @@ class Analytics:
             params.update({'rsids': str(rsid_list)})
         params.update(
             {"expansion": "name,parentRsid,currency,calendarType,timezoneZoneinfo"})
-        rsids = getData(self._endpoint_company + self._getRS,
-                        params=params, headers=self.header)
+        rsids = self.connector.getData(self.endpoint_company + self._getRS,
+                                       params=params, headers=self.header)
         content = rsids['content']
         if not extended_info:
             list_content = [{'name': item['name'], 'rsid': item['rsid']}
                             for item in content]
-            df_rsids = _pd.DataFrame(list_content)
+            df_rsids = modules.pd.DataFrame(list_content)
         else:
-            df_rsids = _pd.DataFrame(content)
+            df_rsids = modules.pd.DataFrame(content)
         total_page = rsids['totalPages']
         last_page = rsids['lastPage']
         if not last_page:  # if last_page =False
             callsToMake = total_page
             list_params = [{**params, 'page': page}
                            for page in range(1, callsToMake)]
-            list_urls = [self._endpoint_company +
+            list_urls = [self.endpoint_company +
                          self._getRS for x in range(1, callsToMake)]
             listheaders = [self.header for x in range(1, callsToMake)]
             workers = min(10, total_page)
-            with _futures.ThreadPoolExecutor(workers) as executor:
-                res = executor.map(lambda x, y, z: getData(
+            with modules.futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(lambda x, y, z: self.connector.getData(
                     x, y, headers=z), list_urls, list_params, listheaders)
             res = list(res)
             list_data = [val for sublist in [r['content']
@@ -356,9 +345,9 @@ class Analytics:
             if not extended_info:
                 list_append = [{'name': item['name'], 'rsid': item['rsid']}
                                for item in list_data]
-                df_append = _pd.DataFrame(list_append)
+                df_append = modules.pd.DataFrame(list_append)
             else:
-                df_append = _pd.DataFrame(list_data)
+                df_append = modules.pd.DataFrame(list_data)
             df_rsids = df_rsids.append(df_append, ignore_index=True)
         if save:
             df_rsids.to_csv('RSIDS.csv', sep='\t')
@@ -367,8 +356,7 @@ class Analytics:
                 f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
         return df_rsids
 
-    def getVirtualReportSuites(self, extended_info: bool = False, limit: int = 100, filterIds: str = None,
-                               idContains: str = None, segmentIds: str = None, save: bool = True) -> list:
+    def getVirtualReportSuites(self, extended_info: bool = False, limit: int = 100, filterIds: str = None, idContains: str = None, segmentIds: str = None, save: bool = True)->list:
         """
         return a lit of virtual reportSuites and their id. It can contain more information if expansion is selected.
         Arguments:
@@ -381,6 +369,9 @@ class Analytics:
         """
         expansion_values = "globalCompanyKey,parentRsid,parentRsidName,timezone,timezoneZoneinfo,currentTimezoneOffset,segmentList,description,modified,isDeleted,dataCurrentAsOf,compatibility,dataSchema,sessionDefinition,curatedComponents,type"
         params = {"limit": limit}
+        nb_error = 0
+        nb_empty = 0
+        list_urls = []
         if extended_info:
             params['expansion'] = expansion_values
         if filterIds is not None:
@@ -389,15 +380,16 @@ class Analytics:
             params['idContains'] = idContains
         if segmentIds is not None:
             params['segmentIds'] = segmentIds
-        path = f"{self._endpoint_company}/reportsuites/virtualreportsuites"
-        vrsid = getData(path, params=params, headers=self.header)
+        path = f"{self.endpoint_company}/reportsuites/virtualreportsuites"
+        vrsid = self.connector.getData(
+            path, params=params, headers=self.header)
         content = vrsid['content']
         if not extended_info:
             list_content = [{'name': item['name'], 'vrsid': item['id']}
                             for item in content]
-            df_vrsids = _pd.DataFrame(list_content)
+            df_vrsids = modules.pd.DataFrame(list_content)
         else:
-            df_vrsids = _pd.DataFrame(content)
+            df_vrsids = modules.pd.DataFrame(content)
         total_page = vrsid['totalPages']
         last_page = vrsid['lastPage']
         if not last_page:  # if last_page =False
@@ -407,8 +399,8 @@ class Analytics:
             list_urls = [path for x in range(1, callsToMake)]
             listheaders = [self.header for x in range(1, callsToMake)]
             workers = min(10, total_page)
-            with _futures.ThreadPoolExecutor(workers) as executor:
-                res = executor.map(lambda x, y, z: getData(
+            with modules.futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(lambda x, y, z: self.connector.getData(
                     x, y, headers=z), list_urls, list_params, listheaders)
             res = list(res)
             list_data = [val for sublist in [r['content']
@@ -419,18 +411,18 @@ class Analytics:
             if not extended_info:
                 list_append = [{'name': item['name'], 'vrsid': item['id']}
                                for item in list_data]
-                df_append = _pd.DataFrame(list_append)
+                df_append = modules.pd.DataFrame(list_append)
             else:
-                df_append = _pd.DataFrame(list_data)
+                df_append = modules.pd.DataFrame(list_data)
             df_vrsids = df_vrsids.append(df_append, ignore_index=True)
         if save:
             df_vrsids.to_csv('VRSIDS.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
             print(
-                f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
+                f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls)+1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
         return df_vrsids
 
-    def getVirtualReportSuite(self, vrsid: str = None, extended_info: bool = False, format: str = 'df') -> object:
+    def getVirtualReportSuite(self, vrsid: str = None, extended_info: bool = False, format: str = 'df')->object:
         """
         return a single virtual report suite ID information as dataframe.
         Arguments:
@@ -444,10 +436,10 @@ class Analytics:
         params = {}
         if extended_info:
             params['expansion'] = expansion_values
-        path = f"{self._endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
-        data = getData(path, params=params, headers=self.header)
+        path = f"{self.endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
+        data = self.connector.getData(path, params=params, headers=self.header)
         if format == "df":
-            data = _pd.DataFrame({vrsid: data})
+            data = modules.pd.DataFrame({vrsid: data})
         return data
 
     def getVirtualReportSuiteComponents(self, vrsid: str = None, nan_value=""):
@@ -460,13 +452,12 @@ class Analytics:
         """
         vrs_data = self.getVirtualReportSuite(extended_info=True, vrsid=vrsid)
         if "curatedComponents" not in vrs_data.index:
-            return _pd.DataFrame()
+            return modules.pd.DataFrame()
         components_cell = vrs_data[vrs_data.index ==
                                    "curatedComponents"].iloc[0, 0]
-        return _pd.DataFrame(components_cell).fillna(value=nan_value)
+        return modules.pd.DataFrame(components_cell).fillna(value=nan_value)
 
-    def createVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None,
-                                 dataSchema: str = "Cache", data_dict: dict = None, **kwargs) -> dict:
+    def createVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None, dataSchema: str = "Cache", data_dict: dict = None, **kwargs)->dict:
         """
         Create a new virtual report suite based on the information provided.
         Arguments:
@@ -476,7 +467,7 @@ class Analytics:
             dataSchema : REQUIRED : Type of schema used for the VRSID. (default "Cache")
             data_dict : OPTIONAL : you can pass directly the dictionary.
         """
-        path = f"{self._endpoint_company}/reportsuites/virtualreportsuites"
+        path = f"{self.endpoint_company}/reportsuites/virtualreportsuites"
         expansion_values = "globalCompanyKey,parentRsid,parentRsidName,timezone,timezoneZoneinfo,currentTimezoneOffset,segmentList,description,modified,isDeleted,dataCurrentAsOf,compatibility,dataSchema,sessionDefinition,curatedComponents,type"
         params = {'expansion': expansion_values}
         if data_dict is None:
@@ -492,9 +483,9 @@ class Analytics:
                 raise Exception(
                     "Missing one or more fundamental keys : name, parentRsid, segmentList, dataSchema")
             body = data_dict
-        res = postData(path, params=params, data=body, headers=self.header)
+        res = self.connector.postData(
+            path, params=params, data=body, headers=self.header)
         return res
-
 
     def updateVirtualReportSuite(self, vrsid: str = None, data_dict: dict = None, **kwargs) -> dict:
         """
@@ -507,10 +498,9 @@ class Analytics:
         """
         path = f"{self._endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
         body = data_dict
-        res = putData(path, data=body, headers=self.header)
+        res = self.connector.putData(path, data=body, headers=self.header)
 
-
-    def deleteVirtualReportSuite(self, vrsid: str = None) -> str:
+    def deleteVirtualReportSuite(self, vrsid: str = None)->str:
         """
         Delete a Virtual Report Suite based on the id passed.
         Arguments:
@@ -518,12 +508,11 @@ class Analytics:
         """
         if vrsid is None:
             raise Exception("require a Virtual ReportSuite ID")
-        path = f"{self._endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
-        res = deleteData(path, headers=self.header)
+        path = f"{self.endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
+        res = self.connector.deleteData(path, headers=self.header)
         return res
 
-    def validateVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None,
-                                   dataSchema: str = "Cache", data_dict: dict = None, **kwargs) -> dict:
+    def validateVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None,  dataSchema: str = "Cache", data_dict: dict = None, **kwargs)->dict:
         """
         Validate the object to create a new virtual report suite based on the information provided.
         Arguments:
@@ -533,7 +522,7 @@ class Analytics:
             dataSchema : REQUIRED : Type of schema used for the VRSID (default : Cache).
             data_dict : OPTIONAL : you can pass directly the dictionary.
         """
-        path = f"{self._endpoint_company}/reportsuites/virtualreportsuites/validate"
+        path = f"{self.endpoint_company}/reportsuites/virtualreportsuites/validate"
         expansion_values = "globalCompanyKey, parentRsid, parentRsidName, timezone, timezoneZoneinfo, currentTimezoneOffset, segmentList, description, modified, isDeleted, dataCurrentAsOf, compatibility, dataSchema, sessionDefinition, curatedComponents, type"
         if data_dict is None:
             body = {
@@ -548,7 +537,7 @@ class Analytics:
                 raise Exception(
                     "Missing one or more fundamental keys : name, parentRsid, segmentList, dataSchema")
             body = data_dict
-        res = postData(path, data=body, headers=self.header)
+        res = self.connector.postData(path, data=body, headers=self.header)
         return res
 
     def getDimensions(self, rsid: str, tags: bool = False, save=False, **kwargs) -> object:
@@ -567,14 +556,14 @@ class Analytics:
         if tags:
             params.update({'expansion': 'tags'})
         params.update({'rsid': rsid})
-        dims = getData(self._endpoint_company +
-                       self._getDimensions, params=params, headers=self.header)
-        df_dims = _pd.DataFrame(dims)
+        dims = self.connector.getData(self.endpoint_company +
+                                      self._getDimensions, params=params, headers=self.header)
+        df_dims = modules.pd.DataFrame(dims)
         columns = ['id', 'name', 'category', 'type',
                    'parent', 'pathable', 'description']
         if kwargs.get('full', False):
-            new_cols = _pd.DataFrame(df_dims.support.values.tolist(),
-                                     columns=['support_oberon', 'support_dw'])  # extract list in column
+            new_cols = modules.pd.DataFrame(df_dims.support.values.tolist(),
+                                            columns=['support_oberon', 'support_dw'])  # extract list in column
             new_df = df_dims.merge(new_cols, right_index=True, left_index=True)
             new_df.drop(['reportable', 'support'], axis=1, inplace=True)
             df_dims = new_df
@@ -599,13 +588,13 @@ class Analytics:
         if tags:
             params.update({'expansion': 'tags'})
         params.update({'rsid': rsid})
-        metrics = getData(self._endpoint_company +
-                          self._getMetrics, params=params, headers=self.header)
-        df_metrics = _pd.DataFrame(metrics)
+        metrics = self.connector.getData(self.endpoint_company +
+                                         self._getMetrics, params=params, headers=self.header)
+        df_metrics = modules.pd.DataFrame(metrics)
         columns = ['id', 'name', 'category', 'type',
                    'dataGroup', 'precision', 'segmentable']
         if kwargs.get('full', False):
-            new_cols = _pd.DataFrame(df_metrics.support.values.tolist(), columns=[
+            new_cols = modules.pd.DataFrame(df_metrics.support.values.tolist(), columns=[
                 'support_oberon', 'support_dw'])
             new_df = df_metrics.merge(
                 new_cols, right_index=True, left_index=True)
@@ -621,30 +610,31 @@ class Analytics:
         """
         Retrieve the list of users for a login company.Returns a data frame.
         Arguments:
-            save : OPTIONAL : Save the data in a file (bool : default False).
-        Possible kwargs:
+            save : OPTIONAL : Save the data in a file (bool : default False). 
+        Possible kwargs: 
             limit :  Nummber of results per requests. Default 100.
-            expansion : string list such as "lastAccess,createDate"
+            expansion : string list such as "lastAccess,createDate"  
         """
+        list_urls = []
         nb_error, nb_empty = 0, 0  # use for multi-thread loop
         params = {'limit': kwargs.get('limit', 100)}
         if kwargs.get("expansion", None) is not None:
             params["expansion"] = kwargs.get("expansion", None)
-        users = getData(self._endpoint_company +
-                        self._getUsers, params=params, headers=self.header)
+        users = self.connector.getData(self.endpoint_company +
+                                       self._getUsers, params=params, headers=self.header)
         data = users['content']
         lastPage = users['lastPage']
         if not lastPage:  # check if lastpage is inversed of False
             callsToMake = users['totalPages']
             list_params = [{'limit': params['limit'], 'page': page}
                            for page in range(1, callsToMake)]
-            list_urls = [self._endpoint_company +
+            list_urls = [self.endpoint_company +
                          self._getUsers for x in range(1, callsToMake)]
             listheaders = [self.header
                            for x in range(1, callsToMake)]
             workers = min(10, len(list_params))
-            with _futures.ThreadPoolExecutor(workers) as executor:
-                res = executor.map(lambda x, y, z: getData(x, y, headers=z), list_urls,
+            with modules.futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(lambda x, y, z: self.connector.getData(x, y, headers=z), list_urls,
                                    list_params, listheaders)
             res = list(res)
             users_lists = [elem['content']
@@ -655,12 +645,12 @@ class Analytics:
             append_data = [val for sublist in [data for data in users_lists]
                            for val in sublist]  # flatten list of list
             data = data + append_data
-        df_users = _pd.DataFrame(data)
+        df_users = modules.pd.DataFrame(data)
         columns = ['email', 'login', 'fullName', 'firstName', 'lastName', 'admin', 'loginId', 'imsUserId', 'login',
                    'createDate', 'lastAccess', 'title', 'disabled', 'phoneNumber', 'companyid']
         df_users = df_users[columns]
-        df_users['createDate'] = _pd.to_datetime(df_users['createDate'])
-        df_users['lastAccess'] = _pd.to_datetime(df_users['lastAccess'])
+        df_users['createDate'] = modules.pd.to_datetime(df_users['createDate'])
+        df_users['lastAccess'] = modules.pd.to_datetime(df_users['lastAccess'])
         if save:
             df_users.to_csv('users.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
@@ -672,11 +662,11 @@ class Analytics:
                     sidFilter: list = None, extended_info: bool = False, format: str = "df", save: bool = False,
                     verbose: bool = False, **kwargs) -> object:
         """
-        Retrieve the list of segments. Returns a data frame.
+        Retrieve the list of segments. Returns a data frame. 
         Arguments:
             name : OPTIONAL : Filter to only include segments that contains the name (str)
             tagNames : OPTIONAL : Filter list to only include segments that contains one of the tags (string delimited with comma, can be list as well)
-            inclType : OPTIONAL : type of segments to be retrieved.(str) Possible values:
+            inclType : OPTIONAL : type of segments to be retrieved.(str) Possible values: 
                 - all : Default value (all segments possibles)
                 - shared : shared segments
                 - template : template segments
@@ -688,7 +678,7 @@ class Analytics:
             extended_info : OPTIONAL : additional segment metadata fields to include on response (bool : default False)
                 if set to true, returns reportSuiteName, ownerFullName, modified, tags, compatibility, definition
             format : OPTIONAL : defined the format returned by the query. (Default df)
-                possibe values :
+                possibe values : 
                     "df" : default value that return a dataframe
                     "raw": return a list of value. More or less what is return from server.
             save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
@@ -697,7 +687,7 @@ class Analytics:
         Possible kwargs:
             limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.
 
-        NOTE : Segment Endpoint doesn't support multi-threading. Default to 500.
+        NOTE : Segment Endpoint doesn't support multi-threading. Default to 500. 
         """
         limit = int(kwargs.get('limit', 500))
         params = {'includeType': 'all', 'limit': limit}
@@ -727,22 +717,22 @@ class Analytics:
             print("Starting requesting segments")
         while not lastPage:
             params['page'] = page_nb
-            segs = getData(self._endpoint_company +
-                           self._getSegments, params=params, headers=self.header)
+            segs = self.connector.getData(self.endpoint_company +
+                                          self._getSegments, params=params, headers=self.header)
             data += segs['content']
             lastPage = segs['lastPage']
             page_nb += 1
             if verbose and page_nb % 10 == 0:
                 print(f"request #{page_nb / 10}")
         if format == "df":
-            segments = _pd.DataFrame(data)
+            segments = modules.pd.DataFrame(data)
         else:
             segments = data
         if save and format == "df":
             segments.to_csv('segments.csv', sep='\t')
             if verbose:
                 print(
-                    f'Saving data in file : {os.getcwd()}{os.sep}segments.csv')
+                    f'Saving data in file : {modules.os.getcwd()}{modules.os.sep}segments.csv')
         return segments
 
     def getSegment(self, segment_id: str = None, *args):
@@ -770,8 +760,8 @@ class Analytics:
             if element not in ValidArgs:
                 args.remove(element)
         params = {'expansion': ','.join(args)}
-        res = getData(self._endpoint_company + path,
-                      params=params, headers=self.header)
+        res = self.connector.getData(self.endpoint_company + path,
+                                     params=params, headers=self.header)
         return res
 
     def createSegment(self, segmentJSON: dict = None) -> object:
@@ -784,9 +774,9 @@ class Analytics:
         if segmentJSON is None:
             print('No segment data has been pushed')
             return None
-        data = _deepcopy(segmentJSON)
-        seg = postData(self._endpoint_company +
-                       self._getSegments, data=data, headers=self.header)
+        data = modules.deepcopy(segmentJSON)
+        seg = self.connector.postData(self.endpoint_company +
+                                      self._getSegments, data=data, headers=self.header)
         return seg
 
     def updateSegment(self, segmentID: str = None, segmentJSON: dict = None) -> object:
@@ -794,14 +784,14 @@ class Analytics:
         Method that updates a specific segment based on the dictionary passed to it.
         Arguments:
             segmentID : REQUIRED : Segment ID to be updated
-            segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment.
+            segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment. 
         """
         if segmentJSON is None or segmentID is None:
             print('No segment or segmentID data has been pushed')
             return None
-        data = _deepcopy(segmentJSON)
-        seg = putData(self._endpoint_company + self._getSegments +
-                      '/' + segmentID, data=data, headers=self.header)
+        data = modules.deepcopy(segmentJSON)
+        seg = self.connector.putData(self.endpoint_company + self._getSegments +
+                                     '/' + segmentID, data=data, headers=self.header)
         return seg
 
     def deleteSegment(self, segmentID: str = None) -> object:
@@ -813,19 +803,19 @@ class Analytics:
         if segmentID is None:
             print('No segmentID data has been pushed')
             return None
-        seg = deleteData(self._endpoint_company +
-                         self._getSegments + '/' + segmentID, headers=self.header)
+        seg = self.connector.deleteData(self.endpoint_company +
+                                        self._getSegments + '/' + segmentID, headers=self.header)
         return seg
 
     def getCalculatedMetrics(self, name: str = None, tagNames: str = None, inclType: str = 'all',
                              rsids_list: list = None,
                              extended_info: bool = False, save=False, **kwargs) -> object:
         """
-        Retrieve the list of calculated metrics. Returns a data frame.
+        Retrieve the list of calculated metrics. Returns a data frame. 
         Arguments:
             name : OPTIONAL : Filter to only include calculated metrics that contains the name (str)
             tagNames : OPTIONAL : Filter list to only include calculated metrics that contains one of the tags (string delimited with comma, can be list as well)
-            inclType : OPTIONAL : type of calculated Metrics to be retrieved. (str) Possible values:
+            inclType : OPTIONAL : type of calculated Metrics to be retrieved. (str) Possible values: 
                 - all : Default value (all calculated metrics possibles)
                 - shared : shared calculated metrics
                 - template : template calculated metrics
@@ -844,6 +834,8 @@ class Analytics:
             if type(tagNames) == list:
                 tagNames = ','.join(tagNames)
             params.update({'tagNames': tagNames})
+        if inclType != 'all':
+            params['includeType'] = inclType
         if rsids_list is not None:
             if type(rsids_list) == list:
                 rsids_list = ','.join(rsids_list)
@@ -851,8 +843,8 @@ class Analytics:
         if extended_info:
             params.update(
                 {'expansion': 'reportSuiteName,definition,ownerFullName,modified,tags,categories,compatibility'})
-        metrics = getData(self._endpoint_company +
-                          self._getCalcMetrics, params=params, headers=self.header)
+        metrics = self.connector.getData(self.endpoint_company +
+                                         self._getCalcMetrics, params=params, headers=self.header)
         data = metrics['content']
         lastPage = metrics['lastPage']
         if not lastPage:  # check if lastpage is inversed of False
@@ -860,11 +852,11 @@ class Analytics:
             while not lastPage:
                 page_nb += 1
                 params['page'] = page_nb
-                metrics = getData(self._endpoint_company +
-                                  self._getCalcMetrics, params=params, headers=self.header)
+                metrics = self.connector.getData(self.endpoint_company +
+                                                 self._getCalcMetrics, params=params, headers=self.header)
                 data += metrics['content']
                 lastPage = metrics['lastPage']
-        df_calc_metrics = _pd.DataFrame(data)
+        df_calc_metrics = modules.pd.DataFrame(data)
         if save:
             df_calc_metrics.to_csv('calculated_metrics.csv', sep='\t')
         return df_calc_metrics
@@ -882,8 +874,8 @@ class Analytics:
         if 'name' not in metricJSON.keys() or 'definition' not in metricJSON.keys() or 'rsid' not in metricJSON.keys():
             raise KeyError(
                 'Expected "name", "definition" and "rsid" in the data')
-        cm = postData(self._endpoint_company +
-                      self._getCalcMetrics, headers=self.header, data=metricJSON)
+        cm = self.connector.postData(self.endpoint_company +
+                                     self._getCalcMetrics, headers=self.header, data=metricJSON)
         return cm
 
     def updateCalculatedMetric(self, calcID: str = None, calcJSON: dict = None) -> object:
@@ -896,12 +888,12 @@ class Analytics:
         if calcJSON is None or calcID is None:
             print('No calcMetric or calcMetric JSON data has been pushed')
             return None
-        data = _deepcopy(calcJSON)
-        cm = putData(self._endpoint_company + self._getCalcMetrics +
-                     '/' + calcID, data=data, headers=self.header)
+        data = modules.deepcopy(calcJSON)
+        cm = self.connector.putData(self.endpoint_company + self._getCalcMetrics +
+                                    '/' + calcID, data=data, headers=self.header)
         return cm
 
-    def deleteCalculatedMetrics(self, calcID: str = None) -> object:
+    def deleteCalculatedMetric(self, calcID: str = None) -> object:
         """
         Method that delete a specific calculated metrics based on the id passed..
         Arguments:
@@ -910,30 +902,35 @@ class Analytics:
         if calcID is None:
             print('No calculated metrics data has been pushed')
             return None
-        cm = deleteData(self._endpoint_company +
-                        self._getCalcMetrics + '/' + calcID, headers=self.header)
+        cm = self.connector.deleteData(self.endpoint_company +
+                                       self._getCalcMetrics + '/' + calcID, headers=self.header)
         return cm
 
-    def getDateRanges(self, extended_info: bool = False, inclType: str = 'all', save: bool = False, **kwargs) -> object:
+    def getDateRanges(self, extended_info: bool = False, save: bool = False,includeType:str='all',**kwargs) -> object:
         """
         Get the list of date ranges available for the user.
         Arguments:
             extended_info : OPTIONAL : additional segment metadata fields to include on response
                 additional infos: reportSuiteName, ownerFullName, modified, tags, compatibility, definition
             save : OPTIONAL : If set to True, it will save the info in a csv file (Default False)
+            includeType : Include additional date ranges not owned by user. The "all" option takes precedence over "shared"
+                Possible values are all, shared, templates. You can add all of them as comma separated string. 
         Possible kwargs:
             limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.
             full : Boolean : Doesn't shrink the number of columns if set to true
         """
         limit = int(kwargs.get('limit', 500))
-        params = {'limit': limit, 'includeType': inclType}
+        includeType = includeType.split(',')
+        params = {'limit': limit, 'includeType': includeType}
         if extended_info:
             params.update(
                 {'expansion': 'definition,ownerFullName,modified,tags'})
-        dateRanges = getData(self._endpoint_company +
-                             self._getDateRanges, params=params, headers=self.header)
+        dateRanges = self.connector.getData(self.endpoint_company +
+                                            self._getDateRanges, params=params, headers=self.header)
         data = dateRanges['content']
-        df_dates = _pd.DataFrame(data)
+        df_dates = modules.pd.DataFrame(data)
+        if save:
+            df_dates.to_csv('date_range.csv',index=False)
         return df_dates
 
     def updateDateRange(self, dateRangeID: str = None, dateRangeJSON: dict = None) -> object:
@@ -946,8 +943,8 @@ class Analytics:
         if dateRangeJSON is None or dateRangeID is None:
             print('No calcMetric or calcMetric JSON data has been pushed')
             return None
-        data = _deepcopy(dateRangeJSON)
-        dr = putData(self._endpoint_company + self._getDateRanges +
+        data = modules.deepcopy(dateRangeJSON)
+        dr = self.connector.putData(self._endpoint_company + self._getDateRanges +
                      '/' + dateRangeID, data=data, headers=self.header)
         return dr
 
@@ -958,10 +955,182 @@ class Analytics:
         path = "/calculatedmetrics/functions"
         limit = int(kwargs.get('limit', 500))
         params = {'limit': limit}
-        funcs = getData(self._endpoint_company + path,
-                        params=params, headers=self.header)
-        df = _pd.DataFrame(funcs)
+        funcs = self.connector.getData(self.endpoint_company + path,
+                                       params=params, headers=self.header)
+        df = modules.pd.DataFrame(funcs)
         return df
+    
+    def getTags(self,limit:int=100,**kwargs)->list:
+        """
+        Return the list of tags
+        Arguments:
+            limit : OPTIONAL : Amount of tag to be returned by request. Default 100
+        """
+        path = "/componentmetadata/tags"
+        params = {'limit':limit}
+        if kwargs.get('page',False):
+            params['page'] = kwargs.get('page',0)
+        res = self.connector.getData(self.endpoint_company + path,params=params,headers = self.header)
+        data = res['content']
+        if res['lastPage'] == False:
+            page = res['number'] +1
+            data += self.getTags(limit=limit,page=page)
+        return data
+    
+    def getTag(self,tagId:str=None)->dict:
+        """
+        Return the a tag by its ID.
+        Arguments:
+            tagId : REQUIRED : the Tag ID to be retrieved.
+        """
+        if tagId is None:
+            raise Exception("Require a tag ID for this method.")
+        path = f"/componentmetadata/tags/{tagId}"
+        res = self.connector.getData(self.endpoint_company+path,headers=self.header)
+        return res
+    
+    def getComponentTagName(self,tagNames:str=None,componentType:str=None)->dict:
+        """
+        Given a comma separated list of tag names, return component ids associated with them.
+        Arguments:
+            tagNames : REQUIRED : Comma separated list of tag names.
+            componentType : REQUIRED : The component type to operate on.
+                Available values : segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
+        """
+        path = "/componentmetadata/tags/tagnames"
+        if tagNames is None:
+            raise Exception("Requires tag names to be provided")
+        if componentType is None:
+            raise Exception("Requires a Component Type to be provided")
+        params = {
+            "tagNames" : tagNames,
+            "componentType" : componentType
+        }
+        res = self.connector.getData(self.endpoint_company + path,params=params,headers = self.header)
+        return res
+    
+    def searchComponentsTags(self,componentType:str=None,componentIds:list=None)->dict:
+        """
+        Search for the tags of a list of component by their ids.
+        Arguments:
+            componentType : REQUIRED : The component type to use in the search.
+                Available values : segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
+            componentIds : REQUIRED : List of components Ids to use.
+        """
+        if componentType is None:
+            raise Exception("ComponentType is required")
+        if componentIds is None or type(componentIds) != list:
+            raise Exception("componentIds is required as a list of ids")
+        path = "/componentmetadata/tags/component/search"
+        obj = {
+            "componentType":componentType,
+            "componentIds" : componentIds
+        }
+        res = self.connector.postData(self.endpoint_company+path,data=obj,headers=self.header)
+        return res
+    
+    def createTags(self,data:list=None)->dict:
+        """
+        Create a new tag and applies that new tag to the passed components.
+        Arguments:
+            data : REQUIRED : list of the tag to be created with their component relation.
+        
+        Example of data :
+        [
+            {
+                "id": 0,
+                "name": "string",
+                "description": "string",
+                "components": [
+                {
+                    "componentType": "string",
+                    "componentId": "string",
+                    "tags": [
+                    "Unknown Type: Tag"
+                    ]
+                }
+                ]
+            }
+        ]
+
+        """
+        if data is None:
+            raise Exception("Requires a list of tags to be created")
+        path = "​/componentmetadata​/tags"
+        res = self.connector.postData(self.endpoint_company+path,data=data,headers=self.header)
+        return res
+
+    def deleteTags(self,componentType:str=None,componentIds:str=None)->str:
+        """
+        Delete all tags from the component Type and the component ids specified.
+        Arguments:
+            componentIds : REQUIRED : the Comma-separated list of componentIds to operate on.
+            componentType : REQUIRED : The component type to operate on.
+                Available values : segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
+        """
+        if componentType is None:
+            raise Exception("require a component type")
+        if componentIds is None:
+            raise Exception("require component ID(s)")
+        path = "/componentmetadata/tags"
+        params = {
+            "componentType" : componentType,
+            "componentIds" : componentIds
+        }
+        res = self.connector.deleteData(self.endpoint_company+path,params=params,headers=self.header)
+        return res
+
+    def deleteTag(self,tagId:str=None)->str:
+        """
+        Delete a Tag based on its id.
+        Arguments:
+            tagId : REQUIRED : The tag ID to be deleted.
+        """
+        if tagId is None:
+            raise Exception("A tag ID is required")
+        path = "​/componentmetadata​/tags​/{tagId}"
+        res = self.connector.deleteData(self.endpoint_company+path,headers=self.header)
+        return res
+    
+    def getComponentTags(self,componentId:str=None,componentType:str=None)->list:
+        """
+        Given a componentId, return all tags associated with that component.
+        Arguments:
+            componentId : REQUIRED : The componentId to operate on. Currently this is just the segmentId.
+            componentType : REQUIRED : The component type to operate on.
+                segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
+        """
+        path = "/componentmetadata/tags/search"
+        if componentType is None:
+            raise Exception("require a component type")
+        if componentId is None:
+            raise Exception("require a component ID")
+        params = {"componentId":componentId,"componentType":componentType}
+        res = self.connector.getData(self.endpoint_company+path, params=params,headers=self.header)
+        return res
+
+    def updateComponentTags(self,data:list=None):
+        """
+        Overwrite the component Tags with the list send.
+        Arguments:
+            data : REQUIRED : list of the components to be udpated with their respective list of tag names.
+
+        Object looks like the following:
+        [
+            {
+                "componentType": "string",
+                "componentId": "string",
+                "tags": [
+                    "Unknown Type: Tag"
+                ]
+            }
+        ]
+        """
+        if data is None or type(data) != list:
+            raise Exception("require list of update to be sent.")
+        path = "/componentmetadata/tags/tagitems"
+        res = self.connector.putData(self.endpoint_company+path,data=data,headers=self.header)
+        return res
 
     def _dataDescriptor(self, json_request: dict):
         """
@@ -998,23 +1167,24 @@ class Analytics:
 
     def _readData(self, data_rows: list, anomaly: bool = False, cols: list = None, item_id: bool = False):
         """
-        read the data from the requests and returns a dataframe.
+        read the data from the requests and returns a dataframe. 
         Parameters:
             data_rows : REQUIRED : Rows that have been returned by the request.
-            anomaly : OPTIONAL : Boolean to tell if the anomaly detection has been used.
+            anomaly : OPTIONAL : Boolean to tell if the anomaly detection has been used. 
             cols : OPTIONAL : list of columns names
         """
-        data_rows = _deepcopy(data_rows)
+        if cols is None:
+            raise ValueError("list of columns must be specified")
+        data_rows = modules.deepcopy(data_rows)
         dict_data = {}
-        dict_data = {row.get('value', 'missing_value')
-                     : row['data'] for row in data_rows}
+        dict_data = {row.get('value', 'missing_value'): row['data'] for row in data_rows}
         if cols is not None:
             n_metrics = len(cols) - 1
         if item_id:  # adding the itemId in the data returned
             cols.append('item_id')
             for row in data_rows:
                 dict_data[row.get('value', 'missing_value')
-                ].append(row['itemId'])
+                          ].append(row['itemId'])
         if anomaly:
             # set full columns
             cols = cols + [f'{metric}-{suffix}' for metric in cols[1:] for suffix in
@@ -1028,17 +1198,18 @@ class Analytics:
                         row.get('dataUpperBound', [0 for i in range(n_metrics)])[item])
                     dict_data[row['value']].append(
                         row.get('dataLowerBound', [0 for i in range(n_metrics)])[item])
-        df = _pd.DataFrame(dict_data).T  # require to transform the data
+        df = modules.pd.DataFrame(dict_data).T  # require to transform the data
         df.reset_index(inplace=True, )
         df.columns = cols
         return df
 
-    def getReport(self, json_request: _Union[dict, str, _IO], n_result: _Union[int, str] = 1000, save: bool = False,
+    def getReport(self, json_request: modules.Union[dict, str, modules.IO], limit:int = 1000, n_result: modules.Union[int, str] = 1000, save: bool = False,
                   item_id: bool = False, verbose: bool = False, debug=False) -> object:
         """
         Retrieve data from a JSON request.Returns an object containing meta info and dataframe. 
         Arguments:
             json_request: REQUIRED : JSON statement that contains your request for Analytics API 2.0.
+            limit : OPTIONAL : number of result per request (defaut 1000)
             The argument can be : 
                 - a dictionary : It will be used as it is.
                 - a string that is a dictionary : It will be transformed to a dictionary / JSON.
@@ -1052,19 +1223,19 @@ class Analytics:
         obj = {}
         if type(json_request) == str and '.json' not in json_request:
             try:
-                request = _json.loads(json_request)
+                request = modules.json.loads(json_request)
             except:
                 raise TypeError("expected a parsable string")
         elif type(json_request) == dict:
             request = json_request
         elif '.json' in json_request:
             try:
-                with open(_Path(json_request), 'r') as file:
+                with open(modules.Path(json_request), 'r') as file:
                     file_string = file.read()
-                request = _json.loads(file_string)
+                request = modules.json.loads(file_string)
             except:
                 raise TypeError("expected a parsable string")
-        request['settings']['limit'] = 1000
+        request['settings']['limit'] = limit
         # info for creating report
         data_info = self._dataDescriptor(request)
         if verbose:
@@ -1084,10 +1255,10 @@ class Analytics:
         if verbose:
             print('Starting to fetch the data...')
         while last_page == False:
-            timestamp = round(_time.time())
+            timestamp = round(modules.time.time())
             request['settings']['page'] = page_nb
-            report = postData(self._endpoint_company +
-                              self._getReport, data=request, headers=self.header)
+            report = self.connector.postData(self.endpoint_company +
+                                             self._getReport, data=request, headers=self.header)
             if verbose:
                 print('Data received.')
             # Recursion to take care of throttling limit
@@ -1096,25 +1267,25 @@ class Analytics:
                     print('reaching the limit : pause for 60 s and entering recursion.')
                 if debug:
                     with open(f'limit_reach_{timestamp}.json', 'w') as f:
-                        f.write(_json.dumps(report, indent=4))
-                _time.sleep(50)
+                        f.write(modules.json.dumps(report, indent=4))
+                modules.time.sleep(50)
                 obj = self.getReport(json_request=request, n_result=n_result,
                                      save=save, item_id=item_id, verbose=verbose)
                 return obj
             if 'lastPage' not in report:  # checking error when no lastPage key in report
                 if verbose:
-                    print(_json.dumps(report, indent=2))
+                    print(modules.json.dumps(report, indent=2))
                 print('Warning : Server Error - no save file & empty dataframe.')
                 if debug:
                     with open(f'server_failure_request_{timestamp}.json', 'w') as f:
-                        f.write(_json.dumps(request, indent=4))
+                        f.write(modules.json.dumps(request, indent=4))
                     with open(f'server_failure_response_{timestamp}.json', 'w') as f:
-                        f.write(_json.dumps(report, indent=4))
+                        f.write(modules.json.dumps(report, indent=4))
                     print(
                         f'Warning : Save JSON request : server_failure_request_{timestamp}.json')
                     print(
                         f'Warning : Save JSON response : server_failure_response_{timestamp}.json')
-                obj['data'] = _pd.DataFrame()
+                obj['data'] = modules.pd.DataFrame()
                 return obj
             # fallback when no lastPage in report
             last_page = report.get('lastPage', True)
@@ -1128,12 +1299,12 @@ class Analytics:
             total_elements = report.get(
                 'totalElements', request['settings']['limit'])
             if total_elements == 0:
-                obj['data'] = _pd.DataFrame()
+                obj['data'] = modules.pd.DataFrame()
                 print(
                     'Warning : No data returned & lastPage is False.\nExit the loop - no save file & empty dataframe.')
                 if debug:
                     with open(f'report_no_element_{timestamp}.json', 'w') as f:
-                        f.write(_json.dumps(report, indent=4))
+                        f.write(modules.json.dumps(report, indent=4))
                 if verbose:
                     print(
                         f'% of total elements retrieved. TotalElements: {report.get("totalElements", "no data")}')
@@ -1145,7 +1316,7 @@ class Analytics:
                 if count_elements >= n_result:
                     last_page = True
             data = report['rows']
-            data_list += _deepcopy(data)  # do a deepcopy
+            data_list += modules.deepcopy(data)  # do a deepcopy
             page_nb += 1
             if verbose:
                 print(f'# of requests : {page_nb}')
@@ -1153,10 +1324,11 @@ class Analytics:
         df = self._readData(data_list, anomaly=anomaly,
                             cols=columns, item_id=item_id)
         if save:
-            df.to_csv(f'report-{timestamp}.csv', index=False)
+            timestampReport = round(modules.time.time())
+            df.to_csv(f'report-{timestampReport}.csv', index=False)
             if verbose:
                 print(
-                    f'Saving data in file : {os.getcwd()}{os.sep}report-{timestamp}.csv')
+                    f'Saving data in file : {modules.os.getcwd()}{modules.os.sep}report-{timestampReport}.csv')
         obj['data'] = df
         if verbose:
             print(
