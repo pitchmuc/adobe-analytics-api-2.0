@@ -2,17 +2,16 @@
 # email : piccini.julien@gmail.com
 # version : 0.1.4
 import json
+# Non standard libraries
+import jwt
 import os
+import pandas as pd
+import requests
 import time
 from concurrent import futures
 from copy import deepcopy
 from pathlib import Path
 from typing import IO, Union, Optional
-
-# Non standard libraries
-import jwt
-import pandas as pd
-import requests
 
 from aanalytics2 import config, connector
 from .paths import find_path
@@ -503,7 +502,7 @@ class Analytics:
             vrsid : REQUIRED : The id of the virtual report suite to update
             data_dict : a json-like dictionary of the vrs data to update
         """
-        path = f"{self._endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
+        path = f"{self.endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
         body = data_dict
         res = self.connector.putData(path, data=body, headers=self.header)
 
@@ -951,7 +950,7 @@ class Analytics:
             print('No calcMetric or calcMetric JSON data has been pushed')
             return None
         data = deepcopy(dateRangeJSON)
-        dr = self.connector.putData(self._endpoint_company + self._getDateRanges +
+        dr = self.connector.putData(self.endpoint_company + self._getDateRanges +
                                     '/' + dateRangeID, data=data, headers=self.header)
         return dr
 
