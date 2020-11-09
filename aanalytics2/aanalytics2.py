@@ -1,6 +1,7 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
 # version : 0.1.4
+
 import json
 # Non standard libraries
 import jwt
@@ -952,6 +953,7 @@ class Analytics:
         data = deepcopy(dateRangeJSON)
         dr = self.connector.putData(self.endpoint_company + self._getDateRanges +
                                     '/' + dateRangeID, data=data, headers=self.header)
+
         return dr
 
     def getCalculatedFunctions(self, **kwargs):
