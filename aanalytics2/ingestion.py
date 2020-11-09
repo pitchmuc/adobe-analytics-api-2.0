@@ -1,6 +1,14 @@
 import gzip
-import aanalytics2
-from aanalytics2 import config, modules, connector
+import io
+from concurrent import futures
+from pathlib import Path
+from typing import IO, Union
+
+# Non standard libraries
+import pandas as pd
+import requests
+
+from aanalytics2 import config, connector
 
 
 class DIAPI:
@@ -34,7 +42,7 @@ class DIAPI:
             path = pkg_resources.resource_filename(
                 "aanalytics2", "supported_tags.pickle")
         with path as f:
-            self.REFERENCE = modules.pd.read_pickle(f)
+            self.REFERENCE = pd.read_pickle(f)
 
     def getMethod(self, pageName: str = None, g: str = None, pe: str = None, pev1: str = None, pev2: str = None, events: str = None, **kwargs):
         """
@@ -58,7 +66,7 @@ class DIAPI:
         endpoint = f"https://{self.tracking_server}/b/ss/{self.rsid}/0"
         params = {"pageName": pageName, "g": g,
                   "pe": pe, "pev1": pev1, "pev2": pev2, "events": events, **kwargs}
-        res = modules.requests.get(endpoint, params=params, headers=header)
+        res = requests.get(endpoint, params=params, headers=header)
         return res
 
     def postMethod(self, pageName: str = None, pageURL: str = None, linkType: str = None, linkURL: str = None, linkName: str = None, events: str = None, **kwargs):
@@ -87,7 +95,7 @@ class DIAPI:
         myxml = dxml.dicttoxml(
             dictionary, custom_root='request', attr_type=False)
         xml_data = myxml.decode()
-        res = modules.requests.post(endpoint, data=xml_data, headers=header)
+        res = requests.post(endpoint, data=xml_data, headers=header)
         return res
 
 
@@ -122,7 +130,7 @@ class Bulkapi:
             path = pkg_resources.resource_filename(
                 "aanalytics2", "CSV_Column_and_Query_String_Reference.pickle")
         with path as f:
-            self.REFERENCE = modules.pd.read_pickle(f)
+            self.REFERENCE = pd.read_pickle(f)
         # if no token has been generated.
         self.connector = connector.AdobeRequest()
         self.header = self.connector.header
@@ -130,7 +138,7 @@ class Bulkapi:
         del self.header["Content-Type"]
         self._createdFiles = []
 
-    def validation(self, file: modules.IO = None, **kwargs):
+    def validation(self, file: IO = None, **kwargs):
         """
         Send the file to a validation endpoint. Return the response object from requests.
         Argument:
@@ -152,8 +160,8 @@ class Bulkapi:
             filename = file
             with open(file, "rb") as f:
                 data = f.read()
-        res = modules.requests.post(self.endpoint+path, files={"file": (None, data)},
-                                    headers=self.header)
+        res = requests.post(self.endpoint + path, files={"file": (None, data)},
+                            headers=self.header)
         return res
 
     def generateTemplate(self, includeAdv: bool = False, returnDF: bool = False, save: bool = True):
@@ -164,12 +172,11 @@ class Bulkapi:
             returnDF : OPTIONAL : Return a pandas dataFrame if you want to work directly with a data frame.(default False)
             save : OPTIONAL : Save the file created directly in your working folder.
         """
-        import io
         ## 2 rows being created
         string = """timestamp,marketingCloudVisitorID,events,pageName,pageURL,reportSuiteID,userAgent,pe,queryString\ntimestampValuePOSIX/Epoch Time (e.g. 1486769029) or ISO-8601 (e.g. 2017-02-10T16:23:49-07:00),marketingCloudVisitorIDValue,eventsValue,pageNameValue,pageURLValue,reportSuiteIDValue,userAgentValue,peValue,queryStringValue
         """
         data = io.StringIO(string)
-        df = modules.pd.read_csv(data, sep=',')
+        df = pd.read_csv(data, sep=',')
         if includeAdv == False:
             df.drop(["pe", "queryString"], axis=1, inplace=True)
         if save:
@@ -184,18 +191,18 @@ class Bulkapi:
         if file.endswith(".gz"):
             return file
         else:  # if sending not gzipped file.
-            new_folder = modules.Path('tmp/')
+            new_folder = Path('tmp/')
             new_folder.mkdir(exist_ok=True)
             with open(file, "rb") as f:
                 content = f.read()
                 new_path = new_folder / f"{file}.gz"
-                with gzip.open(modules.Path(new_path), 'wb') as f:
+                with gzip.open(Path(new_path), 'wb') as f:
                     f.write(content)
                 # save the filename to delete
                 self._createdFiles.append(new_path)
             return new_path
 
-    def sendFiles(self, files: modules.Union[list, modules.IO] = None, **kwargs):
+    def sendFiles(self, files: Union[list, IO] = None, **kwargs):
         """
         Method to send the file(s) through the Bulk API. Returns a list with the different status file sent.
         Arguments:
@@ -221,20 +228,20 @@ class Bulkapi:
         list_headers = [{**self.header, 'x-adobe-vgid': vgid}
                         for vgid in vgid_headers]
         list_urls = [self.endpoint + path for x in range(len(files_gz))]
-        list_files = ({"file": (None, open(modules.Path(file), "rb").read())}
+        list_files = ({"file": (None, open(Path(file), "rb").read())}
                       for file in files_gz)  # generator for files
         workers_input = kwargs.get("workers", 4)
         workers = max(1, workers_input)
-        with modules.futures.ThreadPoolExecutor(workers) as executor:
-            res = executor.map(lambda x, y, z: modules.requests.post(
+        with futures.ThreadPoolExecutor(workers) as executor:
+            res = executor.map(lambda x, y, z: requests.post(
                 x, headers=y, files=z), list_urls, list_headers, list_files)
             list_res = list(res)
         # cleaning temp folder
         if len(self._createdFiles) > 0:
             for file in self._createdFiles:
-                file_path = modules.Path(file)
+                file_path = Path(file)
                 file_path.unlink()
             self._createdFiles = []
-            tmp = modules.Path('tmp/')
+            tmp = Path('tmp/')
             tmp.rmdir()
         return list_res
