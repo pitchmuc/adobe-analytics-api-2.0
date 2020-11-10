@@ -1,6 +1,9 @@
-from aanalytics2 import modules
+# Non standard libraries
+from pathlib import Path
+from typing import Optional
 
-def find_path(path: str) -> modules.Optional[modules.Path]:
+
+def find_path(path: str) -> Optional[Path]:
     """Checks if the file denoted by the specified `path` exists and returns the Path object
     for the file.
 
@@ -9,11 +12,11 @@ def find_path(path: str) -> modules.Optional[modules.Path]:
 
     If the file does not exist with either the absolute and the relative path, returns `None`.
     """
-    if modules.Path(path).exists():
-        return modules.Path(path)
-    elif path.startswith('/') and modules.Path('.' + path).exists():
-        return modules.Path('.' + path)
-    elif path.startswith('\\') and modules.Path('.' + path).exists():
-        return modules.Path('.' + path)
+    if Path(path).exists():
+        return Path(path)
+    elif path.startswith('/') and Path('.' + path).exists():
+        return Path('.' + path)
+    elif path.startswith('\\') and Path('.' + path).exists():
+        return Path('.' + path)
     else:
         return None

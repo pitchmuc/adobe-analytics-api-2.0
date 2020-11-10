@@ -3,6 +3,12 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.1.4
+
+* Dropping usage of modules.py for handling dependency
+* Fix updateDateRanges and updateVirtualReportSuite
+* Adding Projects endpoints (getProjects & getProject)
+
 ## version 0.1.3
 
 * adding support for the Tags components
