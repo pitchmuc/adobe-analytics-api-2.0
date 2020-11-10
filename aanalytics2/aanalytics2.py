@@ -768,8 +768,7 @@ class Analytics:
             if element not in ValidArgs:
                 args.remove(element)
         params = {'expansion': ','.join(args)}
-        res = self.connector.getData(self.endpoint_company + path,
-                                     params=params, headers=self.header)
+        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         return res
 
     def createSegment(self, segmentJSON: dict = None) -> object:
@@ -783,8 +782,11 @@ class Analytics:
             print('No segment data has been pushed')
             return None
         data = deepcopy(segmentJSON)
-        seg = self.connector.postData(self.endpoint_company +
-                                      self._getSegments, data=data, headers=self.header)
+        seg = self.connector.postData(
+            self.endpoint_company + self._getSegments,
+            data=data,
+            headers=self.header
+        )
         return seg
 
     def updateSegment(self, segmentID: str = None, segmentJSON: dict = None) -> object:
@@ -798,8 +800,11 @@ class Analytics:
             print('No segment or segmentID data has been pushed')
             return None
         data = deepcopy(segmentJSON)
-        seg = self.connector.putData(self.endpoint_company + self._getSegments +
-                                     '/' + segmentID, data=data, headers=self.header)
+        seg = self.connector.putData(
+            self.endpoint_company + self._getSegments + '/' + segmentID,
+            data=data,
+            headers=self.header
+        )
         return seg
 
     def deleteSegment(self, segmentID: str = None) -> object:
@@ -815,9 +820,16 @@ class Analytics:
                                         self._getSegments + '/' + segmentID, headers=self.header)
         return seg
 
-    def getCalculatedMetrics(self, name: str = None, tagNames: str = None, inclType: str = 'all',
-                             rsids_list: list = None,
-                             extended_info: bool = False, save=False, **kwargs) -> object:
+    def getCalculatedMetrics(
+            self,
+            name: str = None,
+            tagNames: str = None,
+            inclType: str = 'all',
+            rsids_list: list = None,
+            extended_info: bool = False,
+            save=False,
+            **kwargs
+    ) -> object:
         """
         Retrieve the list of calculated metrics. Returns a data frame. 
         Arguments:
@@ -897,8 +909,11 @@ class Analytics:
             print('No calcMetric or calcMetric JSON data has been pushed')
             return None
         data = deepcopy(calcJSON)
-        cm = self.connector.putData(self.endpoint_company + self._getCalcMetrics +
-                                    '/' + calcID, data=data, headers=self.header)
+        cm = self.connector.putData(
+            self.endpoint_company + self._getCalcMetrics + '/' + calcID,
+            data=data,
+            headers=self.header
+        )
         return cm
 
     def deleteCalculatedMetric(self, calcID: str = None) -> object:
@@ -910,8 +925,10 @@ class Analytics:
         if calcID is None:
             print('No calculated metrics data has been pushed')
             return None
-        cm = self.connector.deleteData(self.endpoint_company +
-                                       self._getCalcMetrics + '/' + calcID, headers=self.header)
+        cm = self.connector.deleteData(
+            self.endpoint_company + self._getCalcMetrics + '/' + calcID,
+            headers=self.header
+        )
         return cm
 
     def getDateRanges(self, extended_info: bool = False, save: bool = False,includeType:str='all',**kwargs) -> object:
@@ -933,8 +950,11 @@ class Analytics:
         if extended_info:
             params.update(
                 {'expansion': 'definition,ownerFullName,modified,tags'})
-        dateRanges = self.connector.getData(self.endpoint_company +
-                                            self._getDateRanges, params=params, headers=self.header)
+        dateRanges = self.connector.getData(
+            self.endpoint_company + self._getDateRanges,
+            params=params,
+            headers=self.header
+        )
         data = dateRanges['content']
         df_dates = pd.DataFrame(data)
         if save:
@@ -952,23 +972,29 @@ class Analytics:
             print('No calcMetric or calcMetric JSON data has been pushed')
             return None
         data = deepcopy(dateRangeJSON)
-        dr = self.connector.putData(self.endpoint_company + self._getDateRanges +
-                                    '/' + dateRangeID, data=data, headers=self.header)
+        dr = self.connector.putData(
+            self.endpoint_company + self._getDateRanges + '/' + dateRangeID,
+            data=data,
+            headers=self.header
+        )
         return dr
 
-    def getCalculatedFunctions(self, **kwargs):
+    def getCalculatedFunctions(self, **kwargs) -> pd.DataFrame:
         """
         Returns the calculated metrics functions.
         """
         path = "/calculatedmetrics/functions"
         limit = int(kwargs.get('limit', 500))
         params = {'limit': limit}
-        funcs = self.connector.getData(self.endpoint_company + path,
-                                       params=params, headers=self.header)
+        funcs = self.connector.getData(
+            self.endpoint_company + path,
+            params=params,
+            headers=self.header
+        )
         df = pd.DataFrame(funcs)
         return df
-    
-    def getTags(self,limit:int=100,**kwargs)->list:
+
+    def getTags(self, limit: int = 100, **kwargs) -> list:
         """
         Return the list of tags
         Arguments:
@@ -980,7 +1006,7 @@ class Analytics:
             params['page'] = kwargs.get('page',0)
         res = self.connector.getData(self.endpoint_company + path,params=params,headers = self.header)
         data = res['content']
-        if res['lastPage'] == False:
+        if not res['lastPage']:
             page = res['number'] +1
             data += self.getTags(limit=limit,page=page)
         return data
@@ -1014,7 +1040,7 @@ class Analytics:
             "tagNames" : tagNames,
             "componentType" : componentType
         }
-        res = self.connector.getData(self.endpoint_company + path,params=params,headers = self.header)
+        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         return res
     
     def searchComponentsTags(self,componentType:str=None,componentIds:list=None)->dict:
@@ -1036,8 +1062,8 @@ class Analytics:
         }
         res = self.connector.postData(self.endpoint_company+path,data=obj,headers=self.header)
         return res
-    
-    def createTags(self,data:list=None)->dict:
+
+    def createTags(self, data: list = None) -> dict:
         """
         Create a new tag and applies that new tag to the passed components.
         Arguments:
@@ -1065,7 +1091,7 @@ class Analytics:
         if data is None:
             raise Exception("Requires a list of tags to be created")
         path = "​/componentmetadata​/tags"
-        res = self.connector.postData(self.endpoint_company+path,data=data,headers=self.header)
+        res = self.connector.postData(self.endpoint_company + path, data=data, headers=self.header)
         return res
 
     def deleteTags(self,componentType:str=None,componentIds:str=None)->str:
@@ -1173,7 +1199,7 @@ class Analytics:
                 obj['filters']['globalFilters'].append(fil['segmentId'])
         return obj
 
-    def _readData(self, data_rows: list, anomaly: bool = False, cols: list = None, item_id: bool = False):
+    def _readData(self, data_rows: list, anomaly: bool = False, cols: list = None, item_id: bool = False) -> DataFrame:
         """
         read the data from the requests and returns a dataframe. 
         Parameters:
