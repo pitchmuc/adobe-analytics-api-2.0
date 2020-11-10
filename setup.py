@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-from aanalytics2 import __version__
+from aanalytics2.__version__ import __version__
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
