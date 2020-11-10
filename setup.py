@@ -1,9 +1,23 @@
+import codecs
+import os
+
 from setuptools import setup, find_packages
 
-from aanalytics2.__version__ import __version__
 
-with open("README.md", "r") as fh:
-    long_description = fh.read()
+def read(rel_path: str):
+    here = os.path.abspath(os.path.dirname(__file__))
+    with codecs.open(os.path.join(here, rel_path), 'r') as fp:
+        return fp.read()
+
+
+def get_version(rel_path: str):
+    for line in read(rel_path).splitlines():
+        if line.startswith('__version__'):
+            delim = '"' if '"' in line else "'"
+            return line.split(delim)[1]
+    else:
+        raise RuntimeError("Unable to find version string.")
+
 
 CLASSIFIERS = [
     "Intended Audience :: Developers",
@@ -20,10 +34,10 @@ CLASSIFIERS = [
 
 setup(
     name='aanalytics2',
-    version=__version__,
+    version=get_version("aanalytics2/__version__.py"),
     license='GPL',
     description='Adobe Analytics API 2.0 python wrapper',
-    long_description=long_description,
+    long_description=read("README.md"),
     long_description_content_type='text/markdown',
     author='Julien Piccini',
     author_email='piccini.julien@gmail.com',
