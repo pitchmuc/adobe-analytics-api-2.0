@@ -506,6 +506,7 @@ class Analytics:
         path = f"{self.endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
         body = data_dict
         res = self.connector.putData(path, data=body, headers=self.header)
+        return res
 
     def deleteVirtualReportSuite(self, vrsid: str = None)->str:
         """
