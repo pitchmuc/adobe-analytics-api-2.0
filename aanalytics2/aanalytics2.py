@@ -1193,17 +1193,16 @@ class Analytics:
                 params["expansion"] += ',companyTemplate'
         if limit is not None:
             params['limit'] = limit
-        res = self.connector.getData(self.endpoint_company+path,params=params,headers=self.header)
+        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         if format == "raw":
             if save:
-                with open('projects.json','w') as f:
-                    f.write(modules.json.dumps(res,indent=2))
+                with open('projects.json', 'w') as f:
+                    f.write(json.dumps(res, indent=2))
             return res
-        df = modules.pd.DataFrame(res)
+        df = pd.DataFrame(res)
         if save:
-            df.to_csv('projects.csv',index=False)
+            df.to_csv('projects.csv', index=False)
         return df
-
 
     def getProject(self,projectId:str=None)->dict:
         """
@@ -1252,7 +1251,13 @@ class Analytics:
                 obj['filters']['globalFilters'].append(fil['segmentId'])
         return obj
 
-    def _readData(self, data_rows: list, anomaly: bool = False, cols: list = None, item_id: bool = False) -> DataFrame:
+    def _readData(
+            self,
+            data_rows: list,
+            anomaly: bool = False,
+            cols: list = None,
+            item_id: bool = False
+    ) -> pd.DataFrame:
         """
         read the data from the requests and returns a dataframe. 
         Parameters:
@@ -1263,15 +1268,13 @@ class Analytics:
         if cols is None:
             raise ValueError("list of columns must be specified")
         data_rows = deepcopy(data_rows)
-        dict_data = {}
         dict_data = {row.get('value', 'missing_value'): row['data'] for row in data_rows}
         if cols is not None:
             n_metrics = len(cols) - 1
         if item_id:  # adding the itemId in the data returned
             cols.append('item_id')
             for row in data_rows:
-                dict_data[row.get('value', 'missing_value')
-                          ].append(row['itemId'])
+                dict_data[row.get('value', 'missing_value')].append(row['itemId'])
         if anomaly:
             # set full columns
             cols = cols + [f'{metric}-{suffix}' for metric in cols[1:] for suffix in
@@ -1290,9 +1293,16 @@ class Analytics:
         df.columns = cols
         return df
 
-    def getReport(self, json_request: Union[dict, str, IO], limit: int = 1000, n_result: Union[int, str] = 1000,
-                  save: bool = False,
-                  item_id: bool = False, verbose: bool = False, debug=False) -> object:
+    def getReport(
+            self,
+            json_request: Union[dict, str, IO],
+            limit: int = 1000,
+            n_result: Union[int, str] = 1000,
+            save: bool = False,
+            item_id: bool = False,
+            verbose: bool = False,
+            debug=False
+    ) -> object:
         """
         Retrieve data from a JSON request.Returns an object containing meta info and dataframe. 
         Arguments:
@@ -1342,7 +1352,7 @@ class Analytics:
         page_nb, count_elements, total_elements = 0, 0, 0
         if verbose:
             print('Starting to fetch the data...')
-        while last_page == False:
+        while not last_page:
             timestamp = round(time.time())
             request['settings']['page'] = page_nb
             report = self.connector.postData(self.endpoint_company +
