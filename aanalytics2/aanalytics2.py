@@ -496,7 +496,7 @@ class Analytics:
             vrsid : REQUIRED : The id of the virtual report suite to update
             data_dict : a json-like dictionary of the vrs data to update
         """
-        path = f"{self._endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
+        path = f"{self.endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
         body = data_dict
         res = self.connector.putData(path, data=body, headers=self.header)
 
@@ -944,7 +944,7 @@ class Analytics:
             print('No calcMetric or calcMetric JSON data has been pushed')
             return None
         data = modules.deepcopy(dateRangeJSON)
-        dr = self.connector.putData(self._endpoint_company + self._getDateRanges +
+        dr = self.connector.putData(self.endpoint_company + self._getDateRanges +
                      '/' + dateRangeID, data=data, headers=self.header)
         return dr
 
@@ -1131,6 +1131,59 @@ class Analytics:
         path = "/componentmetadata/tags/tagitems"
         res = self.connector.putData(self.endpoint_company+path,data=data,headers=self.header)
         return res
+    
+    def getProjects(self,includeType:str='all',full:bool=False,limit:int=None,includeShared:bool=False,includeTemplate:bool=False,format:str='df',save:bool=False)-> object:
+        """
+        Returns the list of projects through either a dataframe or a list.
+        Arguments:
+            includeType : OPTIONAL : type of projects to be retrieved.(str) Possible values: 
+                - all : Default value (all projects possibles)
+                - shared : shared projects
+                - me : only your projects
+            full : OPTIONAL : if set to True, returns all information about projects.
+            limit : OPTIONAL : Limit the number of result returned.
+            includeShared : OPTIONAL : If full is set to False, you can retrieve only information about sharing.
+            includeTemplate: OPTIONAL : If full is set to False, you can add information about template here.
+            format : OPTIONAL : format : OPTIONAL : format of the output. 2 values "df" for dataframe (default) and "raw" for raw json.
+            save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
+        """
+        path = "/projects"
+        params = {"includeType":includeType}
+        if full:
+            params["expansion"] = 'reportSuiteName,ownerFullName,tags,shares,sharesFullName,modified,favorite,approved,companyTemplate,externalReferences,accessLevel'
+        else:
+            params["expansion"] = "ownerFullName,modified"
+            if includeShared:
+                params["expansion"] += ',shares,sharesFullName'
+            if includeTemplate:
+                params["expansion"] += ',companyTemplate'
+        if limit is not None:
+            params['limit'] = limit
+        res = self.connector.getData(self.endpoint_company+path,params=params,headers=self.header)
+        if format == "raw":
+            if save:
+                with open('projects.json','w') as f:
+                    f.write(modules.json.dumps(res,indent=2))
+            return res
+        df = modules.pd.DataFrame(res)
+        if save:
+            df.to_csv('projects.csv',index=False)
+        return df
+
+
+    def getProject(self,projectId:str=None)->dict:
+        """
+        Return the dictionary of the project information and its definition.
+        Arguments:
+            projectId : REQUIRED : the project ID to be retrieved.
+        """
+        if projectId is None:
+            raise Exception("Requires a projectId parameter")
+        params = {'expansion' : 'definition,ownerFullName,modified,favorite,approved,tags,shares,sharesFullName,reportSuiteName,companyTemplate,accessLevel'}
+        path = f"/projects/{projectId}"
+        res = self.connector.getData(self.endpoint_company + path,params=params,headers = self.header)
+        return res
+
 
     def _dataDescriptor(self, json_request: dict):
         """
