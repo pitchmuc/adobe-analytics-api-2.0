@@ -7,7 +7,8 @@ The changes have been tracked starting version 0.1.0
 
 * Dropping usage of modules.py for handling dependency
 * Fix updateDateRanges and updateVirtualReportSuite
-* Adding Projects endpoints (getProjects & getProject)
+* Adding Projects endpoints (getProjects, getProject, deleteProject)
+* Adding Project Data class to easily extract information of project
 
 ## version 0.1.3
 

@@ -30,9 +30,14 @@ Functionalities that are covered :
 * Retrieve Virtual Report Suites
 * Retrieve Virtual Report Suite Curated Components
 * Retrieve Tags
+* Retrieve Projects
 * Update Segments
 * Update Calculated Metrics
 * Update Tags
+* DeleteSegments
+* DeleteCalculatedMetrics
+* DeleteVirtualReportSuite
+* DeleteProjects
 
 documentation on reporting [here](./docs/main.md)
 

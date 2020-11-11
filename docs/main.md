@@ -149,6 +149,37 @@ mycompany.refreshToken(token)
 With all of my API wrappers, I ususall separate the methody by the GET (fetching information), the CREATE methods (posting information), the DELETE methods, the UPDATE mehthods.
 This API is no exception.
 
+## The Project class
+
+There is a way to retrieve projects and especially project definition.\
+The information returns is a dictionary (JSON) that may not be easy to decipher for analysts.\
+Therefore, I have created a class that can ease the understanding of the data in the project dictionary.\
+The instance of that class will provide some information directly from class attributes.
+
+The different attributes are:
+
+* "id" of the project
+* "name" of the project
+* "description" of the project
+* "rsid" attached to the project (can be a Virtual Report Suite ID)
+* "ownerName" of the project owner
+* "ownerId" of the project owner
+* "ownerEmail" of the project owner
+* "template" is a boolean if the project is a template or not
+* "curation" is a boolean if the project has been curated or not
+* "version" of the project
+* "nbPanels" gives the number of Panels there is in your projects
+* "nbSubPanels" gives the number of subPanels that exist in your project
+* "nbElementsUsed" gives you how many dimensions, metrics, segments and calcuated are being used in your projects
+* "elementsUsed" is a dictionary to gives you the elements used such as:
+  * rsids
+  * dimensions
+  * metrics
+  * segments
+  * calculatedMetrics
+
+A method "to_dict()" also exists on this instance so you can flatten these information and later use them in a pandas dataframe if you wish.
+
 ### The get methods
 
 There are several get methods.
@@ -266,6 +297,14 @@ Example of getDimensions usage:
 mydims = mycompany.getDimensions('rsid')
 ```
 
+#### Unsupported GET Methods
+
+I have implemented a getProjects and getProjects methods.
+These methods are not officially available in the documentation of Adobe API 2.0.
+Therefore, if they do stop working, this may not come from the API wrapper / SDK aanalytics2.
+Please refer to the docstring for these methods for now.
+
+
 ### Create
 
 The Adobe Analytics API 2.0 provides some endpoint to create elements in your Analytics setup.
@@ -348,6 +387,10 @@ There is a possibility to delete some elements with the Adobe Analytics API 2.0.
 * deleteTag : Delete a Tag based on its id.
   Arguments:
   * tagId : REQUIRED : The tag ID to be deleted.
+
+* deleteProject : Delete a Project basede on its id.
+  Arguments:
+  * projectId : REQUIRED : The project ID to be deleted.
 
 ### Get report
 
