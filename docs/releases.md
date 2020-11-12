@@ -3,6 +3,11 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.1.5
+
+* Improving retry parameter behavior on GET methods
+* Improving Project class consistency
+
 ## version 0.1.4
 
 * Dropping usage of modules.py for handling dependency
