@@ -282,16 +282,17 @@ class Project:
         if 'definition' in projectDict.keys():
             definition : dict = projectDict['definition']
             self.version : str = definition['version']
-            self.curation : bool = definition['isCurated']
-            infos = self._findPanelsInfos(definition['workspaces'][0])
-            self.nbPanels : int = infos["nb_Panels"]
-            self.nbSubPanels : int = 0
-            self.subPanelsTypes : list = []
-            for panel in infos["panels"]:
-                self.nbSubPanels += infos["panels"][panel]['nb_subPanels']
-                self.subPanelsTypes += infos["panels"][panel]['subPanels_types']
-            self.elementsUsed : dict = self._findElements(definition['workspaces'][0])
-            self.nbElementsUsed : int = len(self.elementsUsed['dimensions']) + len(self.elementsUsed['metrics']) + len(self.elementsUsed['segments'])+len(self.elementsUsed['calculatedMetrics'])
+            self.curation : bool = definition.get('isCurated',False)
+            if definition.get('device','desktop') != 'cell':
+                infos = self._findPanelsInfos(definition['workspaces'][0])
+                self.nbPanels : int = infos["nb_Panels"]
+                self.nbSubPanels : int = 0
+                self.subPanelsTypes : list = []
+                for panel in infos["panels"]:
+                    self.nbSubPanels += infos["panels"][panel]['nb_subPanels']
+                    self.subPanelsTypes += infos["panels"][panel]['subPanels_types']
+                self.elementsUsed : dict = self._findElements(definition['workspaces'][0])
+                self.nbElementsUsed : int = len(self.elementsUsed['dimensions']) + len(self.elementsUsed['metrics']) + len(self.elementsUsed['segments'])+len(self.elementsUsed['calculatedMetrics'])
     
     def _findPanelsInfos(self,workspace:dict=None)->dict:
         """
@@ -304,7 +305,7 @@ class Project:
         dict_data['panels'] = {}
         for panel in workspace['panels']:
             dict_data["panels"][panel['id']] = {}
-            dict_data["panels"][panel['id']]['name'] = panel['name']
+            dict_data["panels"][panel['id']]['name'] = panel.get('name','Default Name')
             dict_data["panels"][panel['id']]['nb_subPanels'] = len(panel['subPanels'])
             dict_data["panels"][panel['id']]['subPanels_types'] = [subPanel['reportlet']['type'] for subPanel in panel['subPanels']]
         return dict_data
@@ -317,7 +318,10 @@ class Project:
         """
         dict_elements : dict = {'dimensions':[],"metrics":[],'segments':[],"reportSuites":[],'calculatedMetrics':[]}
         for panel in workspace['panels']:
-            dict_elements['reportSuites'].append(panel['reportSuite']['id'])
+            if "reportSuite" in panel.keys():
+                dict_elements['reportSuites'].append(panel['reportSuite']['id'])
+            elif "rsid" in panel.keys():
+                dict_elements['reportSuites'].append(panel['rsid'])
             filters : list = panel['segmentGroups']
             if len(filters)>0:
                 for element in filters:
@@ -398,7 +402,7 @@ class Project:
             'template': self.template,
         }
         add_object = {}
-        if self.version is not None:
+        if hasattr(self,'nbPanels'):
             add_object = {
                 'curation' : self.curation,
                 'version' : self.version,
@@ -1362,7 +1366,7 @@ class Analytics:
             df.to_csv('projects.csv', index=False)
         return df
 
-    def getProject(self,projectId:str=None,projectClass:bool=False)->dict:
+    def getProject(self,projectId:str=None,projectClass:bool=False,verbose:bool=False)->dict:
         """
         Return the dictionary of the project information and its definition.
         Arguments:
@@ -1373,8 +1377,10 @@ class Analytics:
             raise Exception("Requires a projectId parameter")
         params = {'expansion' : 'definition,ownerFullName,modified,favorite,approved,tags,shares,sharesFullName,reportSuiteName,companyTemplate,accessLevel'}
         path = f"/projects/{projectId}"
-        res = self.connector.getData(self.endpoint_company + path,params=params,headers = self.header)
+        res = self.connector.getData(self.endpoint_company + path,params=params,headers = self.header,verbose=verbose)
         if projectClass:
+            if verbose:
+                print('building an instance of Project class')
             myProject = Project(res)
             return myProject
         return res

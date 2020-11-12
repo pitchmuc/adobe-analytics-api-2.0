@@ -99,6 +99,7 @@ class AdobeRequest:
         """
         Abstraction for getting data
         """
+        internRetry = self.retry - kwargs.get("retry",0)
         self._checkingDate()
         if headers is None:
             headers = self.header
@@ -113,15 +114,27 @@ class AdobeRequest:
                 endpoint, headers=headers, data=data)
         elif params is not None and data is not None:
             res = requests.get(endpoint, headers=headers, params=params, data=data)
+        if kwargs.get("verbose",False):
+            print(f"request URL : {res.request.url}")
+            print(f"statut_code : {res.status_code}")
         try:
+            if res.status_code == 429 and internRetry > 0:
+                if kwargs.get("verbose",False):
+                    print(f'Too many requests: {internRetry} retry left')
+                time.sleep(45)
+                res_json = self.getData(endpoint,params=params,data=data,headers=headers,retry=1,**kwargs)
+                return res_json             
             res_json = res.json()
         except:
             res_json = {'error': 'Request Error'}
-            if self.retry > 0:
-                for each in range(self.retry):
-                    if 'error' in res_json.keys():
-                        time.sleep(30)
-                        res_json = self.getData(endpoint,params,data,headers,**kwargs)
+            if internRetry > 0:
+                if kwargs.get("verbose",False):
+                    print('Retry parameter activated')
+                    print(f'{internRetry} retry left')
+                if 'error' in res_json.keys():
+                    time.sleep(30)
+                    res_json = self.getData(endpoint,params=params,data=data,headers=headers,retry=1,**kwargs)
+                    return res_json
         return res_json
 
     def postData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, * args, **kwargs):

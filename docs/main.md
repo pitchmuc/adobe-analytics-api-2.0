@@ -209,13 +209,13 @@ There are several get methods.
 * getVirtualReportSuiteComponents: Get the curated components for a VRS (needs Curation enabled in this VRS) and returns them as a DataFrame
   Arguments:
   * vrsid: Virtual Report Suite ID
-  * nan_value: how to treat missing values. Default: "" 
+  * nan_value: how to treat missing values. Default: ""
 
 * getSegments: Retrieve the list of segments. Returns a data frame.
     Arguments:
   * name : OPTIONAL : Filter to only include segments that contains the name (str)
   * tagNames : OPTIONAL : Filter list to only include segments that contains one of the tags (string delimited with comma, can be list as well)
-  inclType : OPTIONAL : type of segments to be retrieved.(str) Possible values: 
+  inclType : OPTIONAL : type of segments to be retrieved.(str) Possible values:
     * all : Default value (all segments possibles)
     * shared : shared segments
     * template : template segments
@@ -303,7 +303,6 @@ I have implemented a getProjects and getProjects methods.
 These methods are not officially available in the documentation of Adobe API 2.0.
 Therefore, if they do stop working, this may not come from the API wrapper / SDK aanalytics2.
 Please refer to the docstring for these methods for now.
-
 
 ### Create
 
