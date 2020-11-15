@@ -362,7 +362,8 @@ class Project:
                         dict_elements['segments'] += temp_data['segments']
                         dict_elements['metrics'] += temp_data['metrics']
                         if len(temp_data['dimensions'])>0:
-                            dict_elements['dimensions'] += [set(temp_data['dimensions'])]
+                            for dim in set(temp_data['dimensions']):
+                                dict_elements['dimensions'].append(dim)
         return dict_elements
 
     def _recursiveColumn(self,node:dict=None,temp_data:dict=None):
