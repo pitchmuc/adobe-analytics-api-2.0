@@ -352,7 +352,7 @@ class Project:
                             elif componentType == "CalculatedMetric":
                                 dict_elements['calculatedMetrics'].append(row['component']['id'])
                         if len(temp_list_dim)>0:
-                            temp_list_dim = set([el[:el.find('::')] for el in temp_list_dim])
+                            temp_list_dim = list(set([el[:el.find('::')] for el in temp_list_dim]))
                         for dim in temp_list_dim:
                             dict_elements['dimensions'].append(dim)
                     columns = reportlet['columnTree']
@@ -364,6 +364,10 @@ class Project:
                         if len(temp_data['dimensions'])>0:
                             for dim in set(temp_data['dimensions']):
                                 dict_elements['dimensions'].append(dim)
+        dict_elements['metrics'] = list(set(dict_elements['metrics']))
+        dict_elements['segments'] = list(set(dict_elements['segments']))
+        dict_elements['dimensions'] = list(set(dict_elements['dimensions']))
+        dict_elements['calculatedMetrics'] = list(set(dict_elements['calculatedMetrics']))
         return dict_elements
 
     def _recursiveColumn(self,node:dict=None,temp_data:dict=None):
@@ -1397,6 +1401,65 @@ class Analytics:
         path = f"/projects/{projectId}"
         res = self.connector.deleteData(self.endpoint_company + path,headers = self.header)
         return res
+    
+    def updateProject(self,projectId:str=None,projectObj:dict=None)->dict:
+        """
+        Update your project with the new object placed as parameter.
+        Arguments:
+            projectId : REQUIRED : the project ID to be updated.
+            projectObj : REQUIRED : the dictionary to replace the previous Workspace.
+                requires the following elements: name,description,rsid, definition, owner
+        """
+        if projectId is None:
+            raise Exception("Requires a projectId parameter")
+        path = f"/projects/{projectId}"
+        if projectObj is None:
+            raise Exception("Requires a projectId parameter")
+        if 'name' not in projectObj.keys():
+            raise KeyError("Requires name key in the project object")
+        if 'description' not in projectObj.keys():
+            raise KeyError("Requires description key in the project object")
+        if 'rsid' not in projectObj.keys():
+            raise KeyError("Requires rsid key in the project object")
+        if 'owner' not in projectObj.keys():
+            raise KeyError("Requires owner key in the project object")
+        if type(projectObj['owner']) != dict:
+            raise ValueError("Requires owner key to be a dictionary")
+        if 'definition' not in projectObj.keys():
+            raise KeyError("Requires definition key in the project object")
+        if type(projectObj['definition']) != dict:
+            raise ValueError("Requires definition key to be a dictionary")
+        res = self.connector.putData(self.endpoint_company+path,data=projectObj,headers=self.header)
+        return res
+
+
+    def createProject(self,projectObj:dict=None)->dict:
+        """
+        Create a project based on the definition you have set.
+        Arguments:
+            projectObj : REQUIRED : the dictionary to create a new Workspace.
+                requires the following elements: name,description,rsid, definition, owner
+        """
+        path = "/projects/"
+        if projectObj is None:
+            raise Exception("Requires a projectId parameter")
+        if 'name' not in projectObj.keys():
+            raise KeyError("Requires name key in the project object")
+        if 'description' not in projectObj.keys():
+            raise KeyError("Requires description key in the project object")
+        if 'rsid' not in projectObj.keys():
+            raise KeyError("Requires rsid key in the project object")
+        if 'owner' not in projectObj.keys():
+            raise KeyError("Requires owner key in the project object")
+        if type(projectObj['owner']) != dict:
+            raise ValueError("Requires owner key to be a dictionary")
+        if 'definition' not in projectObj.keys():
+            raise KeyError("Requires definition key in the project object")
+        if type(projectObj['definition']) != dict:
+            raise ValueError("Requires definition key to be a dictionary")
+        res = self.connector.postData(self.endpoint_company+path,data=projectObj,headers=self.header)
+        return res
+        
 
 
     def _dataDescriptor(self, json_request: dict):
