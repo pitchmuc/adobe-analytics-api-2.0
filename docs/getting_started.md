@@ -76,11 +76,9 @@ login.COMPANY_IDS
 ## returns the same result that cids.
 ```
 
-Form there, 2 methods can be used to create the Analytics class instance.
+From there, 2 methods can be used to create the Analytics class instance.
 
 ```python
-
-#old method
 mycompany = api2.Analytics(cid)
 
 # new method directly in the Login class
@@ -88,7 +86,19 @@ mycompany = loggin.createAnalyticsConnection(cid)
 
 ```
 
-## 6. Use the methods
+Note that for both methods you can use the **retry** parameter to set the number of times the request can be retry in case of Adobe Analytics server not responding.\
+This option will be set for every GET method in your instance.
+
+```python
+
+mycompany = api2.Analytics(cid,retry=3)
+
+# new method directly in the Login class
+mycompany = loggin.createAnalyticsConnection(cid,retry=3)
+
+```
+
+## 6. Use the methods in your instance
 
 Once you have the instance created, you can use the different methods available to them.
 Don't hesitate to use the _help()_ function in order to have more details on the different possible parameters.

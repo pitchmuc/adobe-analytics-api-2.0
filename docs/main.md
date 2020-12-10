@@ -52,7 +52,7 @@ myfilePath = './myCredential/config.json'
 api2.importConfigFile(myfilePath)
 ```
 
-### retrieveToken
+### retrieveToken (OPTIONAL)
 
 This method is not mandatory because each of your requests will be taken care by a wrapping function that will generate a token if you don't have one.
 However, at some point, you may want to generate a token for a reason X or Y, so this function is available for that use-case.
@@ -66,45 +66,89 @@ api2.importConfigFile('config.json')
 token = api2.retrieveToken()
 ```
 
-This method also caches the time limit of the token usage in a "private" variable "_date_limite"
+This method also caches the time limit of the token usage in the config_object in config module.
 It can be accessed like this:
 
 ```python
-api2._date_limite
+aanalytics2.config.config_object
+## your token
+aanalytics2.config.config_object['token']
 ```
 
-you can review when this token expire through the time module:
+You can review when this token expire through the time module:
 
 ```python
 import time
-time.ctime(api2._date_limit)
+time.ctime(aanalytics2.config.config_object['date_limit'])
 
 ## returns something like : 'Mon May 17 18:08:42 2023'
 ```
 
-### getCompanyId
+## Login class
 
-Once the previous steps are completed, you can start using the methods attached directly to Analytics API.
-The first method is the _getCompanyId_, that will return you the different company ID attached to your account.
-You will extract the *globalCompanyId* that you want to use to create your instance of the Analytics class.
-This method takes an optional parameter (infos) that is used to directly fetched the predefined element.
+The `Login` class is the capability to get the different Login Company ID to create your conneciton later on.\
+The class can be instanciated **after** you have imported the configuration JSON file.
 
 ```python
 import aanalytics2 as api2
 api2.importConfigFile('myconfig.json')
-cids = api2.getCompanyId() ## as you can see, no need to call the retrieveToken method.
-cid = cids[0]['globalCompanyId'] ## using the first one
-mycompany = api2.Analytics(cid)
+## Here instanciating the Login class
+login = api2.Login()
+
+## Here retrieving the cids
+cids = login.getCompanyId()
 ```
 
-If you already know which ID you want to select, you can pass the reference directly in the "infos" parameter.
+From this implementation, you can then retrieve the list of loginCompanyId from your __cids__ variable or the **__COMPANY_IDS__** attributes.
 
 ```python
-import aanalytics2 as api2
-api2.importConfigFile('myconfig.json')
-cid = api2.getCompanyId(infos=0) ## selecting the first ID directly in the request.
-mycompany = api2.Analytics(cid)
+## login company Id is kept in that attribute after the usage of the getCompanyId()
+login.COMPANY_IDS
+
+## returns (example):
+[
+ {'globalCompanyId': 'comp1',
+  'companyName': 'Company1',
+  'apiRateLimitPolicy': 'aa_api_tier10_tp',
+  'dpc': 'lon'},
+ {'globalCompanyId': 'comp2',
+  'companyName': 'Company2',
+  'apiRateLimitPolicy': 'aa_api_tier10_tp',
+  'dpc': 'lon'}
+]
+
 ```
+
+After selecting your `globalCompanyId`, you can generate your connection to the Login company by calling the **__createAnalyticsConnection__**.
+
+```python
+mycompany1 = loggin.createAnalyticsConnection('comp1')
+```
+
+We will see later that you can also directly use the `Analytics` class.
+
+### Retry Parameter
+
+The latest version of the aanalytics2 module also provides a **retry** parameter.\
+This parameter will be used to resend the query in case an error occurs in the response.\
+Several reason an error can occur:
+
+* connectivity issue
+* server issue from Adobe Analytics API
+* inconsistent behavior from Adobe Analytics API
+
+The retry parameter is going to be attached to every GET method available in your `Analytics` class.\
+**Note**
+The `getReport` is in fact a POST method. \
+From my point of view, you want to get data so I called it that way. \
+From Adobe API you are generating a report, therefore it requires a POST method with data attached (your report config).\
+Consequently, the `getReport` method doesn't support the **retry** parameter at the moment.\
+This is also a design decision because it is based on data you are providing. If the data is corrupted or non-conformed, I do not realize a check but I expect Adobe Analytics API to return an error.\
+Following this error, I do not want to __retry__ sending that data again.
+
+You can instantiate the `Analytics` class and the `Login` class with the **retry** parameter.\
+The parameter takes the number of time you would like to retry in case of error.\
+If you create the `Analytics` class from the `Login` instance, the retry parameter value is passed (except if you override it).
 
 ## Analytics class
 
@@ -119,6 +163,9 @@ As seen in the previous example, you instantiate the class by passing the compan
 import aanalytics2 as api2
 #...
 mycompany = api2.Analytics(cid)
+
+## or with retry parameter
+mycompany = api2.Analytics(cid,retry=2)
 ```
 
 You instance will have all of the Analytics endpoint wrapped.
@@ -170,8 +217,8 @@ The different attributes are:
 * "version" of the project
 * "nbPanels" gives the number of Panels there is in your projects
 * "nbSubPanels" gives the number of subPanels that exist in your project
-* "nbElementsUsed" gives you how many dimensions, metrics, segments and calcuated are being used in your projects
-* "elementsUsed" is a dictionary to gives you the elements used such as:
+* "nbElementsUsed" gives you how many different dimensions, metrics, segments and calcuated are being used in your projects. Elements have been deduplicated.
+* "elementsUsed" is a dictionary to gives you the different elements used such as:
   * rsids
   * dimensions
   * metrics
@@ -297,9 +344,9 @@ Example of getDimensions usage:
 mydims = mycompany.getDimensions('rsid')
 ```
 
-#### Unsupported GET Methods
+#### BETA Methods
 
-I have implemented a getProjects and getProjects methods.
+I have implemented a getProjects, getProject, updateProject and createProject methods.
 These methods are not officially available in the documentation of Adobe API 2.0.
 Therefore, if they do stop working, this may not come from the API wrapper / SDK aanalytics2.
 Please refer to the docstring for these methods for now.

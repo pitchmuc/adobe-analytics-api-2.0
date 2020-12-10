@@ -34,10 +34,12 @@ Functionalities that are covered :
 * Update Segments
 * Update Calculated Metrics
 * Update Tags
+* Update Projects
 * DeleteSegments
 * DeleteCalculatedMetrics
 * DeleteVirtualReportSuite
 * DeleteProjects
+* createProject
 
 documentation on reporting [here](./docs/main.md)
 

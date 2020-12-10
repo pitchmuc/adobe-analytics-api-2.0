@@ -3,6 +3,13 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.1.6
+
+* Improving documentation
+* Fixing duplication for Project class analyzer.\
+  Now elementsUsed & nbElementsUsed are using deduplicated values.
+* Adding updateProject and createProject methods (beta - not tested)
+
 ## version 0.1.5
 
 * Improving retry parameter behavior on GET methods
