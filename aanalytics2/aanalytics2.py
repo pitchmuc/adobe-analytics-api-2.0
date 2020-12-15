@@ -6,17 +6,16 @@ import os
 import time
 from concurrent import futures
 from copy import deepcopy
-from pathlib import Path
-from typing import IO, Union, Optional
 from dataclasses import dataclass
+from pathlib import Path
+from typing import IO, Union
 
 # Non standard libraries
 import jwt
 import pandas as pd
 import requests
 
-from aanalytics2 import config, connector
-from .paths import find_path
+from aanalytics2 import config, configs, connector
 
 
 def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
@@ -26,13 +25,7 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
         verbose : OPTIONAL : Default False. If set to True, print information.
         save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt). 
     """
-    private_key_path: Optional[Path] = find_path(
-        config.config_object["pathToKey"])
-    if private_key_path is None:
-        raise FileNotFoundError(
-            f"Unable to find the private key under the path `{config.config_object['pathToKey']}`.")
-    with open(private_key_path, 'r') as f:
-        private_key_unencrypted = f.read()
+    private_key = configs.get_private_key_from_config(config)
     header_jwt = {
         'cache-control': 'no-cache',
         'content-type': 'application/x-www-form-urlencoded'
@@ -46,7 +39,7 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
         "aud": "https://ims-na1.adobelogin.com/c/" + config.config_object["client_id"]
     }
     encoded_jwt = jwt.encode(
-        jwt_payload, private_key_unencrypted, algorithm='RS256')
+        jwt_payload, private_key, algorithm='RS256')
     payload = {
         "client_id": config.config_object["client_id"],
         "client_secret": config.config_object["secret"],
@@ -81,8 +74,7 @@ def _checkToken(func):
         if now > config.config_object["date_limit"] - 1000:
             config.config_object["token"] = retrieveToken(*args, **kwargs)
             if kwargs.get("headers", None) is not None:
-                kwargs['headers']['Authorization'] = "Bearer " + \
-                    config.config_object["token"]
+                kwargs['headers']['Authorization'] = "Bearer " + config.config_object["token"]
             return func(*args, **kwargs)
         else:  # need to return the function for decorator to return something
             return func(*args, **kwargs)

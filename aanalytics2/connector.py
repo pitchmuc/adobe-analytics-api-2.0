@@ -7,8 +7,7 @@ from pathlib import Path
 import jwt
 import requests
 
-from aanalytics2 import config
-from .paths import find_path
+from aanalytics2 import config, configs
 
 
 class AdobeRequest:
@@ -38,22 +37,16 @@ class AdobeRequest:
         if self.config['token'] == "" or time.time() > self.config['date_limit']:
             self.token = self.retrieveToken(verbose=verbose)
 
-    def retrieveToken(self, verbose: bool = False, **kwargs)->str:
+    def retrieveToken(self, verbose: bool = False, **kwargs) -> str:
         """ Retrieve the token by using the information provided by the user during the import importConfigFile function. 
         Argument : 
             verbose : OPTIONAL : Default False. If set to True, print information.
         """
-        private_key_path = find_path(self.config['pathToKey'])
-        if private_key_path is None:
-            raise FileNotFoundError(
-                f"Unable to find the configuration file under path `{self.config['pathToKey']}`."
-            )
-        with open(Path(private_key_path), 'r') as f:
-            private_key_unencrypted = f.read()
-            header_jwt = {
-                'cache-control': 'no-cache',
-                'content-type': 'application/x-www-form-urlencoded'
-            }
+        private_key = configs.get_private_key_from_config(self.config)
+        header_jwt = {
+            'cache-control': 'no-cache',
+            'content-type': 'application/x-www-form-urlencoded'
+        }
         jwt_payload = {
             # Expiration set to 24 hours
             "exp": round(24 * 60 * 60 + int(time.time())),
@@ -64,7 +57,7 @@ class AdobeRequest:
             "aud": "https://ims-na1.adobelogin.com/c/" + self.config['client_id']
         }
         encoded_jwt = jwt.encode(
-            jwt_payload, private_key_unencrypted, algorithm='RS256'
+            jwt_payload, private_key, algorithm='RS256'
         )  # working algorithm
         payload = {
             "client_id": self.config['client_id'],
@@ -123,7 +116,7 @@ class AdobeRequest:
                     print(f'Too many requests: {internRetry} retry left')
                 time.sleep(45)
                 res_json = self.getData(endpoint,params=params,data=data,headers=headers,retry=1,**kwargs)
-                return res_json             
+                return res_json
             res_json = res.json()
         except:
             res_json = {'error': 'Request Error'}

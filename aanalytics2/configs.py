@@ -92,7 +92,8 @@ def configure(org_id: str,
               tech_id: str,
               secret: str,
               path_to_key: str,
-              client_id: str):
+              client_id: str,
+              private_key: str = None):
     """Performs programmatic configuration of the API using provided values."""
 
     if not org_id:
@@ -103,14 +104,27 @@ def configure(org_id: str,
         raise ValueError("`tech_id` must be specified in the configuration.")
     if not secret:
         raise ValueError("`secret` must be specified in the configuration.")
-    if not path_to_key:
-        raise ValueError("`pathToKey` must be specified in the configuration.")
+    if not path_to_key and not private_key:
+        raise ValueError("`pathToKey` or `private_key` must be specified in the configuration.")
     config_object["org_id"] = org_id
     config_object["client_id"] = client_id
     header["x-api-key"] = client_id
     config_object["tech_id"] = tech_id
     config_object["secret"] = secret
     config_object["pathToKey"] = path_to_key
-    # ensure the reset of the state by overwritting possible values from previous import.
+    config_object["private_key"] = private_key
+    # ensure the reset of the state by overwriting possible values from previous import.
     config_object["date_limit"] = 0
     config_object["token"] = ""
+
+
+def get_private_key_from_config(config: dict) -> str:
+    private_key = config.get('private_key')
+    if private_key is not None:
+        return private_key
+    private_key_path = find_path(config['pathToKey'])
+    if private_key_path is None:
+        raise FileNotFoundError(f'Unable to find the private key under path `{config["pathToKey"]}`.')
+    with open(Path(private_key_path), 'r') as f:
+        private_key = f.read()
+    return private_key
