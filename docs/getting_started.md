@@ -48,6 +48,11 @@ import aanalytics2 as api2
 api2.importConfigFile('myconfig.json')
 ```
 
+### Alternative : Using the configure method
+
+When you want to connect to the Analytics API from a server application, you may want to use the `configure` method and passing the element directly.
+You can see more details on that connection method on the [authentication without config json page](./authenticating_without_config_json.md)
+
 ## 5. Get Company ID(s) & create your instance
 
 Once all of these setup steps are completed, you can start using the methods attached to Analytics API.

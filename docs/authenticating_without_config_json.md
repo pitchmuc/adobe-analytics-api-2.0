@@ -42,6 +42,12 @@ PASSWORD = os.environ.get('API_PASSWORD')
 
 The aanalytics2 module provide a configure method that will set the correct value to be used in the module.
 
+**Note** : Be careful there is a possibility to pass the `path_to_key` or `private_key` to the configure method.\
+Select the correct method:
+
+* path_to_key : the element is a path to a file containing your key.
+* private_key : the element is the key as a string directly.
+
 ```python
 import os
 
@@ -50,6 +56,7 @@ my_tech_id = os.environ.get('tech_id')
 my_secret = os.environ.get('secret')
 my_path_to_key = os.environ.get('path_to_key')
 my_client_id = os.environ.get('client_id')
+
 
 import aanalytics2 as api2
 

@@ -74,6 +74,7 @@ def import_config_file(path: str) -> None:
         provided_config = json.load(file)
         provided_keys = provided_config.keys()
         if 'api_key' in provided_keys:
+            ## old naming for client_id
             client_id = provided_config['api_key']
         elif 'client_id' in provided_keys:
             client_id = provided_config['client_id']
@@ -88,14 +89,22 @@ def import_config_file(path: str) -> None:
         )
 
 
-def configure(org_id: str,
-              tech_id: str,
-              secret: str,
-              path_to_key: str,
-              client_id: str,
-              private_key: str = None):
-    """Performs programmatic configuration of the API using provided values."""
-
+def configure(org_id: str = None,
+              tech_id: str = None,
+              secret: str = None,
+              client_id: str = None,
+              path_to_key: str=None,
+              private_key: str = None,
+              ):
+    """Performs programmatic configuration of the API using provided values.
+    Arguments:
+        org_id : REQUIRED : Organization ID
+        tech_id : REQUIRED : Technical Account ID
+        secret : REQUIRED : secret generated for your connection
+        client_id : REQUIRED : The client_id (old api_key) provided by the JWT connection. 
+        path_to_key : REQUIRED : If you have a file containing your private key value.
+        private_key : REQUIRED : If you do not use a file but pass a variable directly.
+    """
     if not org_id:
         raise ValueError("`org_id` must be specified in the configuration.")
     if not client_id:
@@ -119,6 +128,9 @@ def configure(org_id: str,
 
 
 def get_private_key_from_config(config: dict) -> str:
+    """
+    Returns the private key directly or read a file to return the private key.
+    """
     private_key = config.get('private_key')
     if private_key is not None:
         return private_key
