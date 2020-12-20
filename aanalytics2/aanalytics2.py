@@ -25,7 +25,7 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
         verbose : OPTIONAL : Default False. If set to True, print information.
         save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt). 
     """
-    private_key = configs.get_private_key_from_config(config)
+    private_key = configs.get_private_key_from_config(config.config_object)
     header_jwt = {
         'cache-control': 'no-cache',
         'content-type': 'application/x-www-form-urlencoded'
