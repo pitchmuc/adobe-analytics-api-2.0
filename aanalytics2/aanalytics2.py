@@ -520,7 +520,7 @@ class Analytics:
                 f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
         return df_rsids
 
-    def getVirtualReportSuites(self, extended_info: bool = False, limit: int = 100, filterIds: str = None, idContains: str = None, segmentIds: str = None, save: bool = True)->list:
+    def getVirtualReportSuites(self, extended_info: bool = False, limit: int = 100, filterIds: str = None, idContains: str = None, segmentIds: str = None, save: bool = False)->list:
         """
         return a lit of virtual reportSuites and their id. It can contain more information if expansion is selected.
         Arguments:
