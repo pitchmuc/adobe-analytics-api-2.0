@@ -3,6 +3,10 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.1.8
+
+* Fix legacy method to retrieve token that was broken by the new capability.
+
 ## version 0.1.7
 
 * Adding an optional parameter to pass directly the private.key as a string to the `configure` method
