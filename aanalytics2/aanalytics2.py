@@ -8,7 +8,7 @@ from concurrent import futures
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import IO, Union
+from typing import IO, Union, List
 
 # Non standard libraries
 import jwt
@@ -17,6 +17,9 @@ import requests
 
 from aanalytics2 import config, configs, connector
 
+
+JsonOrDataFrameType = Union[pd.DataFrame, dict]
+JsonListOrDataFrameType = Union[pd.DataFrame, List[dict]]
 
 def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
     """Retrieves the token by using the information provided by the user during
@@ -258,7 +261,7 @@ class Project:
     This dataclass extract the information retrieved from the getProjet method.
     It flatten the elements and gives you insights on what your project contains.
     """
-    
+
     def __init__(self,projectDict:dict=None):
         if projectDict is None:
             raise Exception("require a dictionary")
@@ -285,7 +288,7 @@ class Project:
                     self.subPanelsTypes += infos["panels"][panel]['subPanels_types']
                 self.elementsUsed : dict = self._findElements(definition['workspaces'][0])
                 self.nbElementsUsed : int = len(self.elementsUsed['dimensions']) + len(self.elementsUsed['metrics']) + len(self.elementsUsed['segments'])+len(self.elementsUsed['calculatedMetrics'])
-    
+
     def _findPanelsInfos(self,workspace:dict=None)->dict:
         """
         Return a dict of the different information for each Panel.
@@ -586,7 +589,7 @@ class Analytics:
                 f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls)+1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
         return df_vrsids
 
-    def getVirtualReportSuite(self, vrsid: str = None, extended_info: bool = False, format: str = 'df')->object:
+    def getVirtualReportSuite(self, vrsid: str = None, extended_info: bool = False, format: str = 'df')->JsonOrDataFrameType:
         """
         return a single virtual report suite ID information as dataframe.
         Arguments:
@@ -705,7 +708,7 @@ class Analytics:
         res = self.connector.postData(path, data=body, headers=self.header)
         return res
 
-    def getDimensions(self, rsid: str, tags: bool = False, save=False, **kwargs) -> object:
+    def getDimensions(self, rsid: str, tags: bool = False, save=False, **kwargs) -> pd.DataFrame:
         """
         Retrieve the list of dimensions from a specific reportSuite.Shrink columns to simplify output.
         Returns the data frame of available dimensions.
@@ -738,7 +741,7 @@ class Analytics:
             df_dims.to_csv(f'dimensions_{rsid}.csv')
         return df_dims
 
-    def getMetrics(self, rsid: str, tags: bool = False, save=False, **kwargs) -> object:
+    def getMetrics(self, rsid: str, tags: bool = False, save=False, **kwargs) -> pd.DataFrame:
         """
         Retrieve the list of metrics from a specific reportSuite. Shrink columns to simplify output.
         Returns the data frame of available metrics.
@@ -771,7 +774,7 @@ class Analytics:
             df_metrics.to_csv(f'metrics_{rsid}.csv', sep='\t')
         return df_metrics
 
-    def getUsers(self, save: bool = False, **kwargs) -> object:
+    def getUsers(self, save: bool = False, **kwargs) -> pd.DataFrame:
         """
         Retrieve the list of users for a login company.Returns a data frame.
         Arguments:
@@ -825,7 +828,7 @@ class Analytics:
 
     def getSegments(self, name: str = None, tagNames: str = None, inclType: str = 'all', rsids_list: list = None,
                     sidFilter: list = None, extended_info: bool = False, format: str = "df", save: bool = False,
-                    verbose: bool = False, **kwargs) -> object:
+                    verbose: bool = False, **kwargs) -> JsonListOrDataFrameType:
         """
         Retrieve the list of segments. Returns a data frame. 
         Arguments:
@@ -986,7 +989,7 @@ class Analytics:
             extended_info: bool = False,
             save=False,
             **kwargs
-    ) -> object:
+    ) -> pd.DataFrame:
         """
         Retrieve the list of calculated metrics. Returns a data frame. 
         Arguments:
@@ -1088,7 +1091,7 @@ class Analytics:
         )
         return cm
 
-    def getDateRanges(self, extended_info: bool = False, save: bool = False,includeType:str='all',**kwargs) -> object:
+    def getDateRanges(self, extended_info: bool = False, save: bool = False,includeType:str='all',**kwargs) -> pd.DataFrame:
         """
         Get the list of date ranges available for the user.
         Arguments:
@@ -1167,7 +1170,7 @@ class Analytics:
             page = res['number'] +1
             data += self.getTags(limit=limit,page=page)
         return data
-    
+
     def getTag(self,tagId:str=None)->dict:
         """
         Return the a tag by its ID.
@@ -1179,7 +1182,7 @@ class Analytics:
         path = f"/componentmetadata/tags/{tagId}"
         res = self.connector.getData(self.endpoint_company+path,headers=self.header)
         return res
-    
+
     def getComponentTagName(self,tagNames:str=None,componentType:str=None)->dict:
         """
         Given a comma separated list of tag names, return component ids associated with them.
@@ -1199,7 +1202,7 @@ class Analytics:
         }
         res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         return res
-    
+
     def searchComponentsTags(self,componentType:str=None,componentIds:list=None)->dict:
         """
         Search for the tags of a list of component by their ids.
@@ -1282,7 +1285,7 @@ class Analytics:
         path = "​/componentmetadata​/tags​/{tagId}"
         res = self.connector.deleteData(self.endpoint_company+path,headers=self.header)
         return res
-    
+
     def getComponentTags(self,componentId:str=None,componentType:str=None)->list:
         """
         Given a componentId, return all tags associated with that component.
@@ -1322,8 +1325,8 @@ class Analytics:
         path = "/componentmetadata/tags/tagitems"
         res = self.connector.putData(self.endpoint_company+path,data=data,headers=self.header)
         return res
-    
-    def getProjects(self,includeType:str='all',full:bool=False,limit:int=None,includeShared:bool=False,includeTemplate:bool=False,format:str='df',save:bool=False)-> object:
+
+    def getProjects(self,includeType:str='all',full:bool=False,limit:int=None,includeShared:bool=False,includeTemplate:bool=False,format:str='df',save:bool=False)-> JsonListOrDataFrameType:
         """
         Returns the list of projects through either a dataframe or a list.
         Arguments:
@@ -1381,7 +1384,7 @@ class Analytics:
             myProject = Project(res)
             return myProject
         return res
-    
+
     def deleteProject(self,projectId:str=None)->dict:
         """
         Delete the project specified by its ID.
@@ -1393,7 +1396,7 @@ class Analytics:
         path = f"/projects/{projectId}"
         res = self.connector.deleteData(self.endpoint_company + path,headers = self.header)
         return res
-    
+
     def updateProject(self,projectId:str=None,projectObj:dict=None)->dict:
         """
         Update your project with the new object placed as parameter.
@@ -1451,7 +1454,7 @@ class Analytics:
             raise ValueError("Requires definition key to be a dictionary")
         res = self.connector.postData(self.endpoint_company+path,data=projectObj,headers=self.header)
         return res
-        
+
 
 
     def _dataDescriptor(self, json_request: dict):
