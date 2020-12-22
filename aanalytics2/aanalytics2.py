@@ -705,7 +705,7 @@ class Analytics:
         res = self.connector.postData(path, data=body, headers=self.header)
         return res
 
-    def getDimensions(self, rsid: str, tags: bool = False, save=False, **kwargs) -> object:
+    def getDimensions(self, rsid: str, tags: bool = False, save=False, **kwargs) -> pd.DataFrame:
         """
         Retrieve the list of dimensions from a specific reportSuite.Shrink columns to simplify output.
         Returns the data frame of available dimensions.
@@ -738,7 +738,7 @@ class Analytics:
             df_dims.to_csv(f'dimensions_{rsid}.csv')
         return df_dims
 
-    def getMetrics(self, rsid: str, tags: bool = False, save=False, **kwargs) -> object:
+    def getMetrics(self, rsid: str, tags: bool = False, save=False, **kwargs) -> pd.DataFrame:
         """
         Retrieve the list of metrics from a specific reportSuite. Shrink columns to simplify output.
         Returns the data frame of available metrics.
@@ -771,7 +771,7 @@ class Analytics:
             df_metrics.to_csv(f'metrics_{rsid}.csv', sep='\t')
         return df_metrics
 
-    def getUsers(self, save: bool = False, **kwargs) -> object:
+    def getUsers(self, save: bool = False, **kwargs) -> pd.DataFrame:
         """
         Retrieve the list of users for a login company.Returns a data frame.
         Arguments:
@@ -986,7 +986,7 @@ class Analytics:
             extended_info: bool = False,
             save=False,
             **kwargs
-    ) -> object:
+    ) -> pd.DataFrame:
         """
         Retrieve the list of calculated metrics. Returns a data frame. 
         Arguments:
@@ -1088,7 +1088,7 @@ class Analytics:
         )
         return cm
 
-    def getDateRanges(self, extended_info: bool = False, save: bool = False,includeType:str='all',**kwargs) -> object:
+    def getDateRanges(self, extended_info: bool = False, save: bool = False,includeType:str='all',**kwargs) -> pd.DataFrame:
         """
         Get the list of date ranges available for the user.
         Arguments:
@@ -1323,7 +1323,7 @@ class Analytics:
         res = self.connector.putData(self.endpoint_company+path,data=data,headers=self.header)
         return res
     
-    def getProjects(self,includeType:str='all',full:bool=False,limit:int=None,includeShared:bool=False,includeTemplate:bool=False,format:str='df',save:bool=False)-> object:
+    def getProjects(self,includeType:str='all',full:bool=False,limit:int=None,includeShared:bool=False,includeTemplate:bool=False,format:str='df',save:bool=False)-> pd.DataFrame:
         """
         Returns the list of projects through either a dataframe or a list.
         Arguments:
