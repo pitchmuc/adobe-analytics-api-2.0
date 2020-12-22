@@ -1323,7 +1323,7 @@ class Analytics:
         res = self.connector.putData(self.endpoint_company+path,data=data,headers=self.header)
         return res
     
-    def getProjects(self,includeType:str='all',full:bool=False,limit:int=None,includeShared:bool=False,includeTemplate:bool=False,format:str='df',save:bool=False)-> pd.DataFrame:
+    def getProjects(self,includeType:str='all',full:bool=False,limit:int=None,includeShared:bool=False,includeTemplate:bool=False,format:str='df',save:bool=False)-> object:
         """
         Returns the list of projects through either a dataframe or a list.
         Arguments:
