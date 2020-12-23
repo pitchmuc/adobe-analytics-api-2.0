@@ -3,6 +3,11 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.1.9
+
+* Fix default statement for `getVirtualReportSuite` that save the result automatically.
+* Improve return type statement
+
 ## version 0.1.8
 
 * Fix legacy method to retrieve token that was broken by the new capability.
