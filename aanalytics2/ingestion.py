@@ -235,7 +235,7 @@ class Bulkapi:
         with futures.ThreadPoolExecutor(workers) as executor:
             res = executor.map(lambda x, y, z: requests.post(
                 x, headers=y, files=z), list_urls, list_headers, list_files)
-            list_res = list(res)
+            list_res = [response.json() for response in res]
         # cleaning temp folder
         if len(self._createdFiles) > 0:
             for file in self._createdFiles:
