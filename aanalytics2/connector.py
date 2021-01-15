@@ -36,49 +36,90 @@ class AdobeRequest:
         self.retry = retry
         if self.config['token'] == "" or time.time() > self.config['date_limit']:
             self.token = self.retrieveToken(verbose=verbose)
-
-    def retrieveToken(self, verbose: bool = False, **kwargs) -> str:
-        """ Retrieve the token by using the information provided by the user during the import importConfigFile function. 
-        Argument : 
-            verbose : OPTIONAL : Default False. If set to True, print information.
-        """
-        private_key = configs.get_private_key_from_config(self.config)
-        header_jwt = {
-            'cache-control': 'no-cache',
-            'content-type': 'application/x-www-form-urlencoded'
-        }
-        jwt_payload = {
-            # Expiration set to 24 hours
-            "exp": round(24 * 60 * 60 + int(time.time())),
-            "iss": self.config['org_id'],  # org_id
-            # technical_account_id
-            "sub": self.config['tech_id'],
-            "https://ims-na1.adobelogin.com/s/ent_analytics_bulk_ingest_sdk": True,
-            "aud": "https://ims-na1.adobelogin.com/c/" + self.config['client_id']
-        }
-        encoded_jwt = jwt.encode(
-            jwt_payload, private_key, algorithm='RS256'
-        )  # working algorithm
-        payload = {
-            "client_id": self.config['client_id'],
-            "client_secret": self.config['secret'],
-            "jwt_token": encoded_jwt.decode("utf-8")
-        }
-        response = requests.post(self.config['tokenEndpoint'], headers=header_jwt, data=payload)
-        json_response = response.json()
-        try:
-            token = json_response['access_token']
-        except:
-            print("Issue retrieving token")
-            print(json_response)
-        self.config['token'] = token
-        self.header.update({"Authorization": f"Bearer {token}"})
-        expire = json_response['expires_in']
-        self.config["date_limit"] = time.time() + expire / 1000 - 500  # end of time for the token
-        if verbose:
-            print('token valid till : ' + time.ctime(time.time() + expire / 1000))
-            print('token has been saved here : ' + Path.as_posix(Path.cwd()))
-        return token
+    if jwt.__version__ <"2.0.0":
+        def retrieveToken(self, verbose: bool = False, **kwargs) -> str:
+            """ Retrieve the token by using the information provided by the user during the import importConfigFile function. 
+            Argument : 
+                verbose : OPTIONAL : Default False. If set to True, print information.
+            """
+            private_key = configs.get_private_key_from_config(self.config)
+            header_jwt = {
+                'cache-control': 'no-cache',
+                'content-type': 'application/x-www-form-urlencoded'
+            }
+            jwt_payload = {
+                # Expiration set to 24 hours
+                "exp": round(24 * 60 * 60 + int(time.time())),
+                "iss": self.config['org_id'],  # org_id
+                # technical_account_id
+                "sub": self.config['tech_id'],
+                "https://ims-na1.adobelogin.com/s/ent_analytics_bulk_ingest_sdk": True,
+                "aud": "https://ims-na1.adobelogin.com/c/" + self.config['client_id']
+            }
+            encoded_jwt = jwt.encode(
+                jwt_payload, private_key, algorithm='RS256'
+            )  # working algorithm
+            payload = {
+                "client_id": self.config['client_id'],
+                "client_secret": self.config['secret'],
+                "jwt_token": encoded_jwt.decode("utf-8")
+            }
+            response = requests.post(self.config['tokenEndpoint'], headers=header_jwt, data=payload)
+            json_response = response.json()
+            try:
+                token = json_response['access_token']
+            except:
+                print("Issue retrieving token")
+                print(json_response)
+            self.config['token'] = token
+            self.header.update({"Authorization": f"Bearer {token}"})
+            expire = json_response['expires_in']
+            self.config["date_limit"] = time.time() + expire / 1000 - 500  # end of time for the token
+            if verbose:
+                print('token valid till : ' + time.ctime(time.time() + expire / 1000))
+            return token
+    elif jwt.__version__ >="2.0.0":
+        def retrieveToken(self, verbose: bool = False, **kwargs) -> str:
+            """ Retrieve the token by using the information provided by the user during the import importConfigFile function. 
+            Argument : 
+                verbose : OPTIONAL : Default False. If set to True, print information.
+            """
+            private_key = configs.get_private_key_from_config(self.config)
+            header_jwt = {
+                'cache-control': 'no-cache',
+                'content-type': 'application/x-www-form-urlencoded'
+            }
+            jwt_payload = {
+                # Expiration set to 24 hours
+                "exp": round(24 * 60 * 60 + int(time.time())),
+                "iss": self.config['org_id'],  # org_id
+                # technical_account_id
+                "sub": self.config['tech_id'],
+                "https://ims-na1.adobelogin.com/s/ent_analytics_bulk_ingest_sdk": True,
+                "aud": "https://ims-na1.adobelogin.com/c/" + self.config['client_id']
+            }
+            encoded_jwt = jwt.encode(
+                jwt_payload, private_key, algorithm='RS256'
+            )  # working algorithm
+            payload = {
+                "client_id": self.config['client_id'],
+                "client_secret": self.config['secret'],
+                "jwt_token": encoded_jwt
+            }
+            response = requests.post(self.config['tokenEndpoint'], headers=header_jwt, data=payload)
+            json_response = response.json()
+            try:
+                token = json_response['access_token']
+            except:
+                print("Issue retrieving token")
+                print(json_response)
+            self.config['token'] = token
+            self.header.update({"Authorization": f"Bearer {token}"})
+            expire = json_response['expires_in']
+            self.config["date_limit"] = time.time() + expire / 1000 - 500  # end of time for the token
+            if verbose:
+                print('token valid till : ' + time.ctime(time.time() + expire / 1000))
+            return token
 
     def _checkingDate(self)->None:
         """
