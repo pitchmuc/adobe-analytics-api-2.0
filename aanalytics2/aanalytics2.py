@@ -1599,9 +1599,9 @@ class Analytics:
             if verbose:
                 print('Data received.')
             # Recursion to take care of throttling limit
-            if report.get('status_code', 200) == 429:
+            if report.get('status_code', 200) == 429 or report.get('error_code',None) == 429050:
                 if verbose:
-                    print('reaching the limit : pause for 60 s and entering recursion.')
+                    print('reaching the limit : pause for 50 s and entering recursion.')
                 if debug:
                     with open(f'limit_reach_{timestamp}.json', 'w') as f:
                         f.write(json.dumps(report, indent=4))

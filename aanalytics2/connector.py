@@ -147,6 +147,8 @@ class AdobeRequest:
             res = requests.post(endpoint, headers=headers, params=params, data=json.dumps(data))
         try:
             res_json = res.json()
+            if res.status_code == 429 or res_json.get('error_code', None) == "429050":
+                res_json['status_code'] = 429
         except:
             res_json = {'error': 'Request Error'}
         return res_json
