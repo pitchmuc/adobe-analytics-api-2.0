@@ -11,62 +11,13 @@ from pathlib import Path
 from typing import IO, Union, List
 
 # Non standard libraries
-import jwt
 import pandas as pd
 import requests
 
-from aanalytics2 import config, configs, connector
-
+from aanalytics2 import config, connector, token_provider
 
 JsonOrDataFrameType = Union[pd.DataFrame, dict]
 JsonListOrDataFrameType = Union[pd.DataFrame, List[dict]]
-
-def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
-    """Retrieves the token by using the information provided by the user during
-    the import importConfigFile function.
-    Argument : 
-        verbose : OPTIONAL : Default False. If set to True, print information.
-        save : OPTIONAL : Default False. If set to True, will save the token in a txt file (token.txt). 
-    """
-    private_key = configs.get_private_key_from_config(config.config_object)
-    header_jwt = {
-        'cache-control': 'no-cache',
-        'content-type': 'application/x-www-form-urlencoded'
-    }
-    jwt_payload = {
-        # Expiration set to 24 hours
-        "exp": round(24 * 60 * 60 + int(time.time())),
-        "iss": config.config_object["org_id"],  # org_id
-        "sub": config.config_object["tech_id"],  # technical_account_id
-        "https://ims-na1.adobelogin.com/s/ent_analytics_bulk_ingest_sdk": True,
-        "aud": "https://ims-na1.adobelogin.com/c/" + config.config_object["client_id"]
-    }
-    encoded_jwt = jwt.encode(
-        jwt_payload, private_key, algorithm='RS256')
-    payload = {
-        "client_id": config.config_object["client_id"],
-        "client_secret": config.config_object["secret"],
-        "jwt_token": encoded_jwt.decode("utf-8")
-    }
-    token_endpoint = "https://ims-na1.adobelogin.com/ims/exchange/jwt"
-    response = requests.post(
-        token_endpoint, headers=header_jwt, data=payload)
-    json_response = response.json()
-    token = json_response['access_token']
-    config.header["Authorization"] = "Bearer " + token
-    config.config_object["token"] = token
-    expire = json_response['expires_in']
-    config.config_object["date_limit"] = time.time() + expire / 1000 - \
-                                         500  # end of time for the token
-    if save:
-        with open('token.txt', 'w') as f:  # save the token
-            f.write(token)
-        if verbose:
-            print(
-                f"token valid till : {time.ctime(time.time() + expire / 1000)}")
-            print(
-                f"token has been saved here: {os.getcwd()}{os.sep}token.txt")
-    return token
 
 
 def _checkToken(func):
@@ -75,9 +26,14 @@ def _checkToken(func):
     def checking(*args, **kwargs):  # if function is not wrapped, will fire
         now = time.time()
         if now > config.config_object["date_limit"] - 1000:
-            config.config_object["token"] = retrieveToken(*args, **kwargs)
+            token_with_expiry = token_provider.get_token_and_expiry_for_config(config.config_object, *args,
+                                                                               **kwargs)
+            token = token_with_expiry['token']
+            config.config_object['token'] = token
+            config.config_object['date_limit'] = time.time() + token_with_expiry['expiry'] / 1000 - 500
+            config.header.update({'Authorization': f'Bearer {token}'})
             if kwargs.get("headers", None) is not None:
-                kwargs['headers']['Authorization'] = "Bearer " + config.config_object["token"]
+                kwargs['headers']['Authorization'] = "Bearer " + token
             return func(*args, **kwargs)
         else:  # need to return the function for decorator to return something
             return func(*args, **kwargs)
@@ -213,7 +169,7 @@ class Login:
     Class to connect to the the login company.
     """
 
-    def __init__(self, config: dict = config.config_object, header: dict = config.header, retry: int = 0)->None:
+    def __init__(self, config: dict = config.config_object, header: dict = config.header, retry: int = 0) -> None:
         """
         Instantiate the Loggin class.
         Arguments:
@@ -227,7 +183,7 @@ class Login:
         self.COMPANY_IDS = {}
         self.retry = retry
 
-    def getCompanyId(self)->dict:
+    def getCompanyId(self) -> dict:
         """
         Retrieve the company ids for later call for the properties.
         """
@@ -243,8 +199,7 @@ class Login:
             print(json_res)
             return None
 
-
-    def createAnalyticsConnection(self, companyId: str = None)->object:
+    def createAnalyticsConnection(self, companyId: str = None) -> object:
         """
         Returns an instance of the Analytics class so you can query the different elements from that instance.
         Arguments:
@@ -255,6 +210,7 @@ class Login:
                               config_object=self.connector.config, header=self.header, retry=self.retry)
         return analytics
 
+
 @dataclass
 class Project:
     """
@@ -262,70 +218,75 @@ class Project:
     It flatten the elements and gives you insights on what your project contains.
     """
 
-    def __init__(self,projectDict:dict=None):
+    def __init__(self, projectDict: dict = None):
         if projectDict is None:
             raise Exception("require a dictionary")
-        self.id : str = projectDict.get('id','')
-        self.name : str = projectDict.get('name','')
-        self.description : str = projectDict.get('description','')
-        self.rsid : str = projectDict.get('rsid','')
-        self.ownerName : str =  projectDict['owner'].get('name','')
-        self.ownerId : int =  projectDict['owner'].get('id','')
-        self.ownerEmail : int =  projectDict['owner'].get('login','')
-        self.template : bool = projectDict.get('companyTemplate',False)
-        self.version : str = None
+        self.id: str = projectDict.get('id', '')
+        self.name: str = projectDict.get('name', '')
+        self.description: str = projectDict.get('description', '')
+        self.rsid: str = projectDict.get('rsid', '')
+        self.ownerName: str = projectDict['owner'].get('name', '')
+        self.ownerId: int = projectDict['owner'].get('id', '')
+        self.ownerEmail: int = projectDict['owner'].get('login', '')
+        self.template: bool = projectDict.get('companyTemplate', False)
+        self.version: str = None
         if 'definition' in projectDict.keys():
-            definition : dict = projectDict['definition']
-            self.version : str = definition['version']
-            self.curation : bool = definition.get('isCurated',False)
-            if definition.get('device','desktop') != 'cell':
+            definition: dict = projectDict['definition']
+            self.version: str = definition['version']
+            self.curation: bool = definition.get('isCurated', False)
+            if definition.get('device', 'desktop') != 'cell':
                 infos = self._findPanelsInfos(definition['workspaces'][0])
-                self.nbPanels : int = infos["nb_Panels"]
-                self.nbSubPanels : int = 0
-                self.subPanelsTypes : list = []
+                self.nbPanels: int = infos["nb_Panels"]
+                self.nbSubPanels: int = 0
+                self.subPanelsTypes: list = []
                 for panel in infos["panels"]:
                     self.nbSubPanels += infos["panels"][panel]['nb_subPanels']
                     self.subPanelsTypes += infos["panels"][panel]['subPanels_types']
-                self.elementsUsed : dict = self._findElements(definition['workspaces'][0])
-                self.nbElementsUsed : int = len(self.elementsUsed['dimensions']) + len(self.elementsUsed['metrics']) + len(self.elementsUsed['segments'])+len(self.elementsUsed['calculatedMetrics'])
+                self.elementsUsed: dict = self._findElements(definition['workspaces'][0])
+                self.nbElementsUsed: int = len(self.elementsUsed['dimensions']) + len(
+                    self.elementsUsed['metrics']) + len(self.elementsUsed['segments']) + len(
+                    self.elementsUsed['calculatedMetrics'])
 
-    def _findPanelsInfos(self,workspace:dict=None)->dict:
+    def _findPanelsInfos(self, workspace: dict = None) -> dict:
         """
         Return a dict of the different information for each Panel.
         Arguments:
             workspace : REQUIRED : the workspace dictionary. 
         """
-        dict_data = {'workspace_id' : workspace['id']}
+        dict_data = {'workspace_id': workspace['id']}
         dict_data['nb_Panels'] = len(workspace['panels'])
         dict_data['panels'] = {}
         for panel in workspace['panels']:
             dict_data["panels"][panel['id']] = {}
-            dict_data["panels"][panel['id']]['name'] = panel.get('name','Default Name')
+            dict_data["panels"][panel['id']]['name'] = panel.get('name', 'Default Name')
             dict_data["panels"][panel['id']]['nb_subPanels'] = len(panel['subPanels'])
-            dict_data["panels"][panel['id']]['subPanels_types'] = [subPanel['reportlet']['type'] for subPanel in panel['subPanels']]
+            dict_data["panels"][panel['id']]['subPanels_types'] = [subPanel['reportlet']['type'] for subPanel in
+                                                                   panel['subPanels']]
         return dict_data
 
-    def _findElements(self,workspace:dict)->list:
+    def _findElements(self, workspace: dict) -> list:
         """
         Returns the list of dimensions used in the FreeformReportlet. 
         Arguments :
             workspace : REQUIRED : the workspace dictionary.
         """
-        dict_elements : dict = {'dimensions':[],"metrics":[],'segments':[],"reportSuites":[],'calculatedMetrics':[]}
+        dict_elements: dict = {'dimensions': [], "metrics": [], 'segments': [], "reportSuites": [],
+                               'calculatedMetrics': []}
         for panel in workspace['panels']:
             if "reportSuite" in panel.keys():
                 dict_elements['reportSuites'].append(panel['reportSuite']['id'])
             elif "rsid" in panel.keys():
                 dict_elements['reportSuites'].append(panel['rsid'])
-            filters : list = panel['segmentGroups']
-            if len(filters)>0:
+            filters: list = panel['segmentGroups']
+            if len(filters) > 0:
                 for element in filters:
                     typeElement = element['componentOptions'][0]['component']['type']
                     idElement = element['componentOptions'][0]['component']['id']
-                    if  typeElement == "Segment":
+                    if typeElement == "Segment":
                         dict_elements['segments'].append(idElement)
                     if typeElement == "DimensionItem":
-                        clean_id : str = idElement[:idElement.find('::')] ## cleaning this type of element : 'variables/evar7.6::3000623228'
+                        clean_id: str = idElement[:idElement.find(
+                            '::')]  ## cleaning this type of element : 'variables/evar7.6::3000623228'
                         dict_elements['dimensions'].append(clean_id)
             for subPanel in panel['subPanels']:
                 if subPanel['reportlet']['type'] == "FreeformReportlet":
@@ -337,7 +298,7 @@ class Project:
                         for row in rows["staticRows"]:
                             ## I have to get a temp dimension to clean them before loading them in order to avoid counting them multiple time for each rows.
                             temp_list_dim = []
-                            componentType :str = row['component']['type']
+                            componentType: str = row['component']['type']
                             if componentType == "DimensionItem":
                                 temp_list_dim.append(row['component']['id'])
                             elif componentType == "Segments":
@@ -346,7 +307,7 @@ class Project:
                                 dict_elements['metrics'].append(row['component']['id'])
                             elif componentType == "CalculatedMetric":
                                 dict_elements['calculatedMetrics'].append(row['component']['id'])
-                        if len(temp_list_dim)>0:
+                        if len(temp_list_dim) > 0:
                             temp_list_dim = list(set([el[:el.find('::')] for el in temp_list_dim]))
                         for dim in temp_list_dim:
                             dict_elements['dimensions'].append(dim)
@@ -356,7 +317,7 @@ class Project:
                         dict_elements['calculatedMetrics'] += temp_data['calculatedMetrics']
                         dict_elements['segments'] += temp_data['segments']
                         dict_elements['metrics'] += temp_data['metrics']
-                        if len(temp_data['dimensions'])>0:
+                        if len(temp_data['dimensions']) > 0:
                             for dim in set(temp_data['dimensions']):
                                 dict_elements['dimensions'].append(dim)
         dict_elements['metrics'] = list(set(dict_elements['metrics']))
@@ -365,13 +326,14 @@ class Project:
         dict_elements['calculatedMetrics'] = list(set(dict_elements['calculatedMetrics']))
         return dict_elements
 
-    def _recursiveColumn(self,node:dict=None,temp_data:dict=None):
+    def _recursiveColumn(self, node: dict = None, temp_data: dict = None):
         """
         recursive function to fetch elements in column stack
         """
         if temp_data is None:
-            temp_data : dict = {'dimensions':[],"metrics":[],'segments':[],"reportSuites":[],'calculatedMetrics':[]}
-        componentType : str = node['component']['type']
+            temp_data: dict = {'dimensions': [], "metrics": [], 'segments': [], "reportSuites": [],
+                               'calculatedMetrics': []}
+        componentType: str = node['component']['type']
         if componentType == "Metric":
             temp_data['metrics'].append(node['component']['id'])
         elif componentType == "CalculatedMetric":
@@ -379,44 +341,44 @@ class Project:
         elif componentType == "Segments":
             temp_data['segments'].append(node['component']['id'])
         elif componentType == "DimensionItem":
-            old_id : str = node['component']['id']
-            new_id:str = old_id[:old_id.find('::')]
+            old_id: str = node['component']['id']
+            new_id: str = old_id[:old_id.find('::')]
             temp_data['dimensions'].append(new_id)
-        if len(node['nodes'])>0:
+        if len(node['nodes']) > 0:
             for new_node in node['nodes']:
-                temp_data = self._recursiveColumn(new_node,temp_data=temp_data)
+                temp_data = self._recursiveColumn(new_node, temp_data=temp_data)
         return temp_data
 
-    def to_dict(self)->dict:
+    def to_dict(self) -> dict:
         """
         transform the class into a dictionary
         """
         obj = {
-            'id':self.id,
-            'name':self.name,
-            'description':self.description,
-            'rsid' : self.rsid ,
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'rsid': self.rsid,
             'ownerName': self.ownerName,
             'ownerId': self.ownerId,
-            'ownerEmail':self.ownerEmail ,
+            'ownerEmail': self.ownerEmail,
             'template': self.template,
         }
         add_object = {}
-        if hasattr(self,'nbPanels'):
+        if hasattr(self, 'nbPanels'):
             add_object = {
-                'curation' : self.curation,
-                'version' : self.version,
-                'nbPanels' : self.nbPanels,
-                'nbSubPanels' : self.nbSubPanels,
-                'subPanelsTypes' : self.subPanelsTypes,
+                'curation': self.curation,
+                'version': self.version,
+                'nbPanels': self.nbPanels,
+                'nbSubPanels': self.nbSubPanels,
+                'subPanelsTypes': self.subPanelsTypes,
                 'nbElementsUsed': self.nbElementsUsed,
                 'dimensions': self.elementsUsed['dimensions'],
-                'metrics' : self.elementsUsed['metrics'],
-                'segments' : self.elementsUsed['segments'],
-                'calculatedMetrics':self.elementsUsed['calculatedMetrics'],
-                'rsids' : self.elementsUsed['reportSuites'],
+                'metrics': self.elementsUsed['metrics'],
+                'segments': self.elementsUsed['segments'],
+                'calculatedMetrics': self.elementsUsed['calculatedMetrics'],
+                'rsids': self.elementsUsed['reportSuites'],
             }
-        full_obj = {**obj,**add_object}
+        full_obj = {**obj, **add_object}
         return full_obj
 
 
@@ -440,7 +402,8 @@ class Analytics:
     _getDateRanges = '/dateranges'
     _getReport = '/reports'
 
-    def __init__(self, company_id: str = None, config_object: dict = config.config_object, header: dict = config.header, retry: int = 0):
+    def __init__(self, company_id: str = None, config_object: dict = config.config_object, header: dict = config.header,
+                 retry: int = 0):
         """
         Instantiate the 
         """
@@ -523,7 +486,8 @@ class Analytics:
                 f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
         return df_rsids
 
-    def getVirtualReportSuites(self, extended_info: bool = False, limit: int = 100, filterIds: str = None, idContains: str = None, segmentIds: str = None, save: bool = False)->list:
+    def getVirtualReportSuites(self, extended_info: bool = False, limit: int = 100, filterIds: str = None,
+                               idContains: str = None, segmentIds: str = None, save: bool = False) -> list:
         """
         return a lit of virtual reportSuites and their id. It can contain more information if expansion is selected.
         Arguments:
@@ -586,10 +550,11 @@ class Analytics:
             df_vrsids.to_csv('VRSIDS.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
             print(
-                f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls)+1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
+                f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
         return df_vrsids
 
-    def getVirtualReportSuite(self, vrsid: str = None, extended_info: bool = False, format: str = 'df')->JsonOrDataFrameType:
+    def getVirtualReportSuite(self, vrsid: str = None, extended_info: bool = False,
+                              format: str = 'df') -> JsonOrDataFrameType:
         """
         return a single virtual report suite ID information as dataframe.
         Arguments:
@@ -624,7 +589,8 @@ class Analytics:
                                    "curatedComponents"].iloc[0, 0]
         return pd.DataFrame(components_cell).fillna(value=nan_value)
 
-    def createVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None, dataSchema: str = "Cache", data_dict: dict = None, **kwargs)->dict:
+    def createVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None,
+                                 dataSchema: str = "Cache", data_dict: dict = None, **kwargs) -> dict:
         """
         Create a new virtual report suite based on the information provided.
         Arguments:
@@ -668,7 +634,7 @@ class Analytics:
         res = self.connector.putData(path, data=body, headers=self.header)
         return res
 
-    def deleteVirtualReportSuite(self, vrsid: str = None)->str:
+    def deleteVirtualReportSuite(self, vrsid: str = None) -> str:
         """
         Delete a Virtual Report Suite based on the id passed.
         Arguments:
@@ -680,7 +646,8 @@ class Analytics:
         res = self.connector.deleteData(path, headers=self.header)
         return res
 
-    def validateVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None,  dataSchema: str = "Cache", data_dict: dict = None, **kwargs)->dict:
+    def validateVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None,
+                                   dataSchema: str = "Cache", data_dict: dict = None, **kwargs) -> dict:
         """
         Validate the object to create a new virtual report suite based on the information provided.
         Arguments:
@@ -1091,7 +1058,8 @@ class Analytics:
         )
         return cm
 
-    def getDateRanges(self, extended_info: bool = False, save: bool = False,includeType:str='all',**kwargs) -> pd.DataFrame:
+    def getDateRanges(self, extended_info: bool = False, save: bool = False, includeType: str = 'all',
+                      **kwargs) -> pd.DataFrame:
         """
         Get the list of date ranges available for the user.
         Arguments:
@@ -1118,7 +1086,7 @@ class Analytics:
         data = dateRanges['content']
         df_dates = pd.DataFrame(data)
         if save:
-            df_dates.to_csv('date_range.csv',index=False)
+            df_dates.to_csv('date_range.csv', index=False)
         return df_dates
 
     def updateDateRange(self, dateRangeID: str = None, dateRangeJSON: dict = None) -> object:
@@ -1161,17 +1129,17 @@ class Analytics:
             limit : OPTIONAL : Amount of tag to be returned by request. Default 100
         """
         path = "/componentmetadata/tags"
-        params = {'limit':limit}
-        if kwargs.get('page',False):
-            params['page'] = kwargs.get('page',0)
-        res = self.connector.getData(self.endpoint_company + path,params=params,headers = self.header)
+        params = {'limit': limit}
+        if kwargs.get('page', False):
+            params['page'] = kwargs.get('page', 0)
+        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         data = res['content']
         if not res['lastPage']:
-            page = res['number'] +1
-            data += self.getTags(limit=limit,page=page)
+            page = res['number'] + 1
+            data += self.getTags(limit=limit, page=page)
         return data
 
-    def getTag(self,tagId:str=None)->dict:
+    def getTag(self, tagId: str = None) -> dict:
         """
         Return the a tag by its ID.
         Arguments:
@@ -1180,10 +1148,10 @@ class Analytics:
         if tagId is None:
             raise Exception("Require a tag ID for this method.")
         path = f"/componentmetadata/tags/{tagId}"
-        res = self.connector.getData(self.endpoint_company+path,headers=self.header)
+        res = self.connector.getData(self.endpoint_company + path, headers=self.header)
         return res
 
-    def getComponentTagName(self,tagNames:str=None,componentType:str=None)->dict:
+    def getComponentTagName(self, tagNames: str = None, componentType: str = None) -> dict:
         """
         Given a comma separated list of tag names, return component ids associated with them.
         Arguments:
@@ -1197,13 +1165,13 @@ class Analytics:
         if componentType is None:
             raise Exception("Requires a Component Type to be provided")
         params = {
-            "tagNames" : tagNames,
-            "componentType" : componentType
+            "tagNames": tagNames,
+            "componentType": componentType
         }
         res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         return res
 
-    def searchComponentsTags(self,componentType:str=None,componentIds:list=None)->dict:
+    def searchComponentsTags(self, componentType: str = None, componentIds: list = None) -> dict:
         """
         Search for the tags of a list of component by their ids.
         Arguments:
@@ -1217,10 +1185,10 @@ class Analytics:
             raise Exception("componentIds is required as a list of ids")
         path = "/componentmetadata/tags/component/search"
         obj = {
-            "componentType":componentType,
-            "componentIds" : componentIds
+            "componentType": componentType,
+            "componentIds": componentIds
         }
-        res = self.connector.postData(self.endpoint_company+path,data=obj,headers=self.header)
+        res = self.connector.postData(self.endpoint_company + path, data=obj, headers=self.header)
         return res
 
     def createTags(self, data: list = None) -> dict:
@@ -1254,7 +1222,7 @@ class Analytics:
         res = self.connector.postData(self.endpoint_company + path, data=data, headers=self.header)
         return res
 
-    def deleteTags(self,componentType:str=None,componentIds:str=None)->str:
+    def deleteTags(self, componentType: str = None, componentIds: str = None) -> str:
         """
         Delete all tags from the component Type and the component ids specified.
         Arguments:
@@ -1268,13 +1236,13 @@ class Analytics:
             raise Exception("require component ID(s)")
         path = "/componentmetadata/tags"
         params = {
-            "componentType" : componentType,
-            "componentIds" : componentIds
+            "componentType": componentType,
+            "componentIds": componentIds
         }
-        res = self.connector.deleteData(self.endpoint_company+path,params=params,headers=self.header)
+        res = self.connector.deleteData(self.endpoint_company + path, params=params, headers=self.header)
         return res
 
-    def deleteTag(self,tagId:str=None)->str:
+    def deleteTag(self, tagId: str = None) -> str:
         """
         Delete a Tag based on its id.
         Arguments:
@@ -1283,10 +1251,10 @@ class Analytics:
         if tagId is None:
             raise Exception("A tag ID is required")
         path = "​/componentmetadata​/tags​/{tagId}"
-        res = self.connector.deleteData(self.endpoint_company+path,headers=self.header)
+        res = self.connector.deleteData(self.endpoint_company + path, headers=self.header)
         return res
 
-    def getComponentTags(self,componentId:str=None,componentType:str=None)->list:
+    def getComponentTags(self, componentId: str = None, componentType: str = None) -> list:
         """
         Given a componentId, return all tags associated with that component.
         Arguments:
@@ -1299,11 +1267,11 @@ class Analytics:
             raise Exception("require a component type")
         if componentId is None:
             raise Exception("require a component ID")
-        params = {"componentId":componentId,"componentType":componentType}
-        res = self.connector.getData(self.endpoint_company+path, params=params,headers=self.header)
+        params = {"componentId": componentId, "componentType": componentType}
+        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         return res
 
-    def updateComponentTags(self,data:list=None):
+    def updateComponentTags(self, data: list = None):
         """
         Overwrite the component Tags with the list send.
         Arguments:
@@ -1323,10 +1291,11 @@ class Analytics:
         if data is None or type(data) != list:
             raise Exception("require list of update to be sent.")
         path = "/componentmetadata/tags/tagitems"
-        res = self.connector.putData(self.endpoint_company+path,data=data,headers=self.header)
+        res = self.connector.putData(self.endpoint_company + path, data=data, headers=self.header)
         return res
 
-    def getProjects(self,includeType:str='all',full:bool=False,limit:int=None,includeShared:bool=False,includeTemplate:bool=False,format:str='df',save:bool=False)-> JsonListOrDataFrameType:
+    def getProjects(self, includeType: str = 'all', full: bool = False, limit: int = None, includeShared: bool = False,
+                    includeTemplate: bool = False, format: str = 'df', save: bool = False) -> JsonListOrDataFrameType:
         """
         Returns the list of projects through either a dataframe or a list.
         Arguments:
@@ -1341,9 +1310,10 @@ class Analytics:
             save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
         """
         path = "/projects"
-        params = {"includeType":includeType}
+        params = {"includeType": includeType}
         if full:
-            params["expansion"] = 'reportSuiteName,ownerFullName,tags,shares,sharesFullName,modified,favorite,approved,companyTemplate,externalReferences,accessLevel'
+            params[
+                "expansion"] = 'reportSuiteName,ownerFullName,tags,shares,sharesFullName,modified,favorite,approved,companyTemplate,externalReferences,accessLevel'
         else:
             params["expansion"] = "ownerFullName,modified"
             if includeShared:
@@ -1366,7 +1336,7 @@ class Analytics:
             df.to_csv('projects.csv', index=False)
         return df
 
-    def getProject(self,projectId:str=None,projectClass:bool=False,verbose:bool=False)->dict:
+    def getProject(self, projectId: str = None, projectClass: bool = False, verbose: bool = False) -> dict:
         """
         Return the dictionary of the project information and its definition.
         Arguments:
@@ -1375,9 +1345,10 @@ class Analytics:
         """
         if projectId is None:
             raise Exception("Requires a projectId parameter")
-        params = {'expansion' : 'definition,ownerFullName,modified,favorite,approved,tags,shares,sharesFullName,reportSuiteName,companyTemplate,accessLevel'}
+        params = {
+            'expansion': 'definition,ownerFullName,modified,favorite,approved,tags,shares,sharesFullName,reportSuiteName,companyTemplate,accessLevel'}
         path = f"/projects/{projectId}"
-        res = self.connector.getData(self.endpoint_company + path,params=params,headers = self.header,verbose=verbose)
+        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header, verbose=verbose)
         if projectClass:
             if verbose:
                 print('building an instance of Project class')
@@ -1385,7 +1356,7 @@ class Analytics:
             return myProject
         return res
 
-    def deleteProject(self,projectId:str=None)->dict:
+    def deleteProject(self, projectId: str = None) -> dict:
         """
         Delete the project specified by its ID.
         Arguments:
@@ -1394,10 +1365,10 @@ class Analytics:
         if projectId is None:
             raise Exception("Requires a projectId parameter")
         path = f"/projects/{projectId}"
-        res = self.connector.deleteData(self.endpoint_company + path,headers = self.header)
+        res = self.connector.deleteData(self.endpoint_company + path, headers=self.header)
         return res
 
-    def updateProject(self,projectId:str=None,projectObj:dict=None)->dict:
+    def updateProject(self, projectId: str = None, projectObj: dict = None) -> dict:
         """
         Update your project with the new object placed as parameter.
         Arguments:
@@ -1424,11 +1395,10 @@ class Analytics:
             raise KeyError("Requires definition key in the project object")
         if type(projectObj['definition']) != dict:
             raise ValueError("Requires definition key to be a dictionary")
-        res = self.connector.putData(self.endpoint_company+path,data=projectObj,headers=self.header)
+        res = self.connector.putData(self.endpoint_company + path, data=projectObj, headers=self.header)
         return res
 
-
-    def createProject(self,projectObj:dict=None)->dict:
+    def createProject(self, projectObj: dict = None) -> dict:
         """
         Create a project based on the definition you have set.
         Arguments:
@@ -1452,10 +1422,8 @@ class Analytics:
             raise KeyError("Requires definition key in the project object")
         if type(projectObj['definition']) != dict:
             raise ValueError("Requires definition key to be a dictionary")
-        res = self.connector.postData(self.endpoint_company+path,data=projectObj,headers=self.header)
+        res = self.connector.postData(self.endpoint_company + path, data=projectObj, headers=self.header)
         return res
-
-
 
     def _dataDescriptor(self, json_request: dict):
         """

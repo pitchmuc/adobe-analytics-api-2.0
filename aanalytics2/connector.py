@@ -1,13 +1,11 @@
 import json
 import time
 from copy import deepcopy
-from pathlib import Path
 
 # Non standard libraries
-import jwt
 import requests
 
-from aanalytics2 import config, configs
+from aanalytics2 import config, token_provider
 
 
 class AdobeRequest:
@@ -28,59 +26,22 @@ class AdobeRequest:
             verbose : OPTIONAL : display comment on the request.
             retry : OPTIONAL : If you wish to retry failed GET requests
         """
-        if config_object['org_id'] == "":
+        if config_object['org_id'] == '':
             raise Exception(
                 'You have to upload the configuration file with importConfigFile method.')
         self.config = deepcopy(config_object)
         self.header = deepcopy(header)
         self.retry = retry
-        if self.config['token'] == "" or time.time() > self.config['date_limit']:
-            self.token = self.retrieveToken(verbose=verbose)
+        if self.config['token'] == '' or time.time() > self.config['date_limit']:
+            token_and_expiry = token_provider.get_token_and_expiry_for_config(config=self.config, verbose=verbose)
+            token = token_and_expiry['token']
+            expiry = token_and_expiry['expiry']
+            self.token = token
+            self.config['token'] = token
+            self.config['date_limit'] = time.time() + expiry / 1000 - 500
+            self.header.update({'Authorization': f'Bearer {token}'})
 
-    def retrieveToken(self, verbose: bool = False, **kwargs) -> str:
-        """ Retrieve the token by using the information provided by the user during the import importConfigFile function. 
-        Argument : 
-            verbose : OPTIONAL : Default False. If set to True, print information.
-        """
-        private_key = configs.get_private_key_from_config(self.config)
-        header_jwt = {
-            'cache-control': 'no-cache',
-            'content-type': 'application/x-www-form-urlencoded'
-        }
-        jwt_payload = {
-            # Expiration set to 24 hours
-            "exp": round(24 * 60 * 60 + int(time.time())),
-            "iss": self.config['org_id'],  # org_id
-            # technical_account_id
-            "sub": self.config['tech_id'],
-            "https://ims-na1.adobelogin.com/s/ent_analytics_bulk_ingest_sdk": True,
-            "aud": "https://ims-na1.adobelogin.com/c/" + self.config['client_id']
-        }
-        encoded_jwt = jwt.encode(
-            jwt_payload, private_key, algorithm='RS256'
-        )  # working algorithm
-        payload = {
-            "client_id": self.config['client_id'],
-            "client_secret": self.config['secret'],
-            "jwt_token": encoded_jwt.decode("utf-8")
-        }
-        response = requests.post(self.config['tokenEndpoint'], headers=header_jwt, data=payload)
-        json_response = response.json()
-        try:
-            token = json_response['access_token']
-        except:
-            print("Issue retrieving token")
-            print(json_response)
-        self.config['token'] = token
-        self.header.update({"Authorization": f"Bearer {token}"})
-        expire = json_response['expires_in']
-        self.config["date_limit"] = time.time() + expire / 1000 - 500  # end of time for the token
-        if verbose:
-            print('token valid till : ' + time.ctime(time.time() + expire / 1000))
-            print('token has been saved here : ' + Path.as_posix(Path.cwd()))
-        return token
-
-    def _checkingDate(self)->None:
+    def _checkingDate(self) -> None:
         """
         Checking if the token is still valid
         """
@@ -92,7 +53,7 @@ class AdobeRequest:
         """
         Abstraction for getting data
         """
-        internRetry = self.retry - kwargs.get("retry",0)
+        internRetry = self.retry - kwargs.get("retry", 0)
         self._checkingDate()
         if headers is None:
             headers = self.header
@@ -107,30 +68,30 @@ class AdobeRequest:
                 endpoint, headers=headers, data=data)
         elif params is not None and data is not None:
             res = requests.get(endpoint, headers=headers, params=params, data=data)
-        if kwargs.get("verbose",False):
+        if kwargs.get("verbose", False):
             print(f"request URL : {res.request.url}")
             print(f"statut_code : {res.status_code}")
         try:
             if res.status_code == 429 and internRetry > 0:
-                if kwargs.get("verbose",False):
+                if kwargs.get("verbose", False):
                     print(f'Too many requests: {internRetry} retry left')
                 time.sleep(45)
-                res_json = self.getData(endpoint,params=params,data=data,headers=headers,retry=1,**kwargs)
+                res_json = self.getData(endpoint, params=params, data=data, headers=headers, retry=1, **kwargs)
                 return res_json
             res_json = res.json()
         except:
             res_json = {'error': 'Request Error'}
             if internRetry > 0:
-                if kwargs.get("verbose",False):
+                if kwargs.get("verbose", False):
                     print('Retry parameter activated')
                     print(f'{internRetry} retry left')
                 if 'error' in res_json.keys():
                     time.sleep(30)
-                    res_json = self.getData(endpoint,params=params,data=data,headers=headers,retry=1,**kwargs)
+                    res_json = self.getData(endpoint, params=params, data=data, headers=headers, retry=1, **kwargs)
                     return res_json
         return res_json
 
-    def postData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, * args, **kwargs):
+    def postData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, *args, **kwargs):
         """
         Abstraction for posting data
         """
