@@ -1599,16 +1599,15 @@ class Analytics:
             if verbose:
                 print('Data received.')
             # Recursion to take care of throttling limit
-            if report.get('status_code', 200) == 429 or report.get('error_code',None) == "429050":
+            while report.get('status_code', 200) == 429 or report.get('error_code',None) == "429050":
                 if verbose:
                     print('reaching the limit : pause for 50 s and entering recursion.')
                 if debug:
                     with open(f'limit_reach_{timestamp}.json', 'w') as f:
                         f.write(json.dumps(report, indent=4))
                 time.sleep(50)
-                obj = self.getReport(json_request=request, n_result=n_result,
-                                     save=save, item_id=item_id, verbose=verbose)
-                return obj
+                report = self.connector.postData(self.endpoint_company +
+                                             self._getReport, data=request, headers=self.header)
             if 'lastPage' not in report:  # checking error when no lastPage key in report
                 if verbose:
                     print(json.dumps(report, indent=2))
