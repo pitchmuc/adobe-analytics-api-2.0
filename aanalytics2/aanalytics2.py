@@ -171,9 +171,9 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs)->str:
     token = token_with_expiry['token']
     config.config_object['token'] = token
     config.config_object['date_limit'] = time.time() + token_with_expiry['expiry'] / 1000 - 500
+    config.header.update({'Authorization': f'Bearer {token}'})
     if verbose:
         print(f"token valid till : {time.ctime(time.time() + token_with_expiry['expiry'] / 1000)}")
-    config.header.update({'Authorization': f'Bearer {token}'})
     return token
 
 
@@ -430,6 +430,7 @@ class Analytics:
         self.header['x-proxy-global-company-id'] = company_id
         self.connector.header['x-proxy-global-company-id'] = company_id
         self.endpoint_company = f"{self._endpoint}/{company_id}"
+        self.company_id = company_id
 
     def refreshToken(self, token: str = None):
         if token is None:

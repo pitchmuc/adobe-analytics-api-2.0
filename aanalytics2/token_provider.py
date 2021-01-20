@@ -54,6 +54,9 @@ def get_token_and_expiry_for_config(config: dict, verbose: bool = False, save: b
 
 
 def _get_jwt(payload: dict, private_key: str) -> str:
+    """
+    Ensure that jwt enconding return the same type (str) as versions < 2.0.0 returned bytes and >2.0.0 return strings. 
+    """
     token: Union[str, bytes] = jwt.encode(payload, private_key, algorithm='RS256')
     if isinstance(token, bytes):
         return token.decode('utf-8')

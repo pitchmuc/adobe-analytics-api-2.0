@@ -47,7 +47,11 @@ class AdobeRequest:
         """
         now = time.time()
         if now > self.config['date_limit']:
-            self.retrieveToken()
+            token_with_expiry = token_provider.get_token_and_expiry_for_config(config=self.config)
+            token = token_with_expiry['token']
+            self.config['token'] = token
+            self.config['date_limit'] = time.time() + token_with_expiry['expiry'] / 1000 - 500
+            self.header.update({'Authorization': f'Bearer {token}'})
 
     def getData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, *args, **kwargs):
         """

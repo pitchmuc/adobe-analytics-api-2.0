@@ -4,7 +4,6 @@ config_object = {
     "tech_id": "",
     "pathToKey": "",
     "secret": "",
-    "companyid": "",
     "date_limit": 0,
     "token": "",
     "tokenEndpoint": "https://ims-na1.adobelogin.com/ims/exchange/jwt"
