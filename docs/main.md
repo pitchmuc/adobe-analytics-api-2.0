@@ -494,6 +494,8 @@ mydata = myreport['data']
 **Note** : It can be that some data are not returned by the API (unknown reason for me). The exception is then handle by setting "missing_value" to these items.\
 Because a dictionary is being built before returning the dataframe, it means that all missing value will be set as "missing_value" and only the last key will remain.
 
+**Handling Throttle** : The throttle limit of 12 requests per 6 seconds or 120 requests per minute is handle automatically. It automatically pause the requests for 50 seconds when the limit is reached.
+
 ### The create methods
 
 Adobe Analytics API 2.0 currently, limiting number of creation.

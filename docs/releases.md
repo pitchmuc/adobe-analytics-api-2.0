@@ -3,6 +3,12 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.2.0
+
+* Upgrade compatibility for PyJWT 2.0.0.
+* Fix return element for `sendFiles` method on the Bulkapi class for ingestion method.
+* Improve management of throttle limit for getReport.  
+
 ## version 0.1.9
 
 * Fix default statement for `getVirtualReportSuite` that save the result automatically.
