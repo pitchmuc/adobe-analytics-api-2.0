@@ -201,9 +201,9 @@ class Login:
         """
         Retrieve the company ids for later call for the properties.
         """
-        res = requests.get(
+        res = self.connector.getData(
             "https://analytics.adobe.io/discovery/me", headers=self.header)
-        json_res = res.json()
+        json_res = res
         try:
             companies = json_res['imsOrgs'][0]['companies']
             self.COMPANY_IDS = json_res['imsOrgs'][0]['companies']
@@ -426,9 +426,9 @@ class Analytics:
                 'Expected "company_id" to be referenced.\nPlease ensure you pass the globalCompanyId when instantiating this class.')
         self.connector = connector.AdobeRequest(
             config_object=config_object, header=header, retry=retry)
-        self.header = deepcopy(self.connector.header)
-        self.header['x-proxy-global-company-id'] = company_id
+        self.header = self.connector.header
         self.connector.header['x-proxy-global-company-id'] = company_id
+        self.header['x-proxy-global-company-id'] = company_id
         self.endpoint_company = f"{self._endpoint}/{company_id}"
         self.company_id = company_id
 

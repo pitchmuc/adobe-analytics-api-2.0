@@ -17,7 +17,8 @@ class AdobeRequest:
                  config_object: dict = config.config_object,
                  header: dict = config.header,
                  verbose: bool = False,
-                 retry: int = 0) -> None:
+                 retry: int = 0
+                ) -> None:
         """
         Set the connector to be used for handling request to AAM
         Arguments:
