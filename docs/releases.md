@@ -3,7 +3,11 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
-# version 0.2.1
+## version 0.2.2
+
+* fix issue when token needed to be updated after 24h.
+
+## version 0.2.1
 
 * fix issue on `_checkingDate` method in `AdobeRequest`
 
