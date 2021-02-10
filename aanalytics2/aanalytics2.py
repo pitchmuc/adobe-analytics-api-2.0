@@ -1351,19 +1351,21 @@ class Analytics:
             df.to_csv('projects.csv', index=False)
         return df
 
-    def getProject(self, projectId: str = None, projectClass: bool = False, verbose: bool = False) -> dict:
+    def getProject(self, projectId: str = None, projectClass: bool = False, retry: int = 0,verbose: bool = False) -> dict:
         """
         Return the dictionary of the project information and its definition.
         Arguments:
             projectId : REQUIRED : the project ID to be retrieved.
             projectClass : OPTIONAL : if set to True. Returns a class of the project with prefiltered information
+            retry : OPTIONAL : If you want to retry the request if it fails. Specify number of retry (0 default)
+            verbose : OPTIONAL : If you wish to have logs of status
         """
         if projectId is None:
             raise Exception("Requires a projectId parameter")
         params = {
             'expansion': 'definition,ownerFullName,modified,favorite,approved,tags,shares,sharesFullName,reportSuiteName,companyTemplate,accessLevel'}
         path = f"/projects/{projectId}"
-        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header, verbose=verbose)
+        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header,retry=retry, verbose=verbose)
         if projectClass:
             if verbose:
                 print('building an instance of Project class')
@@ -1522,6 +1524,7 @@ class Analytics:
             n_result: Union[int, str] = 1000,
             save: bool = False,
             item_id: bool = False,
+            unsafe: bool = False,
             verbose: bool = False,
             debug=False
     ) -> object:
@@ -1537,9 +1540,14 @@ class Analytics:
             n_result : OPTIONAL : Number of result that you would like to retrieve. (default 1000)
                 if you want to have all possible data, use "inf".
             item_id : OPTIONAL : Boolean to define if you want to return the item id for sub requests (default False)
+            unsafe : OPTIONAL : If set to True, it will not check "lastPage" parameter and assume first request is complete. 
+                This may break the script or return incomplete data. (default False).
             save : OPTIONAL : If you would like to save the data within a CSV file. (default False)
             verbose : OPTIONAL : If you want to have comment display (default False)
+            
         """
+        if unsafe and verbose:
+            print('---- running the getReport in "unsafe" mode ----')
         obj = {}
         if type(json_request) == str and '.json' not in json_request:
             try:
@@ -1591,7 +1599,7 @@ class Analytics:
                 time.sleep(50)
                 report = self.connector.postData(self.endpoint_company +
                                              self._getReport, data=request, headers=self.header)
-            if 'lastPage' not in report:  # checking error when no lastPage key in report
+            if 'lastPage' not in report and unsafe == False:  # checking error when no lastPage key in report
                 if verbose:
                     print(json.dumps(report, indent=2))
                 print('Warning : Server Error - no save file & empty dataframe.')

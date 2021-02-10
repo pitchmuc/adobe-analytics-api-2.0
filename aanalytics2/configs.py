@@ -5,8 +5,24 @@ from typing import Optional
 
 # Non standard libraries
 from .config import config_object, header
-from .paths import find_path
 
+def find_path(path: str) -> Optional[Path]:
+    """Checks if the file denoted by the specified `path` exists and returns the Path object
+    for the file.
+
+    If the file under the `path` does not exist and the path denotes an absolute path, tries
+    to find the file by converting the absolute path to a relative path.
+
+    If the file does not exist with either the absolute and the relative path, returns `None`.
+    """
+    if Path(path).exists():
+        return Path(path)
+    elif path.startswith('/') and Path('.' + path).exists():
+        return Path('.' + path)
+    elif path.startswith('\\') and Path('.' + path).exists():
+        return Path('.' + path)
+    else:
+        return None
 
 def create_config_file(verbose: bool = False, destination: str = 'config_analytics_template.json') -> None:
     """Creates a `config_admin.json` file with the pre-defined configuration format
