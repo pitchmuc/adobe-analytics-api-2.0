@@ -48,10 +48,30 @@ import aanalytics2 as api2
 api2.importConfigFile('myconfig.json')
 ```
 
-### Alternative : Using the configure method
+### Alternative 1 : Using the configure method
 
 When you want to connect to the Analytics API from a server application, you may want to use the `configure` method and passing the element directly.
 You can see more details on that connection method on the [authentication without config json page](./authenticating_without_config_json.md)
+
+### Alternative 2 : Using Oauth Token
+
+It may be the case that you only have information from Oauth authentication.\
+In that case, you usually ends up with the following information:
+
+* orgId
+* clientId
+* token
+
+In that case, you can use the configure `method` as well with some specific parameters.
+* oauth
+* token
+
+```python
+import aanalytics2 as api2
+
+api2.configure(oauth=True,org_id='XXXXXX@AdobeOrg',client_id='ysfn28d938z2een27z4',token='myToken')
+```
+*NOTE*: The token will be valid for 22 hours and will not be refresh afterwards.
 
 ## 5. Get Company ID(s) & create your instance
 
