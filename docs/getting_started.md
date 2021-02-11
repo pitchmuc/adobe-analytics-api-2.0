@@ -55,19 +55,9 @@ You can see more details on that connection method on the [authentication withou
 
 ## 5. Get Company ID(s) & create your instance
 
-Once all of these setup steps are completed, you can start using the methods attached to Analytics API.
-The first method is the _getCompanyId_, that will return you the different company ID attached to your account.
-you will extract the *globalCompanyId* and use it to create your instance and use the other methods...
-
-```python
-import aanalytics2 as api2
-api2.importConfigFile('myconfig.json')
-cids = api2.getCompanyId()
-cid = cids[0]['globalCompanyId'] ## using the first one
-mycompany = api2.Analytics(cid)
-```
-
-Starting version 0.1.1 a new class (Login) is avalabile in order to retrieve the login company.
+Once all of these setup steps are completed, you can instantiate the `Login` class.\
+Starting version 0.1.1 a new class (Login) is avalabile in order to retrieve the login company.\
+This is the default path that you should use to retrieve your companyId.
 
 ```python
 import aanalytics2 as api2
@@ -81,12 +71,24 @@ login.COMPANY_IDS
 ## returns the same result that cids.
 ```
 
+The legacy method is the _getCompanyId_, that will return you the different company ID attached to your account.\
+You will extract the *globalCompanyId* and use it to create your instance and use it later in the `Analytics` class . \
+This method **will be deprecated** some time in the future.
+
+```python
+import aanalytics2 as api2
+api2.importConfigFile('myconfig.json')
+cids = api2.getCompanyId()
+cid = cids[0]['globalCompanyId'] ## using the first one
+mycompany = api2.Analytics(cid)
+```
+
 From there, 2 methods can be used to create the Analytics class instance.
 
 ```python
 mycompany = api2.Analytics(cid)
 
-# new method directly in the Login class
+# method directly in the Login class
 mycompany = loggin.createAnalyticsConnection(cid)
 
 ```

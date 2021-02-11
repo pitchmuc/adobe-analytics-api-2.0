@@ -431,6 +431,17 @@ class Analytics:
         self.header['x-proxy-global-company-id'] = company_id
         self.endpoint_company = f"{self._endpoint}/{company_id}"
         self.company_id = company_id
+        try:
+            import importlib.resources as pkg_resources
+            pathLOGS = pkg_resources.path(
+                "aanalytics2", "eventType_usageLogs.pickle")
+        except ImportError:
+            # Try backported to PY<37 `importlib_resources`.
+            import pkg_resources
+            pathLOGS = pkg_resources.resource_filename(
+                "aanalytics2", "eventType_usageLogs.pickle")
+        with pathLOGS as f:
+            self.LOGS_EVENT_TYPE = pd.read_pickle(f)
 
     def refreshToken(self, token: str = None):
         if token is None:
@@ -1441,6 +1452,79 @@ class Analytics:
             raise ValueError("Requires definition key to be a dictionary")
         res = self.connector.postData(self.endpoint_company + path, data=projectObj, headers=self.header)
         return res
+    
+    def getUsageLogs(self,
+        startDate:str=None,
+        endDate:str=None,
+        eventType:str=None,
+        event:str=None,
+        rsid:str=None,
+        login:str=None,
+        ip:str=None,
+        limit:int=100,
+        max_result:int=None,
+        format:str="df",
+        verbose:bool=False,
+        **kwargs)->dict:
+        """
+        Returns the Audit Usage Logs from your company analytics setup.
+        Arguments:
+            startDate : REQUIRED : Start date, format : 2020-12-01T00:00:00-07.(default 3 month prior today)	
+            endDate : REQUIRED : End date, format : 2020-12-15T14:32:33-07. (default today)
+                Should be a maximum of a 3 month period between startDate and endDate.
+            eventType : OPTIONAL : The numeric id for the event type you want to filter logs by. 
+                Please reference the lookup table in the LOGS_EVENT_TYPE
+            event : OPTIONAL : The event description you want to filter logs by. 
+                No wildcards are permitted, but this filter is case insensitive and supports partial matches.
+            rsid : OPTIONAL : ReportSuite ID to filter on.
+            login : OPTIONAL : The login value of the user you want to filter logs by. This filter functions as an exact match.	
+            ip : OPTIONAL : The IP address you want to filter logs by. This filter supports a partial match.	
+            limit : OPTIONAL : Number of results per page.
+            max_result : OPTIONAL : Number of maximum amount of results if you want. If you want to cap the process. Ex : max_result=1000
+            format : OPTIONAL : If you wish to have a DataFrame ("df" - default) or list("raw") as output.
+            verbose : OPTIONAL : Set it to True if you want to have console info.
+        possible kwargs:
+            page : page number (default 0)
+        """
+        import datetime
+        now =  datetime.datetime.now()
+        if startDate is None:
+            startDate = datetime.datetime.isoformat(now - datetime.timedelta(weeks=4*3)).split('.')[0]
+        if endDate is None:
+            endDate = datetime.datetime.isoformat(now).split('.')[0]
+        path = "/auditlogs/usage"
+        params = {"page":kwargs.get('page',0),"limit":limit,"startDate":startDate,"endDate":endDate}
+        if eventType is not None:
+            params['eventType'] = eventType
+        if event is not None:
+            params['event'] = event
+        if rsid is not None:
+            params['rsid'] = rsid
+        if login is not None:
+            params['login'] = login
+        if ip is not None:
+            params['ip'] = ip
+        if verbose:
+            print("retrieving data with these parameters")
+            print(json.dumps(params,indent=2))
+        res = self.connector.getData(self.endpoint_company + path, params=params,verbose=verbose)
+        data = res['content']
+        lastPage = res['lastPage']
+        while lastPage == False:
+            params["page"] += 1
+            print(f"fetching page{params['page']}")
+            res = self.connector.getData(self.endpoint_company + path, params=params,verbose=verbose)
+            data += res['content']
+            lastPage = res['lastPage']
+            if max_result is not None:
+                if len(data) >= max_result:
+                    lastPage = True
+        if format == "df":
+            df = pd.DataFrame(data)
+            return df
+        return data
+
+
 
     def _dataDescriptor(self, json_request: dict):
         """
@@ -1602,7 +1686,8 @@ class Analytics:
             if 'lastPage' not in report and unsafe == False:  # checking error when no lastPage key in report
                 if verbose:
                     print(json.dumps(report, indent=2))
-                print('Warning : Server Error - no save file & empty dataframe.')
+                print('Warning : Server Error')
+                print(json.dumps(report))
                 if debug:
                     with open(f'server_failure_request_{timestamp}.json', 'w') as f:
                         f.write(json.dumps(request, indent=4))

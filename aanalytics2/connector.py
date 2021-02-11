@@ -11,6 +11,8 @@ from aanalytics2 import config, token_provider
 class AdobeRequest:
     """
     Handle request to Audience Manager and taking care that the request have a valid token set each time.
+    Attributes:
+        restTime : Time to rest before sending new request when reaching too many request status code.
     """
 
     def __init__(self,
@@ -32,6 +34,7 @@ class AdobeRequest:
                 'You have to upload the configuration file with importConfigFile method.')
         self.config = deepcopy(config_object)
         self.header = deepcopy(header)
+        self.restTime = 30
         self.retry = retry
         if self.config['token'] == '' or time.time() > self.config['date_limit']:
             token_and_expiry = token_provider.get_token_and_expiry_for_config(config=self.config, verbose=verbose)
@@ -77,11 +80,10 @@ class AdobeRequest:
             print(f"request URL : {res.request.url}")
             print(f"statut_code : {res.status_code}")
         try:
-            while str(res.status_code) == "429" and internRetry > 0:
-                internRetry - 1
+            while str(res.status_code) == "429":
                 if kwargs.get("verbose", False):
-                    print(f'Too many requests: {internRetry} retry left')
-                time.sleep(61)
+                    print(f'Too many requests: retrying in {self.restTime} seconds')
+                time.sleep(self.restTime)
                 res = requests.get(endpoint, headers=headers, params=params, data=data)
             res_json = res.json()
         except:

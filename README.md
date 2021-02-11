@@ -30,6 +30,7 @@ Functionalities that are covered :
 * Retrieve Virtual Report Suites
 * Retrieve Virtual Report Suite Curated Components
 * Retrieve Tags
+* Retrieve Usage Logs from users
 * Retrieve Projects
 * Update Segments
 * Update Calculated Metrics

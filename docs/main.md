@@ -330,7 +330,24 @@ There are several get methods.
   * componentId : REQUIRED : The componentId to operate on. Currently this is just the segmentId.
   * componentType : REQUIRED : The component type to operate on.
 
-\
+* getUsageLogs : Retrieve the usage logs from the users of a login company:
+  Arguments:
+  * startDate : REQUIRED : Start date, format : 2020-12-01T00:00:00-07.(default 3 month prior today)	
+  * endDate : REQUIRED : End date, format : 2020-12-15T14:32:33-07. (default today)
+      Should be a maximum of a 3 month period between startDate and endDate.
+  * eventType : OPTIONAL : The numeric id for the event type you want to filter logs by. 
+      Please reference the lookup table in the LOGS_EVENT_TYPE
+  * event : OPTIONAL : The event description you want to filter logs by. 
+      No wildcards are permitted, but this filter is case insensitive and supports partial matches.
+  * rsid : OPTIONAL : ReportSuite ID to filter on.
+  * login : OPTIONAL : The login value of the user you want to filter logs by. This filter functions as an exact match.	
+  * ip : OPTIONAL : The IP address you want to filter logs by. This filter supports a partial match.	
+  * limit : OPTIONAL : Number of results per page.
+  * max_result : OPTIONAL : Number of maximum amount of results if you want. If you want to cap the process. Ex : max_result=1000
+  * format : OPTIONAL : If you wish to have a DataFrame ("df" - default) or list("raw") as output.
+  * verbose : OPTIONAL : Set it to True if you want to have console info.
+possible kwargs:
+  * page : page number (default 0)
 
 Example of getSegments usage:
 

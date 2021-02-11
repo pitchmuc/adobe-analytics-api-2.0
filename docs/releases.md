@@ -3,6 +3,13 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.2.3
+
+* Better error description when receiving report without `lastPage` key.
+* Adding the User Logs Usage endpoint.
+* Adding attribute `restTime` on Connector class to modify the waiting time when reaching error 429 (Too many requests)
+* Better handling of the 429 error for the GET method. Not required to have a the *retry* parameter.
+
 ## version 0.2.2
 
 * fix issue when token needed to be updated after 24h.
