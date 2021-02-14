@@ -1525,6 +1525,63 @@ class Analytics:
         return data
 
 
+    def getTopItems(self,rsid:str=None,dimension:str=None,dateRange:str=None,searchClause:str=None,lookupNoneValues:bool = True,limit:int=10,verbose:bool=False,**kwargs)->object:
+        """
+        Returns the top items of a request.
+        Arguments:
+            rsid : REQUIRED : ReportSuite ID of the data
+            dimension : REQUIRED : The dimension to retrieve
+            dateRange : OPTIONAL : Format YYYY-MM-DD/YYYY-MM-DD (default 90 days)
+            searchClause : OPTIONAL : General search string; wrap with single quotes. Example: 'PageABC'
+            lookupNoneValues : OPTIONAL : None values to be included (default True)
+            limit : OPTIONAL : Number of items to be returned per page.
+            verbose : OPTIONAL : If you want to have comments displayed (default False)
+        possible kwargs:
+            page : page to look for
+            startDate : start date with format YYYY-MM-DD
+            endDate : end date with format YYYY-MM-DD
+            searchAnd, searchOr, searchNot, searchPhrase : Search element to be included (or not), partial match or not.
+        """
+        path = "/reports/topItems"
+        page = kwargs.get("page",0)
+        if rsid is None:
+            raise ValueError("Require a reportSuite ID")
+        if dimension is None:
+            raise ValueError("Require a dimension")
+        params = {"rsid" : rsid, "dimension":dimension,"lookupNoneValues":lookupNoneValues,"limit":limit,"page":page}
+        if searchClause is not None:
+            params["search-clause"] = searchClause
+        if dateRange is not None and '/' in dateRange:
+            params["dateRange"] = dateRange
+        if kwargs.get('page',None) is not None:
+            params["page"] = kwargs.get('page')
+        if kwargs.get("startDate",None) is not None:
+            params["startDate"] = kwargs.get("startDate")
+        if kwargs.get("endDate",None) is not None:
+            params["endDate"] = kwargs.get("endDate")
+        if kwargs.get("searchAnd", None) is not None:
+            params["searchAnd"] = kwargs.get("searchAnd")
+        if kwargs.get("searchOr",None) is not None:
+            params["searchOr"] = kwargs.get("searchOr")
+        if kwargs.get("searchNot",None) is not None:
+            params["searchNot"] = kwargs.get("searchNot")
+        if kwargs.get("searchPhrase",None) is not None:
+            params["searchPhrase"] = kwargs.get("searchPhrase")
+        last_page = False
+        if verbose:
+            print('Starting to fetch the data...')
+        data = []
+        while not last_page:
+            if verbose:
+                print(f'request page : {page}')
+            res = self.connector.getData(self.endpoint_company+path,params=params)
+            last_page = res.get("lastPage",True)
+            data += res["rows"]
+            page += 1
+            params["page"] = page
+        df = pd.DataFrame(data)
+        return df
+        
 
     def _dataDescriptor(self, json_request: dict):
         """
@@ -1627,7 +1684,7 @@ class Analytics:
             unsafe : OPTIONAL : If set to True, it will not check "lastPage" parameter and assume first request is complete. 
                 This may break the script or return incomplete data. (default False).
             save : OPTIONAL : If you would like to save the data within a CSV file. (default False)
-            verbose : OPTIONAL : If you want to have comment display (default False)
+            verbose : OPTIONAL : If you want to have comments displayed (default False)
             
         """
         if unsafe and verbose:
