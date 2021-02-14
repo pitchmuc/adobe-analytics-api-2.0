@@ -3,6 +3,11 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.2.4
+
+* adding missing dependency file
+* adding the getTopItems methods
+
 ## version 0.2.3
 
 * Better error description when receiving report without `lastPage` key.
