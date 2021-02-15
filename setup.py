@@ -45,6 +45,7 @@ setup(
     keywords=['adobe', 'analytics', 'API', 'python'],
     packages=find_packages(),
     include_package_data=True,
+    data_files=[('aanalytics2', ['CSV_Column_and_Query_String_Reference.pickle', 'eventType_usageLogs.pickle','supported_tags.pickle'])],
     install_requires=[
         'pandas',
         'pathlib2',

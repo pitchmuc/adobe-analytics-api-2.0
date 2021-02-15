@@ -436,12 +436,18 @@ class Analytics:
             pathLOGS = pkg_resources.path(
                 "aanalytics2", "eventType_usageLogs.pickle")
         except ImportError:
-            # Try backported to PY<37 `importlib_resources`.
-            import pkg_resources
-            pathLOGS = pkg_resources.resource_filename(
-                "aanalytics2", "eventType_usageLogs.pickle")
-        with pathLOGS as f:
-            self.LOGS_EVENT_TYPE = pd.read_pickle(f)
+            try:
+                # Try backported to PY<37 `importlib_resources`.
+                import pkg_resources
+                pathLOGS = pkg_resources.resource_filename(
+                    "aanalytics2", "eventType_usageLogs.pickle")
+            except:
+                print('Empty LOGS_EVENT_TYPE attribute')
+        try:
+            with pathLOGS as f:
+                self.LOGS_EVENT_TYPE = pd.read_pickle(f)
+        except:
+            self.LOGS_EVENT_TYPE = "no data"
 
     def refreshToken(self, token: str = None):
         if token is None:

@@ -6,7 +6,7 @@ The changes have been tracked starting version 0.1.0
 ## version 0.2.4
 
 * adding missing dependency file
-* adding the getTopItems methods
+* adding the `getTopItems` method
 
 ## version 0.2.3
 

@@ -38,11 +38,17 @@ class DIAPI:
             path = pkg_resources.path("aanalytics2", "supported_tags.pickle")
         except ImportError:
             # Try backported to PY<37 with pkg_resources.
-            import pkg_resources
-            path = pkg_resources.resource_filename(
-                "aanalytics2", "supported_tags.pickle")
-        with path as f:
-            self.REFERENCE = pd.read_pickle(f)
+            try:
+                import pkg_resources
+                path = pkg_resources.resource_filename(
+                    "aanalytics2", "supported_tags.pickle")
+            except:
+                print('no supported_tags file')
+        try:
+            with path as f:
+                self.REFERENCE = pd.read_pickle(f)
+        except:
+            self.REFERENCE = None
 
     def getMethod(self, pageName: str = None, g: str = None, pe: str = None, pev1: str = None, pev2: str = None, events: str = None, **kwargs):
         """
@@ -125,12 +131,18 @@ class Bulkapi:
             path = pkg_resources.path(
                 "aanalytics2", "CSV_Column_and_Query_String_Reference.pickle")
         except ImportError:
-            # Try backported to PY<37 `importlib_resources`.
-            import pkg_resources
-            path = pkg_resources.resource_filename(
-                "aanalytics2", "CSV_Column_and_Query_String_Reference.pickle")
-        with path as f:
-            self.REFERENCE = pd.read_pickle(f)
+            try:
+                # Try backported to PY<37 `importlib_resources`.
+                import pkg_resources
+                path = pkg_resources.resource_filename(
+                    "aanalytics2", "CSV_Column_and_Query_String_Reference.pickle")
+            except:
+                print('no CSV_Column_and_Query_string_Reference file')
+        try:
+            with path as f:
+                self.REFERENCE = pd.read_pickle(f)
+        except:
+            self.REFERENCE = None
         # if no token has been generated.
         self.connector = connector.AdobeRequest()
         self.header = self.connector.header
