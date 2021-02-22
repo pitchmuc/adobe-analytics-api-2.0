@@ -25,12 +25,12 @@ def find_path(path: str) -> Optional[Path]:
         return Path('.' + path)
     else:
         return None
+   
 
-def create_config_file(verbose: bool = False, destination: str = 'config_analytics_template.json') -> None:
+def createConfigFile(verbose: bool = False, destination: str = 'config_analytics_template.json') -> None:
     """Creates a `config_admin.json` file with the pre-defined configuration format
     to store the access data in under the specified `destination`.
     """
-
     json_data = {
         'org_id': '<orgID>',
         'client_id': "<APIkey>",
@@ -45,32 +45,7 @@ def create_config_file(verbose: bool = False, destination: str = 'config_analyti
             f" file created at this location : {os.getcwd()}{os.sep}config_analytics.json"
         )
 
-
-def createConfigFile(verbose: bool = False, destination: str = 'config_analytics_template.json') -> None:
-    """Creates a `config_admin.json` file with the pre-defined configuration format
-    to store the access data in under the specified `destination`.
-    """
-
-    create_config_file(verbose, destination)
-
-
 def importConfigFile(path: str) -> None:
-    """Reads the file denoted by the supplied `path` and retrieves the configuration information
-    from it.
-
-    Arguments:
-        path: REQUIRED : path to the configuration file. Can be either a fully-qualified or relative.
-
-    Example of path value.
-    "config.json"
-    "./config.json"
-    "/my-folder/config.json"
-    """
-
-    import_config_file(path)
-
-
-def import_config_file(path: str) -> None:
     """Reads the file denoted by the supplied `path` and retrieves the configuration information
     from it.
 
