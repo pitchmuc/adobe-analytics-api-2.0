@@ -87,8 +87,12 @@ class AdobeRequest:
                 res = requests.get(endpoint, headers=headers, params=params, data=data)
             res_json = res.json()
         except:
+            ## handling 1.4
             if kwargs.get('legacy',False):
-                return res.text
+                try:
+                    return json.loads(res.text)
+                except:
+                    return res.text
             res_json = {'error': 'Request Error'}
             while internRetry > 0:
                 if kwargs.get("verbose", False):
@@ -120,9 +124,12 @@ class AdobeRequest:
             if res.status_code == 429 or res_json.get('error_code', None) == "429050":
                 res_json['status_code'] = 429
         except:
+            ## handling 1.4
             if kwargs.get('legacy',False):
-                return res.text
-            print
+                try:
+                    return json.loads(res.text)
+                except:
+                    return res.text
             res_json = {'error': 'Request Error'}
         return res_json
 
