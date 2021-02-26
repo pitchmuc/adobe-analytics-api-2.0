@@ -39,7 +39,7 @@ class LegacyAnalytics:
         if method is not None:
             myParams['method'] = method
         path = path
-        res = self.connector.getData(self.endpoint + path,params=myParams,headers=self.header)
+        res = self.connector.getData(self.endpoint + path,params=myParams,headers=self.header,legacy=True)
         return res
 
     def postData(self,path:str="/",method:str=None,params:dict=None,data:Union[dict,list]=None)->dict:
@@ -60,5 +60,5 @@ class LegacyAnalytics:
         if method is not None:
             myParams['method'] = method
         path = path
-        res = self.connector.postData(self.endpoint + path,params=myParams, data=data,headers=self.header)
+        res = self.connector.postData(self.endpoint + path,params=myParams, data=data,headers=self.header,legacy=True)
         return res
