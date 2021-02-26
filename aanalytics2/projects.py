@@ -37,10 +37,10 @@ class Project:
                     self.elementsUsed['metrics']) + len(self.elementsUsed['segments']) + len(
                     self.elementsUsed['calculatedMetrics'])
 
-    def __str__(self):
+    def __str__(self)->str:
         return json.dumps(self.to_dict(),indent=4)
     
-    def __repr__(self):
+    def __repr__(self)->str:
         return json.dumps(self.to_dict(),indent=4)
 
     def _findPanelsInfos(self, workspace: dict = None) -> dict:

@@ -278,6 +278,24 @@ class Analytics:
         except:
             self.LOGS_EVENT_TYPE = "no data"
 
+    def __str__(self)->str:
+        obj = {
+            "endpoint" : self.endpoint_company,
+            "companyId" : self.company_id,
+            "header" : self.header,
+            "token" : self.connector.config['token']
+        }
+        return json.dumps(obj,indent=4)
+    
+    def __repr__(self)->str:
+        obj = {
+            "endpoint" : self.endpoint_company,
+            "companyId" : self.company_id,
+            "header" : self.header,
+            "token" : self.connector.config['token']
+        }
+        return json.dumps(obj,indent=4)
+
     def refreshToken(self, token: str = None):
         if token is None:
             raise AttributeError(

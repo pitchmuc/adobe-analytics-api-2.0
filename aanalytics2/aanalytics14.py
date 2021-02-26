@@ -16,7 +16,7 @@ class LegacyAnalytics:
             raise Exception("Require a company name")
         self.connector = connector.AdobeRequest(config_object=config)
         self.token = self.connector.token
-        self.endpoint = "https://api.omniture.com/admin/1.4/rest/"
+        self.endpoint = "https://api.omniture.com/admin/1.4/rest"
         self.header = header = {
             'Accept': 'application/json',
             'Authorization': f'Bearer {self.token}',

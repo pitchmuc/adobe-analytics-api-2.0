@@ -3,6 +3,12 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.2.5
+
+* adding limited capability for 1.4 API (see documentation)
+* Sepearating the Project Class to its own submodule
+* Improve classes visualization
+
 ## version 0.2.4
 
 * adding missing dependency file

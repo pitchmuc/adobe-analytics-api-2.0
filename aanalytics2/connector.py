@@ -123,7 +123,7 @@ class AdobeRequest:
 
     def patchData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
         """
-        Abstraction for deleting data
+        Abstraction for patching data
         """
         self._checkingDate()
         if headers is None:
@@ -142,7 +142,7 @@ class AdobeRequest:
 
     def putData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
         """
-        Abstraction for deleting data
+        Abstraction for putting data
         """
         self._checkingDate()
         if headers is None:

@@ -54,7 +54,7 @@ def test_core_elements():
     assert len(users)>0
     rsids = myCompany.getReportSuites()
     assert isinstance(rsids,pd.DataFrame)
-    singleRSID = rsids.loc[0,'rsid']
+    singleRSID = rsids.loc[1,'rsid']
     print(f"reportSuite selected : {singleRSID}")
     dims = myCompany.getDimensions(singleRSID)
     assert isinstance(dims,pd.DataFrame)

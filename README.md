@@ -51,6 +51,12 @@ documentation on reporting [here](./docs/main.md)
 
 documentation on ingestion APIs [here](./docs/ingestion.md)
 
+## Legacy Analytics API 1.4
+
+This module provide limited support for the 1.4 API.
+It basically wrapped your request with some internal module and you can pass your request path, method, parameters and / or data.
+More information in the [dedicated documentation for 1.4](./docs/legacyAnalytics.md)
+
 ## Getting Started
 
 To install the library with PIP use:
