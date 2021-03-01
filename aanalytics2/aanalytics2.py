@@ -1415,12 +1415,14 @@ class Analytics:
         res = self.connector.postData(self.endpoint_company + path, data=projectObj, headers=self.header)
         return res
     
-    def findUsageComponents(self,components:list=None,
+    def findComponentsUsage(self,components:list=None,
                             projectDetails:list=None,
                             segments:Union[list,pd.DataFrame]=None,
                             calculatedMetrics:Union[list,pd.DataFrame]=None,
                             recursive:bool=False,
+                            regexUsed:bool=False,
                             verbose:bool=False,
+                            resetProjectDetails:bool=False
                             )->dict:
         """
         Find the usage of components in the different part of Adobe Analytics setup.
@@ -1432,14 +1434,25 @@ class Analytics:
             segments : OPTIONAL : If you wish to pass the segments to look for. (should contain definition)
             calculatedMetrics : OPTIONAL : If you wish to pass the segments to look for. (should contain definition)
             recursive : OPTIONAL : if set to True, will also find the reference where the meta component are used.
-                calculated metrics based on your prop search will also be searched to see where they are located.
+                segments based on your elements will also be searched to see where they are located.
+            regexUsed : OPTIONAL : If set to True, the element are definied as a regex and some default setup is turned off.
+            resetProjectDetails : OPTIONAL : Set to false by default. If set to True, it will NOT use the cache.
         """
         listComponentProp = [comp for comp in components if 'prop' in comp]
         listComponentVar = [comp for comp in components if 'evar' in comp]
         listComponentEvent = [comp for comp in components if 'event' in comp]
         listComponentSegs = [comp for comp in components if comp.startswith('s')]
         listComponentCalcs = [comp for comp in components if comp.startswith('cm')]
+        restComponents = set(components) - set(listComponentProp+listComponentVar+listComponentEvent+listComponentSegs+listComponentCalcs)
+        listDefaultElements = [comp for comp in restComponents]
         listRecusion = []
+        ## adding unrefular ones
+
+        regPartSeg = "('|\.)" ## ensure to not catch evar100 for evar10
+        regPartPro = "($|\.)" ## ensure to not catch evar100 for evar10
+        if regexUsed:
+            regPartSeg = ""
+            regPartPro = ""
         if verbose:
             print('retrieving segments')
         if len(self.segments) == 0 and segments is None:
@@ -1464,74 +1477,98 @@ class Analytics:
                 myMetrics = pd.DataFrame(calculatedMetrics)
         else:
             myMetrics = calculatedMetrics
-        if verbose:
-            print('retrieving projects details - long process')
-        if len(self.projectsDetails) == 0 and projectDetails is None:
+        if (len(self.projectsDetails) == 0 and projectDetails is None) or resetProjectDetails:
+            if verbose:
+                print('retrieving projects details - long process')
             self.projectDetails = self.getAllProjectDetails(verbose=verbose)
             myProjectDetails = (self.projectsDetails[key].to_dict() for key in self.projectsDetails)
-        elif len(self.projectsDetails) > 0 and projectDetails is None:
+        elif len(self.projectsDetails) > 0 and projectDetails is None and resetProjectDetails==False:
+            if verbose:
+                print('transforming projects details')
             myProjectDetails = (self.projectsDetails[key].to_dict() for key in self.projectsDetails)
         elif projectDetails is not None:
+            if verbose:
+                print('setting the project details')
             if isinstance(projectDetails[0],Project):
                 myProjectDetails = (item.to_dict() for item in projectDetails)
             elif isinstance(projectDetails[0],dict):
                 myProjectDetails = (Project(item).to_dict() for item in projectDetails)
         else:
             raise Exception("Project details were not able to be processed")
-        returnObj = defaultdict(list)
+        returnObj = {element : {'segments':[],'calculatedMetrics':[],'projects':[]} for element in components}
         recurseObj = defaultdict(list)
         if verbose:
             print('search started')
             print(f'recursive option : {recursive}')
         for _,seg in mySegments.iterrows():
             for prop in listComponentProp:
-                if re.search(f"{prop}('|\.)",str(seg['definition'])):
-                    returnObj[prop].append({seg['name']:seg['id']})
+                if re.search(f"{prop+regPartSeg}",str(seg['definition'])):
+                    returnObj[prop]['segments'].append({seg['name']:seg['id']})
                     if recursive:
                         listRecusion.append(seg['id'])
             for var in listComponentVar:
-                if re.search(f"{var}('|\.)",str(seg['definition'])):
-                    returnObj[var].append({seg['name']:seg['id']})
+                if re.search(f"{var+regPartSeg}",str(seg['definition'])):
+                    returnObj[var]['segments'].append({seg['name']:seg['id']})
                     if recursive:
                         listRecusion.append(seg['id'])
             for event in listComponentEvent:
                 if re.search(f"{event}'",str(seg['definition'])):
-                    returnObj[event].append({seg['name']:seg['id']})
+                    returnObj[event]['segments'].append({seg['name']:seg['id']})
+                    if recursive:
+                        listRecusion.append(seg['id'])
+            for element in listDefaultElements:
+                if re.search(f"{element}",str(seg['definition'])):
+                    returnObj[element]['segments'].append({seg['name']:seg['id']})
                     if recursive:
                         listRecusion.append(seg['id'])
         for _,met in myMetrics.iterrows():
             for prop in listComponentProp:
-                if re.search(f"{prop}('|\.)",str(met['definition'])):
-                    returnObj[prop].append({met['name']:met['id']})
+                if re.search(f"{prop+regPartSeg}",str(met['definition'])):
+                    returnObj[prop]['calculatedMetrics'].append({met['name']:met['id']})
                     if recursive:
                         listRecusion.append(met['id'])
             for var in listComponentVar:
-                if re.search(f"{var}('|\.)",str(met['definition'])):
-                    returnObj[var].append({met['name']:met['id']})
+                if re.search(f"{var+regPartSeg}",str(met['definition'])):
+                    returnObj[var]['calculatedMetrics'].append({met['name']:met['id']})
                     if recursive:
                         listRecusion.append(met['id'])
             for event in listComponentEvent:
                 if re.search(f"{event}'",str(met['definition'])):
-                    returnObj[event].append({met['name']:met['id']})
+                    returnObj[event]['calculatedMetrics'].append({met['name']:met['id']})
+                    if recursive:
+                        listRecusion.append(met['id'])
+            for element in listDefaultElements:
+                if re.search(f"{element}'",str(met['definition'])):
+                    returnObj[element]['calculatedMetrics'].append({met['name']:met['id']})
                     if recursive:
                         listRecusion.append(met['id'])
         for proj in myProjectDetails:
             for prop in listComponentProp:
                 for element in proj['dimensions']:
-                    if re.search(f"{prop}",element):
-                        returnObj[prop].append({proj['name']:proj['id']})
+                    if re.search(f"{prop+regPartPro}",element):
+                        returnObj[prop]['projects'].append({proj['name']:proj['id']})
             for var in listComponentVar:
                 for element in proj['dimensions']:
-                    if re.search(f"{var}",element):
-                        returnObj[prop].append({proj['name']:proj['id']})
+                    if re.search(f"{var+regPartPro}",element):
+                        returnObj[var]['projects'].append({proj['name']:proj['id']})
             for seg in listComponentSegs:
                 for element in proj['segments']:
                     if re.search(f"{seg}",element):
-                        returnObj[seg].append({proj['name']:proj['id']})
+                        returnObj[seg]['projects'].append({proj['name']:proj['id']})
             for met in listComponentCalcs:
                 for element in proj['calculatedMetrics']:
                     if re.search(f"{met}",element):
-                        returnObj[met].append({proj['name']:proj['id']})
+                        returnObj[met]['projects'].append({proj['name']:proj['id']})
+            for element in listDefaultElements:
+                for met in proj['calculatedMetrics']:
+                    if re.search(f"{element}",met):
+                        returnObj[element]['projects'].append({proj['name']:proj['id']})
+                for dim in proj['dimensions']:
+                    if re.search(f"{element}",dim):
+                        returnObj[element]['projects'].append({proj['name']:proj['id']})
+                for rsid in proj['rsids']:
+                    if re.search(f"{element}",rsid):
+                        returnObj[element]['projects'].append({proj['name']:proj['id']})
             if recursive:
                 for rec in listRecusion:
                     for element in proj['segments']:
