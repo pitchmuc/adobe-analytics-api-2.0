@@ -13,6 +13,7 @@ The changes have been tracked starting version 0.1.0
 * Adding `listProjectIds` attributes that stores the result of `getProjects` method in a `raw` format.
 * Adding the `getCalculatedMetric` method in the module.
 * Adding *validate* methods for calculatedMetric and Segment
+* Update documentation for [Projects elements](./projects.md)
 
 ## version 0.2.4
 

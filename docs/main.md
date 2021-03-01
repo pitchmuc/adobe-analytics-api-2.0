@@ -363,10 +363,12 @@ mydims = mycompany.getDimensions('rsid')
 
 #### BETA Methods
 
-I have implemented a getProjects, getProject, updateProject and createProject methods.
+I have implemented a `getProjects`, `getProject`, `updateProject` and `createProject` methods.
 These methods are not officially available in the documentation of Adobe API 2.0.
 Therefore, if they do stop working, this may not come from the API wrapper / SDK aanalytics2.
 Please refer to the docstring for these methods for now.
+
+From these beta methods, I have created other supported methods that are explained in the [Project documentation](./projects.md).
 
 ### Create
 
