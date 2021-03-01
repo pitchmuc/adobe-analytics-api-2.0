@@ -5,9 +5,14 @@ The changes have been tracked starting version 0.1.0
 
 ## version 0.2.5
 
-* adding limited capability for 1.4 API (see documentation)
+* adding limited capability for 1.4 API [see documentation](./legacyAnalytics.md)
 * Sepearating the Project Class to its own submodule
-* Improve classes visualization
+* Improve classes representation
+* Adding `getAllProjectDetails` method
+* Adding `projectsDetails` attributes on the Analytics instance that stores the projectDetail in a dictionary.
+* Adding `listProjectIds` attributes that stores the result of `getProjects` method in a `raw` format.
+* Adding the `getCalculatedMetric` method in the module.
+* Adding *validate* methods for calculatedMetric and Segment
 
 ## version 0.2.4
 

@@ -8,6 +8,8 @@ from concurrent import futures
 from copy import deepcopy
 from pathlib import Path
 from typing import IO, Union, List
+from collections import defaultdict
+import re
 
 # Non standard libraries
 import pandas as pd
@@ -260,6 +262,10 @@ class Analytics:
         self.header['x-proxy-global-company-id'] = company_id
         self.endpoint_company = f"{self._endpoint}/{company_id}"
         self.company_id = company_id
+        self.listProjectIds = []
+        self.projectsDetails = {}
+        self.segments = []
+        self.calculatedMetrics = []
         try:
             import importlib.resources as pkg_resources
             pathLOGS = pkg_resources.path(
@@ -749,11 +755,12 @@ class Analytics:
                     f'Saving data in file : {os.getcwd()}{os.sep}segments.csv')
         return segments
 
-    def getSegment(self, segment_id: str = None, *args):
+    def getSegment(self, segment_id: str = None,full:bool=False, *args):
         """
         Get a specific segment from the ID. Returns the object of the segment.
         Arguments:
             segment_id : REQUIRED : the segment id to retrieve.
+            full : OPTIONAL : Add all possible options
         Possible args:
             - "reportSuiteName" : string : to retrieve reportSuite attached to the segment
             - "ownerFullName" : string : to retrieve ownerFullName attached to the segment
@@ -774,6 +781,8 @@ class Analytics:
             if element not in ValidArgs:
                 args.remove(element)
         params = {'expansion': ','.join(args)}
+        if full:
+            params = {'expansion': ','.join(ValidArgs)}
         res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         return res
 
@@ -793,6 +802,21 @@ class Analytics:
             data=data,
             headers=self.header
         )
+        return seg
+    
+    def createSegmentValidate(self, segmentJSON: dict = None) -> object:
+        """
+        Method that validate a new segment based on the dictionary passed to it.
+        Arguments:
+            segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment.
+            More information at this address <https://adobedocs.github.io/analytics-2.0-apis/#/segments/segments_createSegment>
+        """
+        if segmentJSON is None:
+            print('No segment data has been pushed')
+            return None
+        data = deepcopy(segmentJSON)
+        path = "/segments/validate"
+        seg = self.connector.postData(self.endpoint_company +path,data=data)
         return seg
 
     def updateSegment(self, segmentID: str = None, segmentJSON: dict = None) -> object:
@@ -834,6 +858,7 @@ class Analytics:
             rsids_list: list = None,
             extended_info: bool = False,
             save=False,
+            format:str='df',
             **kwargs
     ) -> pd.DataFrame:
         """
@@ -849,6 +874,7 @@ class Analytics:
             extended_info : OPTIONAL : additional segment metadata fields to include on response (list)
                 additional infos: reportSuiteName,definition, ownerFullName, modified, tags, compatibility
             save : OPTIONAL : If set to True, it will save the info in a csv file (Default False)
+            format : OPTIONAL : format of the output. 2 values "df" for dataframe and "raw" for raw json.
         Possible kwargs:
             limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.(int)
         """
@@ -882,14 +908,36 @@ class Analytics:
                                                  self._getCalcMetrics, params=params, headers=self.header)
                 data += metrics['content']
                 lastPage = metrics['lastPage']
+        if format == "raw":
+            if save:
+                with open('calculated_metrics.json','w') as f:
+                    f.write(json.dumps(data,indent=4))
+            return data
         df_calc_metrics = pd.DataFrame(data)
         if save:
             df_calc_metrics.to_csv('calculated_metrics.csv', sep='\t')
         return df_calc_metrics
 
-    def createCalculatedMetrics(self, metricJSON: dict = None) -> object:
+    def getCalculatedMetric(self,calculatedMetricId:str=None,full:bool=True)->dict:
         """
-        Method that create a specific calculated based on the dictionary passed to it.
+        Return a dictionary on the calculated metrics requested.
+        Arguments:
+            calculatedMetricId : REQUIRED : The calculated metric ID to be retrieved.
+            full : OPTIONAL : additional segment metadata fields to include on response (list)
+                additional infos: reportSuiteName,definition, ownerFullName, modified, tags, compatibility
+        """
+        if calculatedMetricId is None:
+            raise ValueError("Require a calculated metrics ID")
+        params = {}
+        if full:
+            params.update({'expansion': 'reportSuiteName,definition,ownerFullName,modified,tags,categories,compatibility'})
+        path = f"/calculatedmetrics/{calculatedMetricId}"
+        res = self.connector.getData(self.endpoint_company+path,params=params)
+        return res
+
+    def createCalculatedMetric(self, metricJSON: dict = None) -> dict:
+        """
+        Method that create a specific calculated metric based on the dictionary passed to it.
         Arguments:
             metricJSON : REQUIRED : Calculated Metrics information to create. (Required: name, definition, rsid)
             More information can be found at this address https://adobedocs.github.io/analytics-2.0-apis/#/calculatedmetrics/calculatedmetrics_createCalculatedMetric
@@ -902,6 +950,23 @@ class Analytics:
                 'Expected "name", "definition" and "rsid" in the data')
         cm = self.connector.postData(self.endpoint_company +
                                      self._getCalcMetrics, headers=self.header, data=metricJSON)
+        return cm
+    
+    def createCalculatedMetricValidate(self,metricJSON: dict=None)->dict:
+        """
+        Method that validate a specific calculated metrics definition based on the dictionary passed to it.
+        Arguments:
+            metricJSON : REQUIRED : Calculated Metrics information to create. (Required: name, definition, rsid)
+            More information can be found at this address https://adobedocs.github.io/analytics-2.0-apis/#/calculatedmetrics/calculatedmetrics_createCalculatedMetric
+        """
+        if metricJSON is None or type(metricJSON) != dict:
+            raise Exception(
+                "Expected a dictionary to create the calculated metrics")
+        if 'name' not in metricJSON.keys() or 'definition' not in metricJSON.keys() or 'rsid' not in metricJSON.keys():
+            raise KeyError(
+                'Expected "name", "definition" and "rsid" in the data')
+        path = "/calculatedmetrics/validate"
+        cm = self.connector.postData(self.endpoint_company+path, data=metricJSON)
         return cm
 
     def updateCalculatedMetric(self, calcID: str = None, calcJSON: dict = None) -> object:
@@ -937,7 +1002,7 @@ class Analytics:
         )
         return cm
 
-    def getDateRanges(self, extended_info: bool = False, save: bool = False, includeType: str = 'all',
+    def getDateRanges(self, extended_info: bool = False, save: bool = False, includeType: str = 'all',verbose:bool=False,
                       **kwargs) -> pd.DataFrame:
         """
         Get the list of date ranges available for the user.
@@ -960,7 +1025,8 @@ class Analytics:
         dateRanges = self.connector.getData(
             self.endpoint_company + self._getDateRanges,
             params=params,
-            headers=self.header
+            headers=self.header,
+            verbose=verbose
         )
         data = dateRanges['content']
         df_dates = pd.DataFrame(data)
@@ -1202,6 +1268,7 @@ class Analytics:
         if limit is not None:
             params['limit'] = limit
         res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
+        self.listProjectIds = res
         if format == "raw":
             if save:
                 with open('projects.json', 'w') as f:
@@ -1215,9 +1282,11 @@ class Analytics:
             df.to_csv('projects.csv', index=False)
         return df
 
-    def getProject(self, projectId: str = None, projectClass: bool = False, retry: int = 0,verbose: bool = False) -> dict:
+    def getProject(self, projectId: str = None, projectClass: bool = False, retry: int = 0,verbose: bool = False) -> Union[dict,Project]:
         """
         Return the dictionary of the project information and its definition.
+        It will return a dictionary or a Project class.
+        The project detail will be saved as Project class in the projectsDetails class attribute.
         Arguments:
             projectId : REQUIRED : the project ID to be retrieved.
             projectClass : OPTIONAL : if set to True. Returns a class of the project with prefiltered information
@@ -1235,7 +1304,47 @@ class Analytics:
                 print('building an instance of Project class')
             myProject = Project(res)
             return myProject
+        self.projectsDetails[projectId] = Project(res)
         return res
+    
+    def getAllProjectDetails(self,projects:JsonListOrDataFrameType=None,filterNameProject:str=None,filterNameOwner:str=None,useAttribute:bool=True,verbose:bool=False)->dict:
+        """
+        Retrieve all projects details. You can either pass the list of dataframe returned from the getProjects methods and some filters.
+        Returns a dict of ProjectId and the value is the Project class for analysis.
+        Arguments:
+            projects : OPTIONAL : Takes the type of object returned from the getProjects (all data - not only the ID).
+                    If None is provided and you never ran the getProjects method, we will call the getProjects method and retrieve the elements.
+                    Otherwise you can pass either a limited list of elements that you want to check details for.
+            filterNameProject : OPTIONAL : If you want to retrieve project details for project with a specific string in their name.
+            filterNameOwner : OPTIONAL : If you want to retrieve project details for project with an owner having a specific name.
+            useAttribute : OPTIONAL : True by default, it will use the projectList saved in the listProjectIds attribute.
+                If you want to start from scratch on the retrieval process of your projects.
+        
+        Not using filter may end up taking a while to retrieve the information.
+        """
+        ## if no project data
+        if projects is None:
+            if len(self.listProjectIds)>0 and useAttribute:
+                fullProjectIds = self.listProjectIds
+            else:
+                fullProjectIds = self.getProjects(format='raw')
+        ## if project data is passed
+        elif projects is not None:
+            if isinstance(projects,pd.DataFrame):
+                fullProjectIds = projects.to_dict(orient='records')
+            elif isinstance(projects,list):
+                fullProjectIds = (proj['id'] for proj in projects)
+        if filterNameProject is not None:
+                fullProjectIds = [project for project in fullProjectIds if filterNameProject in project['name']]
+        if filterNameOwner is not None:
+                fullProjectIds = [project for project in fullProjectIds if filterNameOwner in project['owner'].get('name','')]
+        if verbose:
+            print(f'{len(fullProjectIds)} project details to retrieve')
+        projectIds = (project['id'] for project in fullProjectIds)
+        projectsDetails = {projectId:self.getProject(projectId,projectClass=True) for projectId in projectIds}
+        if filterNameProject is None and filterNameOwner is None:
+            self.projectsDetails = projectsDetails
+        return projectsDetails
 
     def deleteProject(self, projectId: str = None) -> dict:
         """
@@ -1305,6 +1414,137 @@ class Analytics:
             raise ValueError("Requires definition key to be a dictionary")
         res = self.connector.postData(self.endpoint_company + path, data=projectObj, headers=self.header)
         return res
+    
+    def findUsageComponents(self,components:list=None,
+                            projectDetails:list=None,
+                            segments:Union[list,pd.DataFrame]=None,
+                            calculatedMetrics:Union[list,pd.DataFrame]=None,
+                            recursive:bool=False,
+                            verbose:bool=False,
+                            )->dict:
+        """
+        Find the usage of components in the different part of Adobe Analytics setup.
+        Projects, Segment, Calculated metrics.
+        Arguments:
+            components : REQUIRED : list of component to look for.
+                        Example : evar10,event1,prop3,segmentId, calculatedMetricsId
+            ProjectDetails: OPTIONAL : list of project details.
+            segments : OPTIONAL : If you wish to pass the segments to look for. (should contain definition)
+            calculatedMetrics : OPTIONAL : If you wish to pass the segments to look for. (should contain definition)
+            recursive : OPTIONAL : if set to True, will also find the reference where the meta component are used.
+                calculated metrics based on your prop search will also be searched to see where they are located.
+        """
+        listComponentProp = [comp for comp in components if 'prop' in comp]
+        listComponentVar = [comp for comp in components if 'evar' in comp]
+        listComponentEvent = [comp for comp in components if 'event' in comp]
+        listComponentSegs = [comp for comp in components if comp.startswith('s')]
+        listComponentCalcs = [comp for comp in components if comp.startswith('cm')]
+        listRecusion = []
+        if verbose:
+            print('retrieving segments')
+        if len(self.segments) == 0 and segments is None:
+            self.segments = self.getSegments(extended_info=True)
+            mySegments = self.segments
+        elif len(self.segments) > 0 and segments is None:
+            mySegments = self.segments
+        elif segments is not None:
+            if type(segments) == list:
+                mySegments = pd.DataFrame(segments)
+        else:
+            mySegments = segments
+        if verbose:
+            print('retrieving calculated metrics')
+        if len(self.calculatedMetrics) == 0 and calculatedMetrics is None:
+            self.calculatedMetrics = self.getCalculatedMetrics(extended_info=True)
+            myMetrics = self.calculatedMetrics
+        elif len(self.segments) > 0 and calculatedMetrics is None:
+            myMetrics = self.calculatedMetrics
+        elif calculatedMetrics is not None:
+            if type(calculatedMetrics) == list:
+                myMetrics = pd.DataFrame(calculatedMetrics)
+        else:
+            myMetrics = calculatedMetrics
+        if verbose:
+            print('retrieving projects details - long process')
+        if len(self.projectsDetails) == 0 and projectDetails is None:
+            self.projectDetails = self.getAllProjectDetails(verbose=verbose)
+            myProjectDetails = (self.projectsDetails[key].to_dict() for key in self.projectsDetails)
+        elif len(self.projectsDetails) > 0 and projectDetails is None:
+            myProjectDetails = (self.projectsDetails[key].to_dict() for key in self.projectsDetails)
+        elif projectDetails is not None:
+            if isinstance(projectDetails[0],Project):
+                myProjectDetails = (item.to_dict() for item in projectDetails)
+            elif isinstance(projectDetails[0],dict):
+                myProjectDetails = (Project(item).to_dict() for item in projectDetails)
+        else:
+            raise Exception("Project details were not able to be processed")
+        returnObj = defaultdict(list)
+        recurseObj = defaultdict(list)
+        if verbose:
+            print('search started')
+            print(f'recursive option : {recursive}')
+        for _,seg in mySegments.iterrows():
+            for prop in listComponentProp:
+                if re.search(f"{prop}('|\.)",str(seg['definition'])):
+                    returnObj[prop].append({seg['name']:seg['id']})
+                    if recursive:
+                        listRecusion.append(seg['id'])
+            for var in listComponentVar:
+                if re.search(f"{var}('|\.)",str(seg['definition'])):
+                    returnObj[var].append({seg['name']:seg['id']})
+                    if recursive:
+                        listRecusion.append(seg['id'])
+            for event in listComponentEvent:
+                if re.search(f"{event}'",str(seg['definition'])):
+                    returnObj[event].append({seg['name']:seg['id']})
+                    if recursive:
+                        listRecusion.append(seg['id'])
+        for _,met in myMetrics.iterrows():
+            for prop in listComponentProp:
+                if re.search(f"{prop}('|\.)",str(met['definition'])):
+                    returnObj[prop].append({met['name']:met['id']})
+                    if recursive:
+                        listRecusion.append(met['id'])
+            for var in listComponentVar:
+                if re.search(f"{var}('|\.)",str(met['definition'])):
+                    returnObj[var].append({met['name']:met['id']})
+                    if recursive:
+                        listRecusion.append(met['id'])
+            for event in listComponentEvent:
+                if re.search(f"{event}'",str(met['definition'])):
+                    returnObj[event].append({met['name']:met['id']})
+                    if recursive:
+                        listRecusion.append(met['id'])
+        for proj in myProjectDetails:
+            for prop in listComponentProp:
+                for element in proj['dimensions']:
+                    if re.search(f"{prop}",element):
+                        returnObj[prop].append({proj['name']:proj['id']})
+            for var in listComponentVar:
+                for element in proj['dimensions']:
+                    if re.search(f"{var}",element):
+                        returnObj[prop].append({proj['name']:proj['id']})
+            for seg in listComponentSegs:
+                for element in proj['segments']:
+                    if re.search(f"{seg}",element):
+                        returnObj[seg].append({proj['name']:proj['id']})
+            for met in listComponentCalcs:
+                for element in proj['calculatedMetrics']:
+                    if re.search(f"{met}",element):
+                        returnObj[met].append({proj['name']:proj['id']})
+            if recursive:
+                for rec in listRecusion:
+                    for element in proj['segments']:
+                        if re.search(f"{rec}",element):
+                            recurseObj[rec].append({proj['name']:proj['id']})
+                    for element in proj['calculatedMetrics']:
+                        if re.search(f"{rec}",element):
+                            recurseObj[rec].append({proj['name']:proj['id']})
+        if recursive:
+            returnObj['recursion'] = recurseObj
+        if verbose:
+            print('done')
+        return returnObj
     
     def getUsageLogs(self,
         startDate:str=None,
