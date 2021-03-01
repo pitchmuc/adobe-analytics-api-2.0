@@ -47,7 +47,7 @@ documentation on reporting [here](./docs/main.md)
 ### Data Ingestion APIs
 
 * Data Ingestion API from API 1.4
-* Bulk Data Ingestion API
+* Bulk Data Insertion API
 
 documentation on ingestion APIs [here](./docs/ingestion.md)
 
