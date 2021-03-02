@@ -158,3 +158,7 @@ There is an option to not use the cache for the projectDetails. It is the longue
 
 Your elements can also be a reportSuiteId, you can also look which reportSuite id have been used.\
 You can also use default dimension (e.g. : browser) and metrics (e.g. : visits)
+
+With the current version, your evars and props used in the calculated metrics will not be found unfortunately.\
+The way that calculated metrics are created is that they create a new segment for the dimension used when you built them.\
+These segments are not returned with the default getSegments methods and therefore are not showing in the results.
