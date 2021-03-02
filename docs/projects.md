@@ -133,7 +133,7 @@ findings= myCompany.findComponentsUsage(myElements)
         'segments': [
             {'segment name':'segmentsId1'},
             ...],
-        'calculatedmetrics': [
+        'calculatedMetrics': [
             {'calculated metrics name':'calcId'},
             ...],
         'projects': [

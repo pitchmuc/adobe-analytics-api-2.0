@@ -1340,6 +1340,7 @@ class Analytics:
                 fullProjectIds = [project for project in fullProjectIds if filterNameOwner in project['owner'].get('name','')]
         if verbose:
             print(f'{len(fullProjectIds)} project details to retrieve')
+            print(f"estimated time required : {int(len(fullProjectIds)/60)} minutes")
         projectIds = (project['id'] for project in fullProjectIds)
         projectsDetails = {projectId:self.getProject(projectId,projectClass=True) for projectId in projectIds}
         if filterNameProject is None and filterNameOwner is None:
@@ -1551,6 +1552,10 @@ class Analytics:
                 for element in proj['dimensions']:
                     if re.search(f"{var+regPartPro}",element):
                         returnObj[var]['projects'].append({proj['name']:proj['id']})
+            for event in listComponentEvent:
+                for element in proj['metrics']:
+                    if re.search(f"{event}",element):
+                        returnObj[event]['projects'].append({proj['name']:proj['id']})
             for seg in listComponentSegs:
                 for element in proj['segments']:
                     if re.search(f"{seg}",element):
@@ -1568,6 +1573,9 @@ class Analytics:
                         returnObj[element]['projects'].append({proj['name']:proj['id']})
                 for rsid in proj['rsids']:
                     if re.search(f"{element}",rsid):
+                        returnObj[element]['projects'].append({proj['name']:proj['id']})
+                for event in proj['metrics']:
+                    if re.search(f"{element}",event):
                         returnObj[element]['projects'].append({proj['name']:proj['id']})
             if recursive:
                 for rec in listRecusion:
