@@ -315,6 +315,33 @@ There are several get methods.
   * limit : number of segments retrieved by request. default 500: Limited to 1000 by the Analytics API.
   * full : Boolean : Doesn't shrink the number of columns if set to true
 
+* getCalculatedMetrics : Return the calculated metrics of your login company (dataframe by default).
+  Arguments:
+  * name : OPTIONAL : Filter to only include calculated metrics that contains the name (str)
+  * tagNames : OPTIONAL : Filter list to only include calculated metrics that contains one of the tags (string delimited with comma, can be list as well)
+  * inclType : OPTIONAL : type of calculated Metrics to be retrieved. (str) Possible values: 
+      - all : Default value (all calculated metrics possibles)
+      - shared : shared calculated metrics
+      - template : template calculated metrics
+  * rsid_list : OPTIONAL : Filter list to only include segments tied to specified RSID list (list)
+  * extended_info : OPTIONAL : additional segment metadata fields to include on response (list)
+      additional infos: reportSuiteName,definition, ownerFullName, modified, tags, compatibility
+  * save : OPTIONAL : If set to True, it will save the info in a csv file (Default False)
+  * format : OPTIONAL : format of the output. 2 values "df" for dataframe and "raw" for raw json.
+Possible kwargs:
+  limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.(int)
+
+* getSegment : retrieve a specific segment by its ID.
+  Arguments:
+  * segment_id : REQUIRED : the segment id to retrieve.
+  * full : OPTIONAL : Add all possible information. bool, default False
+
+getCalculatedMetric : Return a dictionary on the calculated metrics requested.
+  Arguments:
+  * calculatedMetricId : REQUIRED : The calculated metric ID to be retrieved.
+  * full : OPTIONAL : additional segment metadata fields to include on response (list)
+      additional infos: reportSuiteName,definition, ownerFullName, modified, tags, compatibility
+
 * getTags : Retrieve the list of Tags used on the company Login.
   Arguments:
   * limit : OPTIONAL : Amount of tag to be returned by request. Default 100
@@ -402,6 +429,11 @@ Here is the list of the possible create options.
   Arguments:
   * metricJSON : REQUIRED : Calculated Metrics information to create. Required :  name, definition, rsid
     more information can be found on the [Swagger refrence](https://adobedocs.github.io/analytics-2.0-apis/#/calculatedmetrics/calculatedmetrics_createCalculatedMetric)
+  
+* createCalculatedMetricValidate: Validate a calculated metrics definition or object passed.
+  Arguments:
+  * metricJSON : REQUIRED : Calculated Metrics information to create. (Required: name, definition, rsid)
+      More information can be found at this address https://adobedocs.github.io/analytics-2.0-apis/#/calculatedmetrics/calculatedmetrics_createCalculatedMetric
 
 * createTags : This method creates a tag and associate it with a component.
   Arguments:

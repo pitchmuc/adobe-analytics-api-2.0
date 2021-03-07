@@ -755,7 +755,7 @@ class Analytics:
                     f'Saving data in file : {os.getcwd()}{os.sep}segments.csv')
         return segments
 
-    def getSegment(self, segment_id: str = None,full:bool=False, *args):
+    def getSegment(self, segment_id: str = None,full:bool=False, *args) -> dict:
         """
         Get a specific segment from the ID. Returns the object of the segment.
         Arguments:
@@ -786,7 +786,7 @@ class Analytics:
         res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         return res
 
-    def createSegment(self, segmentJSON: dict = None) -> object:
+    def createSegment(self, segmentJSON: dict = None) -> dict:
         """
         Method that creates a new segment based on the dictionary passed to it.
         Arguments:
