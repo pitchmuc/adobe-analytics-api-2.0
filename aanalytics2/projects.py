@@ -97,7 +97,7 @@ class Project:
                             componentType: str = row['component']['type']
                             if componentType == "DimensionItem":
                                 temp_list_dim.append(row['component']['id'])
-                            elif componentType == "Segments":
+                            elif componentType == "Segments" or componentType == "Segment":
                                 dict_elements['segments'].append(row['component']['id'])
                             elif componentType == "Metric":
                                 dict_elements['metrics'].append(row['component']['id'])
