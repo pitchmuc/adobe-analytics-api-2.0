@@ -147,10 +147,15 @@ class AdobeRequest:
         elif params is not None and data is not None:
             res = requests.patch(endpoint, headers=headers, params=params, data=json.dumps(data))
         try:
-            status_code = res.json()
+            while str(res.status_code) == "429":
+                if kwargs.get("verbose", False):
+                    print(f'Too many requests: retrying in {self.restTime} seconds')
+                time.sleep(self.restTime)
+                res = requests.patch(endpoint, headers=headers, params=params,data=json.dumps(data))
+            res_json = res.json()
         except:
-            status_code = {'error': 'Request Error'}
-        return status_code
+            res_json = {'error': 'Request Error'}
+        return res_json
 
     def putData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
         """
@@ -183,6 +188,11 @@ class AdobeRequest:
         elif params is not None:
             res = requests.delete(endpoint, headers=headers, params=params)
         try:
+            while str(res.status_code) == "429":
+                if kwargs.get("verbose", False):
+                    print(f'Too many requests: retrying in {self.restTime} seconds')
+                time.sleep(self.restTime)
+                res = requests.delete(endpoint, headers=headers, params=params)
             status_code = res.status_code
         except:
             status_code = {'error': 'Request Error'}

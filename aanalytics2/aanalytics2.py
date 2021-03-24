@@ -713,7 +713,7 @@ class Analytics:
         params = {'includeType': 'all', 'limit': limit}
         if extended_info:
             params.update(
-                {'expansion': 'reportSuiteName,ownerFullName,modified,tags,compatibility,definition'})
+                {'expansion': 'reportSuiteName,ownerFullName,modified,tags,compatibility,definition,shares'})
         if name is not None:
             params.update({'name': str(name)})
         if tagNames is not None:
@@ -894,9 +894,9 @@ class Analytics:
             params.update({'rsids': rsids_list})
         if extended_info:
             params.update(
-                {'expansion': 'reportSuiteName,definition,ownerFullName,modified,tags,categories,compatibility'})
+                {'expansion': 'reportSuiteName,definition,ownerFullName,modified,tags,categories,compatibility,shares'})
         metrics = self.connector.getData(self.endpoint_company +
-                                         self._getCalcMetrics, params=params, headers=self.header)
+                                         self._getCalcMetrics, params=params)
         data = metrics['content']
         lastPage = metrics['lastPage']
         if not lastPage:  # check if lastpage is inversed of False
@@ -1240,7 +1240,7 @@ class Analytics:
         return res
 
     def getProjects(self, includeType: str = 'all', full: bool = False, limit: int = None, includeShared: bool = False,
-                    includeTemplate: bool = False, format: str = 'df', save: bool = False) -> JsonListOrDataFrameType:
+                    includeTemplate: bool = False, format: str = 'df', cache:bool=False, save: bool = False) -> JsonListOrDataFrameType:
         """
         Returns the list of projects through either a dataframe or a list.
         Arguments:
@@ -1252,6 +1252,7 @@ class Analytics:
             includeShared : OPTIONAL : If full is set to False, you can retrieve only information about sharing.
             includeTemplate: OPTIONAL : If full is set to False, you can add information about template here.
             format : OPTIONAL : format : OPTIONAL : format of the output. 2 values "df" for dataframe (default) and "raw" for raw json.
+            cache : OPTIONAL : Boolean in case you want to cache the result in the "listProjectIds" attribute.
             save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
         """
         path = "/projects"
@@ -1268,7 +1269,8 @@ class Analytics:
         if limit is not None:
             params['limit'] = limit
         res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
-        self.listProjectIds = res
+        if cache:
+            self.listProjectIds = res
         if format == "raw":
             if save:
                 with open('projects.json', 'w') as f:
@@ -1282,7 +1284,7 @@ class Analytics:
             df.to_csv('projects.csv', index=False)
         return df
 
-    def getProject(self, projectId: str = None, projectClass: bool = False, retry: int = 0,verbose: bool = False) -> Union[dict,Project]:
+    def getProject(self, projectId: str = None, projectClass: bool = False, retry: int = 0, cache:bool=False, verbose: bool = False) -> Union[dict,Project]:
         """
         Return the dictionary of the project information and its definition.
         It will return a dictionary or a Project class.
@@ -1291,6 +1293,7 @@ class Analytics:
             projectId : REQUIRED : the project ID to be retrieved.
             projectClass : OPTIONAL : if set to True. Returns a class of the project with prefiltered information
             retry : OPTIONAL : If you want to retry the request if it fails. Specify number of retry (0 default)
+            cache : OPTIONAL : If you want to cache the result as Project class in the "projectsDetails" attribute.
             verbose : OPTIONAL : If you wish to have logs of status
         """
         if projectId is None:
@@ -1304,10 +1307,15 @@ class Analytics:
                 print('building an instance of Project class')
             myProject = Project(res)
             return myProject
-        self.projectsDetails[projectId] = Project(res)
+        if cache:
+            try:
+                self.projectsDetails[projectId] = Project(res)
+            except:
+                if verbose:
+                    print('WARNING : Cannot convert Project to Project class')
         return res
     
-    def getAllProjectDetails(self,projects:JsonListOrDataFrameType=None,filterNameProject:str=None,filterNameOwner:str=None,useAttribute:bool=True,verbose:bool=False)->dict:
+    def getAllProjectDetails(self, projects:JsonListOrDataFrameType=None, filterNameProject:str=None, filterNameOwner:str=None, useAttribute:bool=True, cache:bool=False,verbose:bool=False)->dict:
         """
         Retrieve all projects details. You can either pass the list of dataframe returned from the getProjects methods and some filters.
         Returns a dict of ProjectId and the value is the Project class for analysis.
@@ -1319,7 +1327,7 @@ class Analytics:
             filterNameOwner : OPTIONAL : If you want to retrieve project details for project with an owner having a specific name.
             useAttribute : OPTIONAL : True by default, it will use the projectList saved in the listProjectIds attribute.
                 If you want to start from scratch on the retrieval process of your projects.
-        
+            cache : OPTIONAL : If you want to cache the different elements retrieved for future usage.
         Not using filter may end up taking a while to retrieve the information.
         """
         ## if no project data
@@ -1327,7 +1335,7 @@ class Analytics:
             if len(self.listProjectIds)>0 and useAttribute:
                 fullProjectIds = self.listProjectIds
             else:
-                fullProjectIds = self.getProjects(format='raw')
+                fullProjectIds = self.getProjects(format='raw',cache=cache)
         ## if project data is passed
         elif projects is not None:
             if isinstance(projects,pd.DataFrame):
@@ -1388,6 +1396,7 @@ class Analytics:
             raise ValueError("Requires definition key to be a dictionary")
         res = self.connector.putData(self.endpoint_company + path, data=projectObj, headers=self.header)
         return res
+
 
     def createProject(self, projectObj: dict = None) -> dict:
         """

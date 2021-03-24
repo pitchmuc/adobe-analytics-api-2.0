@@ -73,7 +73,7 @@ class Project:
                 dict_elements['reportSuites'].append(panel['reportSuite']['id'])
             elif "rsid" in panel.keys():
                 dict_elements['reportSuites'].append(panel['rsid'])
-            filters: list = panel['segmentGroups']
+            filters: list = panel.get('segmentGroups',[])
             if len(filters) > 0:
                 for element in filters:
                     typeElement = element['componentOptions'][0]['component']['type']
