@@ -6,8 +6,6 @@ The changes have been tracked starting version 0.1.0
 ## version 0.2.6
 
 * `getSegments` and `getMetrics` return now shares information
-* add the `getScheduledProjects` method
-Patch: **0.2.6-1**
 * adding `429` status code handling for *delete* and *patch* requests.
 * adding `cache` option parameter for `getProjects`, `getProject` and `getAllProjectDetails`
 * Fixing `Project` class that was expecting global filters to be used.
