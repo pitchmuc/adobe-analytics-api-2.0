@@ -1290,7 +1290,7 @@ class Analytics:
             df.to_csv('projects.csv', index=False)
         return df
 
-    def getProject(self, projectId: str = None, projectClass: bool = False, retry: int = 0, cache:bool=False, verbose: bool = False) -> Union[dict,Project]:
+    def getProject(self, projectId: str = None, projectClass: bool = False, rsidSuffix: bool = False, retry: int = 0, cache:bool=False, verbose: bool = False) -> Union[dict,Project]:
         """
         Return the dictionary of the project information and its definition.
         It will return a dictionary or a Project class.
@@ -1298,6 +1298,7 @@ class Analytics:
         Arguments:
             projectId : REQUIRED : the project ID to be retrieved.
             projectClass : OPTIONAL : if set to True. Returns a class of the project with prefiltered information
+            rsidSuffix : OPTIONAL : if set to True, returns project class with rsid as suffic to dimensions and metrics.
             retry : OPTIONAL : If you want to retry the request if it fails. Specify number of retry (0 default)
             cache : OPTIONAL : If you want to cache the result as Project class in the "projectsDetails" attribute.
             verbose : OPTIONAL : If you wish to have logs of status
@@ -1311,7 +1312,7 @@ class Analytics:
         if projectClass:
             if verbose:
                 print('building an instance of Project class')
-            myProject = Project(res)
+            myProject = Project(res,rsidSuffix=rsidSuffix)
             return myProject
         if cache:
             try:
@@ -1321,7 +1322,7 @@ class Analytics:
                     print('WARNING : Cannot convert Project to Project class')
         return res
     
-    def getAllProjectDetails(self, projects:JsonListOrDataFrameType=None, filterNameProject:str=None, filterNameOwner:str=None, useAttribute:bool=True, cache:bool=False,verbose:bool=False)->dict:
+    def getAllProjectDetails(self, projects:JsonListOrDataFrameType=None, filterNameProject:str=None, filterNameOwner:str=None, useAttribute:bool=True, cache:bool=False, rsidSuffix:bool=False, verbose:bool=False)->dict:
         """
         Retrieve all projects details. You can either pass the list of dataframe returned from the getProjects methods and some filters.
         Returns a dict of ProjectId and the value is the Project class for analysis.
@@ -1333,7 +1334,9 @@ class Analytics:
             filterNameOwner : OPTIONAL : If you want to retrieve project details for project with an owner having a specific name.
             useAttribute : OPTIONAL : True by default, it will use the projectList saved in the listProjectIds attribute.
                 If you want to start from scratch on the retrieval process of your projects.
+            rsidSuffix : OPTIONAL : If you want to add rsid as suffix of metrics and dimension (::rsid)
             cache : OPTIONAL : If you want to cache the different elements retrieved for future usage.
+            verbose : OPTIONAL : Set to True to print information.
         Not using filter may end up taking a while to retrieve the information.
         """
         ## if no project data
@@ -1356,7 +1359,7 @@ class Analytics:
             print(f'{len(fullProjectIds)} project details to retrieve')
             print(f"estimated time required : {int(len(fullProjectIds)/60)} minutes")
         projectIds = (project['id'] for project in fullProjectIds)
-        projectsDetails = {projectId:self.getProject(projectId,projectClass=True) for projectId in projectIds}
+        projectsDetails = {projectId:self.getProject(projectId,projectClass=True,rsidSuffix=rsidSuffix) for projectId in projectIds}
         if filterNameProject is None and filterNameOwner is None:
             self.projectsDetails = projectsDetails
         return projectsDetails
@@ -1438,7 +1441,8 @@ class Analytics:
                             recursive:bool=False,
                             regexUsed:bool=False,
                             verbose:bool=False,
-                            resetProjectDetails:bool=False
+                            resetProjectDetails:bool=False,
+                            rsidPrefix:bool=False,
                             )->dict:
         """
         Find the usage of components in the different part of Adobe Analytics setup.
@@ -1453,6 +1457,7 @@ class Analytics:
                 segments based on your elements will also be searched to see where they are located.
             regexUsed : OPTIONAL : If set to True, the element are definied as a regex and some default setup is turned off.
             resetProjectDetails : OPTIONAL : Set to false by default. If set to True, it will NOT use the cache.
+            rsidPrefix : OPTIONAL : If you do not give projectDetails and you want to look for rsid usage in report for dimensions and metrics.
         """
         listComponentProp = [comp for comp in components if 'prop' in comp]
         listComponentVar = [comp for comp in components if 'evar' in comp]
@@ -1462,8 +1467,7 @@ class Analytics:
         restComponents = set(components) - set(listComponentProp+listComponentVar+listComponentEvent+listComponentSegs+listComponentCalcs)
         listDefaultElements = [comp for comp in restComponents]
         listRecusion = []
-        ## adding unrefular ones
-
+        ## adding unregular ones
         regPartSeg = "('|\.)" ## ensure to not catch evar100 for evar10
         regPartPro = "($|\.)" ## ensure to not catch evar100 for evar10
         if regexUsed:
@@ -1496,7 +1500,7 @@ class Analytics:
         if (len(self.projectsDetails) == 0 and projectDetails is None) or resetProjectDetails:
             if verbose:
                 print('retrieving projects details - long process')
-            self.projectDetails = self.getAllProjectDetails(verbose=verbose)
+            self.projectDetails = self.getAllProjectDetails(verbose=verbose,rsidPrefix=rsidPrefix)
             myProjectDetails = (self.projectsDetails[key].to_dict() for key in self.projectsDetails)
         elif len(self.projectsDetails) > 0 and projectDetails is None and resetProjectDetails==False:
             if verbose:

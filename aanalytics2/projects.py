@@ -8,7 +8,13 @@ class Project:
     It flatten the elements and gives you insights on what your project contains.
     """
 
-    def __init__(self, projectDict: dict = None):
+    def __init__(self, projectDict: dict = None,rsidSuffix:bool=False):
+        """
+        Instancialize the class.
+        Arguments:
+            projectDict : REQUIRED : the dictionary of the project (returned by getProject method)
+            rsidSuffix : OPTIONAL : If you want to have the rsid suffix to dimension and metrics.
+        """
         if projectDict is None:
             raise Exception("require a dictionary")
         self.id: str = projectDict.get('id', '')
@@ -33,7 +39,7 @@ class Project:
                 for panel in infos["panels"]:
                     self.nbSubPanels += infos["panels"][panel]['nb_subPanels']
                     self.subPanelsTypes += infos["panels"][panel]['subPanels_types']
-                self.elementsUsed: dict = self._findElements(definition['workspaces'][0])
+                self.elementsUsed: dict = self._findElements(definition['workspaces'][0],rsidSuffix=rsidSuffix)
                 self.nbElementsUsed: int = len(self.elementsUsed['dimensions']) + len(
                     self.elementsUsed['metrics']) + len(self.elementsUsed['segments']) + len(
                     self.elementsUsed['calculatedMetrics'])
@@ -63,7 +69,7 @@ class Project:
                                                                    panel['subPanels']]
         return dict_data
 
-    def _findElements(self, workspace: dict) -> list:
+    def _findElements(self, workspace: dict,rsidSuffix:bool=False) -> list:
         """
         Returns the list of dimensions used in the FreeformReportlet. 
         Arguments :
@@ -71,11 +77,16 @@ class Project:
         """
         dict_elements: dict = {'dimensions': [], "metrics": [], 'segments': [], "reportSuites": [],
                                'calculatedMetrics': []}
+        tmp_rsid = "" # default empty value
         for panel in workspace['panels']:
             if "reportSuite" in panel.keys():
                 dict_elements['reportSuites'].append(panel['reportSuite']['id'])
+                if rsidSuffix:
+                    tmp_rsid = f"::{panel['reportSuite']['id']}"
             elif "rsid" in panel.keys():
                 dict_elements['reportSuites'].append(panel['rsid'])
+                if rsidSuffix:
+                    tmp_rsid = f"::{panel['rsid']}"
             filters: list = panel.get('segmentGroups',[])
             if len(filters) > 0:
                 for element in filters:
@@ -92,27 +103,27 @@ class Project:
                     reportlet = subPanel['reportlet']
                     rows = reportlet['freeformTable']
                     if 'dimension' in rows.keys():
-                        dict_elements['dimensions'].append(rows['dimension']['id'])
+                        dict_elements['dimensions'].append(f"{rows['dimension']['id']}{tmp_rsid}")
                     if len(rows["staticRows"]) > 0:
                         for row in rows["staticRows"]:
                             ## I have to get a temp dimension to clean them before loading them in order to avoid counting them multiple time for each rows.
                             temp_list_dim = []
                             componentType: str = row['component']['type']
                             if componentType == "DimensionItem":
-                                temp_list_dim.append(row['component']['id'])
+                                temp_list_dim.append(f"{row['component']['id']}{tmp_rsid}")
                             elif componentType == "Segments" or componentType == "Segment":
                                 dict_elements['segments'].append(row['component']['id'])
                             elif componentType == "Metric":
-                                dict_elements['metrics'].append(row['component']['id'])
+                                dict_elements['metrics'].append(f"{row['component']['id']}{tmp_rsid}")
                             elif componentType == "CalculatedMetric":
                                 dict_elements['calculatedMetrics'].append(row['component']['id'])
                         if len(temp_list_dim) > 0:
                             temp_list_dim = list(set([el[:el.find('::')] for el in temp_list_dim]))
                         for dim in temp_list_dim:
-                            dict_elements['dimensions'].append(dim)
+                            dict_elements['dimensions'].append(f"{dim}{tmp_rsid}")
                     columns = reportlet['columnTree']
                     for node in columns['nodes']:
-                        temp_data = self._recursiveColumn(node)
+                        temp_data = self._recursiveColumn(node,tmp_rsid=tmp_rsid)
                         dict_elements['calculatedMetrics'] += temp_data['calculatedMetrics']
                         dict_elements['segments'] += temp_data['segments']
                         dict_elements['metrics'] += temp_data['metrics']
@@ -125,16 +136,17 @@ class Project:
         dict_elements['calculatedMetrics'] = list(set(dict_elements['calculatedMetrics']))
         return dict_elements
 
-    def _recursiveColumn(self, node: dict = None, temp_data: dict = None):
+    def _recursiveColumn(self, node: dict = None, temp_data: dict = None,tmp_rsid:str=""):
         """
         recursive function to fetch elements in column stack
+        tmp_rsid : OPTIONAL : empty by default, if rsid is pass, it will add the value to dimension and metrics
         """
         if temp_data is None:
             temp_data: dict = {'dimensions': [], "metrics": [], 'segments': [], "reportSuites": [],
                                'calculatedMetrics': []}
         componentType: str = node['component']['type']
         if componentType == "Metric":
-            temp_data['metrics'].append(node['component']['id'])
+            temp_data['metrics'].append(f"{node['component']['id']}{tmp_rsid}")
         elif componentType == "CalculatedMetric":
             temp_data['calculatedMetrics'].append(node['component']['id'])
         elif componentType == "Segments":
@@ -142,10 +154,10 @@ class Project:
         elif componentType == "DimensionItem":
             old_id: str = node['component']['id']
             new_id: str = old_id[:old_id.find('::')]
-            temp_data['dimensions'].append(new_id)
+            temp_data['dimensions'].append(f"{new_id}{tmp_rsid}")
         if len(node['nodes']) > 0:
             for new_node in node['nodes']:
-                temp_data = self._recursiveColumn(new_node, temp_data=temp_data)
+                temp_data = self._recursiveColumn(new_node, temp_data=temp_data,tmp_rsid=tmp_rsid)
         return temp_data
 
     def to_dict(self) -> dict:
@@ -162,6 +174,8 @@ class Project:
             'ownerEmail': self.ownerEmail,
             'template': self.template,
             'reportType':self.reportType,
+            'curation': self.curation or False,
+            'version': self.version or None,
         }
         add_object = {}
         if hasattr(self, 'nbPanels'):
