@@ -22,9 +22,10 @@ class Project:
         self.version: str = None
         if 'definition' in projectDict.keys():
             definition: dict = projectDict['definition']
-            self.version: str = definition['version']
+            self.version: str = definition.get('version',None)
             self.curation: bool = definition.get('isCurated', False)
             if definition.get('device', 'desktop') != 'cell':
+                self.reportType = "desktop"
                 infos = self._findPanelsInfos(definition['workspaces'][0])
                 self.nbPanels: int = infos["nb_Panels"]
                 self.nbSubPanels: int = 0
@@ -36,6 +37,8 @@ class Project:
                 self.nbElementsUsed: int = len(self.elementsUsed['dimensions']) + len(
                     self.elementsUsed['metrics']) + len(self.elementsUsed['segments']) + len(
                     self.elementsUsed['calculatedMetrics'])
+            else:
+                self.reportType = "mobile"
 
     def __str__(self)->str:
         return json.dumps(self.to_dict(),indent=4)
@@ -158,6 +161,7 @@ class Project:
             'ownerId': self.ownerId,
             'ownerEmail': self.ownerEmail,
             'template': self.template,
+            'reportType':self.reportType,
         }
         add_object = {}
         if hasattr(self, 'nbPanels'):

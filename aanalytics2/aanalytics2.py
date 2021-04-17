@@ -1,6 +1,5 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
-# version : 0.1.4
 import json
 import os
 import time
@@ -560,13 +559,14 @@ class Analytics:
         res = self.connector.postData(path, data=body, headers=self.header)
         return res
 
-    def getDimensions(self, rsid: str, tags: bool = False, save=False, **kwargs) -> pd.DataFrame:
+    def getDimensions(self, rsid: str, tags: bool = False, description:bool=False, save=False, **kwargs) -> pd.DataFrame:
         """
         Retrieve the list of dimensions from a specific reportSuite.Shrink columns to simplify output.
         Returns the data frame of available dimensions.
         Arguments:
             rsid : REQUIRED : Report Suite ID from which you want the dimensions
             tags : OPTIONAL : If you would like to have additional information, such as tags. (bool : default False)
+            description : OPTIONAL : Trying to add the description column. It may break the method.
             save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
         Possible kwargs:
             full : Boolean : Doesn't shrink the number of columns if set to true
@@ -580,7 +580,9 @@ class Analytics:
                                       self._getDimensions, params=params, headers=self.header)
         df_dims = pd.DataFrame(dims)
         columns = ['id', 'name', 'category', 'type',
-                   'parent', 'pathable', 'description']
+                   'parent', 'pathable']
+        if description:
+            columns.append('description')
         if kwargs.get('full', False):
             new_cols = pd.DataFrame(df_dims.support.values.tolist(),
                                     columns=['support_oberon', 'support_dw'])  # extract list in column
@@ -593,13 +595,15 @@ class Analytics:
             df_dims.to_csv(f'dimensions_{rsid}.csv')
         return df_dims
 
-    def getMetrics(self, rsid: str, tags: bool = False, save=False, **kwargs) -> pd.DataFrame:
+    def getMetrics(self, rsid: str, tags: bool = False, save=False, dataGroup:bool=False, **kwargs) -> pd.DataFrame:
         """
         Retrieve the list of metrics from a specific reportSuite. Shrink columns to simplify output.
         Returns the data frame of available metrics.
         Arguments:
             rsid : REQUIRED : Report Suite ID from which you want the dimensions (str)
             tags : OPTIONAL : If you would like to have additional information, such as tags.(bool : default False)
+            dataGroup : OPTIONAL : Adding dataGroups to the column exported. Default False. 
+                May break the report.
             save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
         Possible kwargs:
             full : Boolean : Doesn't shrink the number of columns if set to true.
@@ -612,7 +616,9 @@ class Analytics:
                                          self._getMetrics, params=params, headers=self.header)
         df_metrics = pd.DataFrame(metrics)
         columns = ['id', 'name', 'category', 'type',
-                   'dataGroup', 'precision', 'segmentable']
+                   'precision', 'segmentable']
+        if dataGroup:
+            columns.append('dataGroup')
         if kwargs.get('full', False):
             new_cols = pd.DataFrame(df_metrics.support.values.tolist(), columns=[
                 'support_oberon', 'support_dw'])
@@ -1727,6 +1733,57 @@ class Analytics:
             page += 1
             params["page"] = page
         df = pd.DataFrame(data)
+        return df
+    
+    def compareReportSuites(self,listRsids:list=None,element:str='dimensions',comparison:str="full",save: bool=False)->pd.DataFrame:
+        """
+        Compare reportSuite on dimensions (default) or metrics based on the comparison selected.
+        Returns a dataframe with multi-index and a column telling which elements are differents
+        Arguments:
+            listRsids : REQUIRED : list of report suite ID to compare
+            element : REQUIRED : Elements to compare. 2 possible choices:
+                dimensions (default)
+                metrics
+            comparison : REQUIRED : Type of comparison to do:
+                full (default) : compare name and settings
+                name : compare only names
+            save : OPTIONAL : if you want to save in a csv.
+        """
+        if listRsids is None or type(listRsids) != list:
+            raise ValueError("Require a list of rsids")
+        if element=="dimensions":
+            listDFs = [self.getDimensions(rsid) for rsid in listRsids]
+        elif element == "metrics":
+            listDFs = [self.getMetrics(rsid) for rsid in listRsids]
+        for df,rsid in zip(listDFs, listRsids):
+            df['rsid']=rsid
+            df.set_index('id',inplace=True)
+            df.set_index('rsid',append=True,inplace=True)
+        df = pd.concat(listDFs)
+        df = df.unstack()
+        if comparison=='name':
+            df_name = df['name'].copy()
+            ## transforming to a new df with boolean value comparison to col 0
+            temp_df = df_name.eq(df_name.iloc[:, 0], axis=0)
+            ## now doing a complete comparison of all boolean with all
+            df_name['different'] = ~temp_df.eq(temp_df.iloc[:,0],axis=0).all(1)
+            if save:
+                df_name.to_csv('comparison_name.csv')
+            return df_name
+        ## retrieve main indexes from multi level indexes
+        mainIndex = set([val[0] for val in list(df.columns)])
+        dict_temp = {}
+        for index in mainIndex:
+            temp_df = df[index].copy()
+            temp_df.fillna('',inplace=True)
+            ## transforming to a new df with boolean value comparison to col 0
+            temp_df.eq(temp_df.iloc[:, 0], axis=0)
+            ## now doing a complete comparison of all boolean with all
+            dict_temp[index] = list(temp_df.eq(temp_df.iloc[:,0],axis=0).all(1))
+        df_bool = pd.DataFrame(dict_temp)
+        df['different'] = list(~df_bool.eq(df_bool.iloc[:,0],axis=0).all(1))
+        if save:
+            df.to_csv('comparison_full.csv')
         return df
         
 
