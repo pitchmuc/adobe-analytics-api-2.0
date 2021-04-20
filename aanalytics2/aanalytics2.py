@@ -1520,6 +1520,7 @@ class Analytics:
         if verbose:
             print('search started')
             print(f'recursive option : {recursive}')
+            print('start looking into segments')
         for _,seg in mySegments.iterrows():
             for prop in listComponentProp:
                 if re.search(f"{prop+regPartSeg}",str(seg['definition'])):
@@ -1541,6 +1542,8 @@ class Analytics:
                     returnObj[element]['segments'].append({seg['name']:seg['id']})
                     if recursive:
                         listRecusion.append(seg['id'])
+        if verbose:
+            print('start looking into calculated metrics')
         for _,met in myMetrics.iterrows():
             for prop in listComponentProp:
                 if re.search(f"{prop+regPartSeg}",str(met['definition'])):
@@ -1562,40 +1565,44 @@ class Analytics:
                     returnObj[element]['calculatedMetrics'].append({met['name']:met['id']})
                     if recursive:
                         listRecusion.append(met['id'])
+        if verbose:
+            print('start looking into projects')
         for proj in myProjectDetails:
-            for prop in listComponentProp:
-                for element in proj['dimensions']:
-                    if re.search(f"{prop+regPartPro}",element):
-                        returnObj[prop]['projects'].append({proj['name']:proj['id']})
-            for var in listComponentVar:
-                for element in proj['dimensions']:
-                    if re.search(f"{var+regPartPro}",element):
-                        returnObj[var]['projects'].append({proj['name']:proj['id']})
-            for event in listComponentEvent:
-                for element in proj['metrics']:
-                    if re.search(f"{event}",element):
-                        returnObj[event]['projects'].append({proj['name']:proj['id']})
-            for seg in listComponentSegs:
-                for element in proj['segments']:
-                    if re.search(f"{seg}",element):
-                        returnObj[seg]['projects'].append({proj['name']:proj['id']})
-            for met in listComponentCalcs:
-                for element in proj['calculatedMetrics']:
-                    if re.search(f"{met}",element):
-                        returnObj[met]['projects'].append({proj['name']:proj['id']})
-            for element in listDefaultElements:
-                for met in proj['calculatedMetrics']:
-                    if re.search(f"{element}",met):
-                        returnObj[element]['projects'].append({proj['name']:proj['id']})
-                for dim in proj['dimensions']:
-                    if re.search(f"{element}",dim):
-                        returnObj[element]['projects'].append({proj['name']:proj['id']})
-                for rsid in proj['rsids']:
-                    if re.search(f"{element}",rsid):
-                        returnObj[element]['projects'].append({proj['name']:proj['id']})
-                for event in proj['metrics']:
-                    if re.search(f"{element}",event):
-                        returnObj[element]['projects'].append({proj['name']:proj['id']})
+            ## mobile reports don't have dimensions.
+            if proj['reportType'] == "desktop":
+                for prop in listComponentProp:
+                    for element in proj['dimensions']:
+                        if re.search(f"{prop+regPartPro}",element):
+                            returnObj[prop]['projects'].append({proj['name']:proj['id']})
+                for var in listComponentVar:
+                    for element in proj['dimensions']:
+                        if re.search(f"{var+regPartPro}",element):
+                            returnObj[var]['projects'].append({proj['name']:proj['id']})
+                for event in listComponentEvent:
+                    for element in proj['metrics']:
+                        if re.search(f"{event}",element):
+                            returnObj[event]['projects'].append({proj['name']:proj['id']})
+                for seg in listComponentSegs:
+                    for element in proj['segments']:
+                        if re.search(f"{seg}",element):
+                            returnObj[seg]['projects'].append({proj['name']:proj['id']})
+                for met in listComponentCalcs:
+                    for element in proj['calculatedMetrics']:
+                        if re.search(f"{met}",element):
+                            returnObj[met]['projects'].append({proj['name']:proj['id']})
+                for element in listDefaultElements:
+                    for met in proj['calculatedMetrics']:
+                        if re.search(f"{element}",met):
+                            returnObj[element]['projects'].append({proj['name']:proj['id']})
+                    for dim in proj['dimensions']:
+                        if re.search(f"{element}",dim):
+                            returnObj[element]['projects'].append({proj['name']:proj['id']})
+                    for rsid in proj['rsids']:
+                        if re.search(f"{element}",rsid):
+                            returnObj[element]['projects'].append({proj['name']:proj['id']})
+                    for event in proj['metrics']:
+                        if re.search(f"{element}",event):
+                            returnObj[element]['projects'].append({proj['name']:proj['id']})
             if recursive:
                 for rec in listRecusion:
                     for element in proj['segments']:
