@@ -791,6 +791,36 @@ class Analytics:
             params = {'expansion': ','.join(ValidArgs)}
         res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         return res
+    
+    def scanSegment(self,segment:Union[str,dict],verbose:bool=False)->dict:
+        """
+        Return the dimensions, metrics and reportSuite used and the main scope of the segment.
+        Arguments:
+            segment : REQUIRED : either the ID of the segment or the full definition.
+            verbose : OPTIONAL : print some comment.
+        """
+        if type(segment) == str:
+            if verbose:
+                print('retrieving segment definition')
+            defSegment = self.getSegment(segment,full=True)
+        elif type(segment) == dict:
+            defSegment = deepcopy(segment)
+            if 'definition' not in defSegment.keys():
+                raise KeyError('missing "definition" key ')
+            if verbose:
+                print('copied segment definition')
+        mydef = str(defSegment['definition'])
+        dimensions : list = re.findall("'(variables/.+?)'",mydef)
+        metrics : list = re.findall("'(metrics/.+?)'",mydef)
+        reportSuite = defSegment['rsid']
+        scope = re.search("'context': '(.+)'}[^'context']+",mydef)
+        res = {
+            'dimensions' : set(dimensions) if len(dimensions)>0 else {},
+            'metrics' : set(metrics) if len(metrics)>0 else {},
+            'rsid' : reportSuite,
+            'scope' : scope.group(1)
+        }
+        return res
 
     def createSegment(self, segmentJSON: dict = None) -> dict:
         """
@@ -940,6 +970,37 @@ class Analytics:
         path = f"/calculatedmetrics/{calculatedMetricId}"
         res = self.connector.getData(self.endpoint_company+path,params=params)
         return res
+    
+    def scanCalculatedMetric(self,calculatedMetric:Union[str,dict],verbose:bool=False)->dict:
+        """
+        Return a dictionary of metrics and dimensions used in the calculated metrics.
+        """
+        if type(calculatedMetric) == str:
+            if verbose:
+                print('retrieving calculated metrics definition')
+            cm = self.getCalculatedMetric(calculatedMetric,full=True)
+        elif type(calculatedMetric) == dict:
+            cm = deepcopy(calculatedMetric)
+            if 'definition' not in cm.keys():
+                raise KeyError('missing "definition" key')
+            if verbose:
+                print('copied calculated metrics definition')
+        mydef = str(cm['definition'])
+        segments:list = cm['compatibility']['segments']
+        res = {"dimensions":[],'metrics':[]}
+        for segment in segments:
+            if verbose:
+                print(f"retrieving segment {segment} definition")
+            tmp:dict = self.scanSegment(segment)
+            res['dimensions'] += [dim for dim in tmp['dimensions']]
+            res['metrics'] += [met for met in tmp['metrics']]
+        metrics : list = re.findall("'(metrics/.+?)'",mydef)
+        res['metrics'] += metrics
+        res['rsid'] = cm['rsid']
+        res['metrics'] = set(res['metrics']) if len(res['metrics'])>0 else {}
+        res['dimensions'] = set(res['dimensions']) if len(res['dimensions'])>0 else {}
+        return res
+
 
     def createCalculatedMetric(self, metricJSON: dict = None) -> dict:
         """
