@@ -1395,7 +1395,7 @@ class Analytics:
             filterNameOwner : OPTIONAL : If you want to retrieve project details for project with an owner having a specific name.
             useAttribute : OPTIONAL : True by default, it will use the projectList saved in the listProjectIds attribute.
                 If you want to start from scratch on the retrieval process of your projects.
-            rsidSuffix : OPTIONAL : If you want to add rsid as suffix of metrics and dimension (::rsid)
+            rsidSuffix : OPTIONAL : If you want to add rsid as suffix of metrics and dimensions (::rsid)
             cache : OPTIONAL : If you want to cache the different elements retrieved for future usage.
             verbose : OPTIONAL : Set to True to print information.
         Not using filter may end up taking a while to retrieve the information.

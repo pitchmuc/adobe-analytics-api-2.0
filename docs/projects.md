@@ -118,6 +118,7 @@ Therefore there are 4 optional parameters that can definitely save you a lot of 
 * useAttribute : OPTIONAL : `True` by default, it will use the projectList saved in the `listProjectIds` attribute of your instance.
     It avoids to recreates the call and can save several seconds.
     If you want to start from scratch on the retrieval process of your projects, set it to `False`.
+* rsidSuffix : OPTIONAL : If you want to add rsid as suffix of metrics and dimensions (::rsid)
 
 ## Find the components used
 
