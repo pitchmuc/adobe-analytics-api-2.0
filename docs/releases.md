@@ -8,6 +8,7 @@ The changes have been tracked starting version 0.1.0
 * adding `compareReportSuites` method
 * adding `reportType` as attribute from projects. Either `desktop` or `mobile`
 * adding `version` and `curation` attributes by default on dict version of `project`.
+* adding `scanSegment` and `scanCalculatedMetric` methods.
 
 ## version 0.2.6
 

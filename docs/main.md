@@ -590,3 +590,21 @@ Results for Calculated Metric:
 'rsid' : "rsid",
 }
 ```
+
+## Compare ReportSuite
+
+The `compareReportSuites` method allows you to compare the setup between reportSuites for either dimensions and metrics.\
+It also has several parameters that would allow for extensive comparison (with attribution) or just names.
+
+* compareReportSuites
+  Compare reportSuite on dimensions (default) or metrics based on the comparison selected.
+  Returns a dataframe with multi-index and a column telling which elements are differents
+  Arguments:
+  * listRsids : REQUIRED : list of report suite ID to compare
+  * element : REQUIRED : Elements to compare. 2 possible choices:
+    * dimensions (default)
+    * metrics
+  * comparison : REQUIRED : Type of comparison to do:
+    * full (default) : compare name and settings
+    * name : compare only names
+* save : OPTIONAL : if you want to save in a csv.
