@@ -560,3 +560,33 @@ You can only create Calculated Metrics and Segments so far.
   Arguments:
   * metricJSON : REQUIRED : the dictionary that represents the JSON statement for the  Calculated Metrics.
     Required in the dictionary :  name, definition, rsid
+
+### The scan methods
+
+The scan methods allow to search for the elements used in a Segment or a Calculated Metric.\
+You can `scanSegment` or `scanCalculatedMetric` with either:
+
+* the id of the Segment or the Calculated Metric.
+* the dictionary result of the segment or calculated metric retrieved from `getSegment` or `getCalculatedMetric` methods.
+
+The result will be a dictionary with the different information.\
+Results for Segment:
+
+```python
+{
+'dimensions' : {"variables/referringdomain","variables/evar3"},
+'metrics' : {"metrics/bouncerate","metrics/visits"},
+'rsid' : "rsid",
+'scope' : "hits"
+}
+```
+
+Results for Calculated Metric:
+
+```python
+{
+'dimensions' : {"variables/referringdomain","variables/evar3"},
+'metrics' : {"metrics/bouncerate","metrics/visits"},
+'rsid' : "rsid",
+}
+```

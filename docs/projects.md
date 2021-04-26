@@ -17,6 +17,21 @@ You can either call the `Project` class directly from `aanalytics2` or ask to re
 **NOTE**: The definition are not consistent over time, therefore the `Project` class may not work on old projects.\
 For that case, the solution is to open that Workspace project again and re-saved it. This will create a compatible version of the project definition.
 
+**NOTE 2**: When retrieving the project in the class, you can decide to returns the reportSuite ID (`rsid`) attached to the dimension and metrics.\
+In case of multiple reportSuites in the same project, which do not have the same setup, it helps to identify which dimension is used from which reportSuite.
+The reportSuite ID will be added as suffix with this element `::` as separator.
+the result will look something like (for metrics):
+
+```python
+"metrics": [
+         "metrics/bouncerate::ags862serverlog",
+         "metrics/visitors::ags862serverlog",
+         "metrics/occurrences::ags862serverlog",
+         "metrics/bounces::ags862serverlog",
+         "metrics/visits::ags862serverlog"
+     ],
+```
+
 So far we are able to realize the following calls:
 
 ```python
@@ -120,6 +135,7 @@ This method takes 7 possibles arguments.
     e.g. : segments based on your elements will also be searched to see where they are located..
 * regexUsed : OPTIONAL : If set to True, the element are definied as a regex and some default setup is turned off.
 * resetProjectDetails : OPTIONAL : Set to false by default. If set to True, it will NOT use the cache.
+* rsidSuffix : OPTIONAL : If you do not give projectDetails (or resetProjectDetails) and you want to look for rsid usage in report for dimensions and metrics.
 * verbose : OPTIONAL : print comments along the way
 
 It will return a dictionary as a result and you can call the method like this:
@@ -150,6 +166,9 @@ On this key, will get a list of dictionary of element names and ids.
 
 **regexUsed**: If you want to pass a regex in the elements searched.\
 so your list could look like:`myElements = ['evar1[0-9]','event1[2-3]\d','prop1$','segId','calcId']`
+
+**rsidSuffix**: When adding the rsid suffix capability, you can have more option when searching for elements attached to a specific reportSuite.\
+It could looks like this: `myElements = ['variables/referringdomain::ags862serverlog']`
 
 ### Remarks
 
