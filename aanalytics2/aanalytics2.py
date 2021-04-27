@@ -616,7 +616,7 @@ class Analytics:
                                          self._getMetrics, params=params, headers=self.header)
         df_metrics = pd.DataFrame(metrics)
         columns = ['id', 'name', 'category', 'type',
-                   'precision', 'segmentable']
+                   'precision', 'segmentable', 'description']
         if dataGroup:
             columns.append('dataGroup')
         if kwargs.get('full', False):
