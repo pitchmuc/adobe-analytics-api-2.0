@@ -7,9 +7,15 @@ The changes have been tracked starting version 0.1.0
 
 * adding `compareReportSuites` method. ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/main.md#compare-reportsuite))
 * adding `reportType` as attribute from projects. Either `desktop` or `mobile`
-* adding `version` and `curation` attributes by default on dict version of `project`.
+* adding `version` and `curation` attributes by default on dict version of `project`
 * adding `scanSegment` and `scanCalculatedMetric` methods. ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/main.md#the-scan-methods))
-* adding `rsidSuffix` parameter for `Project` class ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/projects.md#project-class)), `findComponentUsage` ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/projects.md#find-the-components-used)) and `getAllProjectDetails` ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/projects.md#project-class))
+* adding `rsidSuffix` parameter for `Project` class ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/projects.md#project-class)), `findComponentUsage` ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/projects.md#find-the-components-used)) and `getAllProjectDetails` ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/projects.md#getting-all-projects-details))
+*Patch*:
+* Adding description parameter option in `getMetrics`
+* Most of `save` parameter will get timestamp
+* Fix `rsidPrefix` as `rsidSuffix` parameter for findComponentUsage method.
+* Fix generator exhausted when trying to use recursive mode in findComponentUsage.
+* Change default comparison to retrieve all columns from dimensions and metrics.
 
 ## version 0.2.6
 

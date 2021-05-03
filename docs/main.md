@@ -286,6 +286,7 @@ There are several get methods.
   Arguments:
   * rsid : REQUIRED : Report Suite ID from which you want the dimensions
   * tags : OPTIONAL : If you would like to have additional information, such as tags. (bool : default False)
+  * description : OPTIONAL : Trying to add the description column. It may break the method.
   * save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
   Possible kwargs:
   * full : Boolean : Doesn't shrink the number of columns if set to true
@@ -295,6 +296,8 @@ There are several get methods.
   Arguments:
   * rsid : REQUIRED : Report Suite ID from which you want the dimensions
   * tags : OPTIONAL : If you would like to have additional information, such as tags. (bool : default False)
+  * dataGroup : OPTIONAL : Adding dataGroups to the column exported. Default False.
+                May break the report.
   * save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
   Possible kwargs:
   * full : Boolean : Doesn't shrink the number of columns if set to true
@@ -608,3 +611,5 @@ It also has several parameters that would allow for extensive comparison (with a
     * full (default) : compare name and settings
     * name : compare only names
 * save : OPTIONAL : if you want to save in a csv.
+
+**NOTE** : At the moment, description are not compared because could break the methods and were not deem critical.

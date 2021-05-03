@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import IO, Union, List
 from collections import defaultdict
 import re
+from itertools import tee
 
 # Non standard libraries
 import pandas as pd
@@ -595,7 +596,7 @@ class Analytics:
             df_dims.to_csv(f'dimensions_{rsid}.csv')
         return df_dims
 
-    def getMetrics(self, rsid: str, tags: bool = False, save=False, dataGroup:bool=False, **kwargs) -> pd.DataFrame:
+    def getMetrics(self, rsid: str, tags: bool = False, save=False, description:bool=False, dataGroup:bool=False, **kwargs) -> pd.DataFrame:
         """
         Retrieve the list of metrics from a specific reportSuite. Shrink columns to simplify output.
         Returns the data frame of available metrics.
@@ -619,6 +620,8 @@ class Analytics:
                    'precision', 'segmentable']
         if dataGroup:
             columns.append('dataGroup')
+        if description:
+            columns.append('description')
         if kwargs.get('full', False):
             new_cols = pd.DataFrame(df_metrics.support.values.tolist(), columns=[
                 'support_oberon', 'support_dw'])
@@ -1503,7 +1506,7 @@ class Analytics:
                             regexUsed:bool=False,
                             verbose:bool=False,
                             resetProjectDetails:bool=False,
-                            rsidPrefix:bool=False,
+                            rsidSuffix:bool=False,
                             )->dict:
         """
         Find the usage of components in the different part of Adobe Analytics setup.
@@ -1518,7 +1521,7 @@ class Analytics:
                 segments based on your elements will also be searched to see where they are located.
             regexUsed : OPTIONAL : If set to True, the element are definied as a regex and some default setup is turned off.
             resetProjectDetails : OPTIONAL : Set to false by default. If set to True, it will NOT use the cache.
-            rsidPrefix : OPTIONAL : If you do not give projectDetails and you want to look for rsid usage in report for dimensions and metrics.
+            rsidSuffix : OPTIONAL : If you do not give projectDetails and you want to look for rsid usage in report for dimensions and metrics.
         """
         listComponentProp = [comp for comp in components if 'prop' in comp]
         listComponentVar = [comp for comp in components if 'evar' in comp]
@@ -1534,6 +1537,7 @@ class Analytics:
         if regexUsed:
             regPartSeg = ""
             regPartPro = ""
+        ## Segments
         if verbose:
             print('retrieving segments')
         if len(self.segments) == 0 and segments is None:
@@ -1546,6 +1550,7 @@ class Analytics:
                 mySegments = pd.DataFrame(segments)
         else:
             mySegments = segments
+        ### Calculated Metrics
         if verbose:
             print('retrieving calculated metrics')
         if len(self.calculatedMetrics) == 0 and calculatedMetrics is None:
@@ -1558,10 +1563,11 @@ class Analytics:
                 myMetrics = pd.DataFrame(calculatedMetrics)
         else:
             myMetrics = calculatedMetrics
+        ### Projects
         if (len(self.projectsDetails) == 0 and projectDetails is None) or resetProjectDetails:
             if verbose:
                 print('retrieving projects details - long process')
-            self.projectDetails = self.getAllProjectDetails(verbose=verbose,rsidPrefix=rsidPrefix)
+            self.projectDetails = self.getAllProjectDetails(verbose=verbose,rsidSuffix=rsidSuffix)
             myProjectDetails = (self.projectsDetails[key].to_dict() for key in self.projectsDetails)
         elif len(self.projectsDetails) > 0 and projectDetails is None and resetProjectDetails==False:
             if verbose:
@@ -1576,6 +1582,7 @@ class Analytics:
                 myProjectDetails = (Project(item).to_dict() for item in projectDetails)
         else:
             raise Exception("Project details were not able to be processed")
+        recurseProjects = tee(myProjectDetails) ## copying the project generator for recursive pass (low memory - intensive computation)
         returnObj = {element : {'segments':[],'calculatedMetrics':[],'projects':[]} for element in components}
         recurseObj = defaultdict(list)
         if verbose:
@@ -1644,11 +1651,11 @@ class Analytics:
                         if re.search(f"{event}",element):
                             returnObj[event]['projects'].append({proj['name']:proj['id']})
                 for seg in listComponentSegs:
-                    for element in proj['segments']:
+                    for element in proj.get('segments',[]):
                         if re.search(f"{seg}",element):
                             returnObj[seg]['projects'].append({proj['name']:proj['id']})
                 for met in listComponentCalcs:
-                    for element in proj['calculatedMetrics']:
+                    for element in proj.get('calculatedMetrics',[]):
                         if re.search(f"{met}",element):
                             returnObj[met]['projects'].append({proj['name']:proj['id']})
                 for element in listDefaultElements:
@@ -1664,12 +1671,15 @@ class Analytics:
                     for event in proj['metrics']:
                         if re.search(f"{element}",event):
                             returnObj[element]['projects'].append({proj['name']:proj['id']})
-            if recursive:
+        if recursive:
+            if verbose:
+                print('start looking into recursive elements')
+            for proj in recurseProjects:
                 for rec in listRecusion:
-                    for element in proj['segments']:
+                    for element in proj.get('segments',[]):
                         if re.search(f"{rec}",element):
                             recurseObj[rec].append({proj['name']:proj['id']})
-                    for element in proj['calculatedMetrics']:
+                    for element in proj.get('calculatedMetrics',[]):
                         if re.search(f"{rec}",element):
                             recurseObj[rec].append({proj['name']:proj['id']})
         if recursive:
@@ -1824,9 +1834,9 @@ class Analytics:
         if listRsids is None or type(listRsids) != list:
             raise ValueError("Require a list of rsids")
         if element=="dimensions":
-            listDFs = [self.getDimensions(rsid) for rsid in listRsids]
+            listDFs = [self.getDimensions(rsid,full=True) for rsid in listRsids]
         elif element == "metrics":
-            listDFs = [self.getMetrics(rsid) for rsid in listRsids]
+            listDFs = [self.getMetrics(rsid,full=True) for rsid in listRsids]
         for df,rsid in zip(listDFs, listRsids):
             df['rsid']=rsid
             df.set_index('id',inplace=True)
@@ -1855,7 +1865,7 @@ class Analytics:
         df_bool = pd.DataFrame(dict_temp)
         df['different'] = list(~df_bool.eq(df_bool.iloc[:,0],axis=0).all(1))
         if save:
-            df.to_csv('comparison_full.csv')
+            df.to_csv(f'comparison_full_{element}_{int(time.time())}.csv')
         return df
         
 
