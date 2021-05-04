@@ -1582,7 +1582,7 @@ class Analytics:
                 myProjectDetails = (Project(item).to_dict() for item in projectDetails)
         else:
             raise Exception("Project details were not able to be processed")
-        recurseProjects = tee(myProjectDetails) ## copying the project generator for recursive pass (low memory - intensive computation)
+        teeProjects:tuple = tee(myProjectDetails) ## duplicating the project generator for recursive pass (low memory - intensive computation)
         returnObj = {element : {'segments':[],'calculatedMetrics':[],'projects':[]} for element in components}
         recurseObj = defaultdict(list)
         if verbose:
@@ -1635,7 +1635,7 @@ class Analytics:
                         listRecusion.append(met['id'])
         if verbose:
             print('start looking into projects')
-        for proj in myProjectDetails:
+        for proj in teeProjects[0]:
             ## mobile reports don't have dimensions.
             if proj['reportType'] == "desktop":
                 for prop in listComponentProp:
@@ -1674,7 +1674,7 @@ class Analytics:
         if recursive:
             if verbose:
                 print('start looking into recursive elements')
-            for proj in recurseProjects:
+            for proj in teeProjects[1]:
                 for rec in listRecusion:
                     for element in proj.get('segments',[]):
                         if re.search(f"{rec}",element):
