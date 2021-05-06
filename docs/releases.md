@@ -9,7 +9,7 @@ The changes have been tracked starting version 0.1.0
 * adding `reportType` as attribute from projects. Either `desktop` or `mobile`
 * adding `version` and `curation` attributes by default on dict version of `project`
 * adding `scanSegment` and `scanCalculatedMetric` methods. ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/main.md#the-scan-methods))
-* adding `rsidSuffix` parameter for `Project` class ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/projects.md#project-class)), `findComponentUsage` ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/projects.md#find-the-components-used)) and `getAllProjectDetails` ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/projects.md#getting-all-projects-details))
+* adding `rsidSuffix` parameter for `Project` class ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/projects.md#project-class)), `findComponentUsage` ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/projects.md#find-the-components-used)) and `getAllProjectDetails` ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/projects.md#getting-all-projects-details))\
 *Patch*:
 * Adding description parameter option in `getMetrics`
 * Most of `save` parameter will get timestamp
