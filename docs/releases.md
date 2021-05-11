@@ -13,9 +13,10 @@ The changes have been tracked starting version 0.1.0
 *Patch*:
 * Adding description parameter option in `getMetrics`
 * Most of `save` parameter will get timestamp
-* Fix `rsidPrefix` as `rsidSuffix` parameter for findComponentUsage method.
-* Fix generator exhausted when trying to use recursive mode in findComponentUsage.
+* Fix `rsidPrefix` as `rsidSuffix` parameter for `findComponentUsage` method.
+* Fix generator exhausted when trying to use recursive mode in `findComponentUsage`.
 * Change default comparison to retrieve all columns from dimensions and metrics.
+* Change search for elements to support rsidSuffix in `findComponentUsage`
 
 ## version 0.2.6
 

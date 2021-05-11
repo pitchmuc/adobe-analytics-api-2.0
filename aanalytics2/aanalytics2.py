@@ -681,7 +681,7 @@ class Analytics:
         df_users['createDate'] = pd.to_datetime(df_users['createDate'])
         df_users['lastAccess'] = pd.to_datetime(df_users['lastAccess'])
         if save:
-            df_users.to_csv('users.csv', sep='\t')
+            df_users.to_csv(f'users_{int(time.time())}.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
             print(
                 f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve users or increase limit')
@@ -758,10 +758,13 @@ class Analytics:
         else:
             segments = data
         if save and format == "df":
-            segments.to_csv('segments.csv', sep='\t')
+            segments.to_csv(f'segments_{int(time.time())}.csv', sep='\t')
             if verbose:
                 print(
-                    f'Saving data in file : {os.getcwd()}{os.sep}segments.csv')
+                    f'Saving data in file : {os.getcwd()}{os.sep}segments_{int(time.time())}.csv')
+        elif save and format == "raw":
+            with open(f"segments_{int(time.time())}.csv","w") as f:
+                f.write(json.dumps(segments,indent=4))
         return segments
 
     def getSegment(self, segment_id: str = None,full:bool=False, *args) -> dict:
@@ -949,12 +952,12 @@ class Analytics:
                 lastPage = metrics['lastPage']
         if format == "raw":
             if save:
-                with open('calculated_metrics.json','w') as f:
+                with open(f'calculated_metrics_{int(time.time())}.json','w') as f:
                     f.write(json.dumps(data,indent=4))
             return data
         df_calc_metrics = pd.DataFrame(data)
         if save:
-            df_calc_metrics.to_csv('calculated_metrics.csv', sep='\t')
+            df_calc_metrics.to_csv(f'calculated_metrics_{int(time.time())}.csv', sep='\t')
         return df_calc_metrics
 
     def getCalculatedMetric(self,calculatedMetricId:str=None,full:bool=True)->dict:
@@ -1351,7 +1354,7 @@ class Analytics:
             df['created'] = pd.to_datetime(df['created'], format='%Y-%m-%dT%H:%M:%SZ')
             df['modified'] = pd.to_datetime(df['modified'], format='%Y-%m-%dT%H:%M:%SZ')
         if save:
-            df.to_csv('projects.csv', index=False)
+            df.to_csv(f'projects_{int(time.time())}.csv', index=False)
         return df
 
     def getProject(self, projectId: str = None, projectClass: bool = False, rsidSuffix: bool = False, retry: int = 0, cache:bool=False, verbose: bool = False) -> Union[dict,Project]:
@@ -1533,7 +1536,7 @@ class Analytics:
         listRecusion = []
         ## adding unregular ones
         regPartSeg = "('|\.)" ## ensure to not catch evar100 for evar10
-        regPartPro = "($|\.)" ## ensure to not catch evar100 for evar10
+        regPartProj = "($|\.|\::)" ## ensure to not catch evar100 for evar10
         if regexUsed:
             regPartSeg = ""
             regPartPro = ""
@@ -1640,11 +1643,11 @@ class Analytics:
             if proj['reportType'] == "desktop":
                 for prop in listComponentProp:
                     for element in proj['dimensions']:
-                        if re.search(f"{prop+regPartPro}",element):
+                        if re.search(f"{prop+regPartProj}",element):
                             returnObj[prop]['projects'].append({proj['name']:proj['id']})
                 for var in listComponentVar:
                     for element in proj['dimensions']:
-                        if re.search(f"{var+regPartPro}",element):
+                        if re.search(f"{var+regPartProj}",element):
                             returnObj[var]['projects'].append({proj['name']:proj['id']})
                 for event in listComponentEvent:
                     for element in proj['metrics']:
@@ -1850,7 +1853,7 @@ class Analytics:
             ## now doing a complete comparison of all boolean with all
             df_name['different'] = ~temp_df.eq(temp_df.iloc[:,0],axis=0).all(1)
             if save:
-                df_name.to_csv('comparison_name.csv')
+                df_name.to_csv(f'comparison_name_{int(time.time())}.csv')
             return df_name
         ## retrieve main indexes from multi level indexes
         mainIndex = set([val[0] for val in list(df.columns)])
