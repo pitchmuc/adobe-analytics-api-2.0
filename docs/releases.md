@@ -17,6 +17,7 @@ The changes have been tracked starting version 0.1.0
 * Fix generator exhausted when trying to use recursive mode in `findComponentUsage`.
 * Change default comparison to retrieve all columns from dimensions and metrics.
 * Change search for elements to support rsidSuffix in `findComponentUsage`
+* fixed scan when no segment are used.
 
 ## version 0.2.6
 

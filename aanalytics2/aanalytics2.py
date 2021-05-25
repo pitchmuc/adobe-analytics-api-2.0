@@ -992,7 +992,7 @@ class Analytics:
             if verbose:
                 print('copied calculated metrics definition')
         mydef = str(cm['definition'])
-        segments:list = cm['compatibility']['segments']
+        segments:list = cm['compatibility'].get('segments',[])
         res = {"dimensions":[],'metrics':[]}
         for segment in segments:
             if verbose:
