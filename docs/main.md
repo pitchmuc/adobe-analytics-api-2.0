@@ -4,7 +4,7 @@ The aanalytics2 python library stands for Adobe Analytics API 2.0 support.
 It is set to wrap the different endpoints from the documentation.
 You can find the swagger documentation [here](https://adobedocs.github.io/analytics-2.0-apis/).
 
-The different section will quickly explain the methods available in the differennt part of this API.
+The different section will quickly explain the methods available in the different part of this API.
 
 ## Core components
 
