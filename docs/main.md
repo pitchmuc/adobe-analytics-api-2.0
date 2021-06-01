@@ -322,10 +322,10 @@ There are several get methods.
   Arguments:
   * name : OPTIONAL : Filter to only include calculated metrics that contains the name (str)
   * tagNames : OPTIONAL : Filter list to only include calculated metrics that contains one of the tags (string delimited with comma, can be list as well)
-  * inclType : OPTIONAL : type of calculated Metrics to be retrieved. (str) Possible values: 
-      - all : Default value (all calculated metrics possibles)
-      - shared : shared calculated metrics
-      - template : template calculated metrics
+  * inclType : OPTIONAL : type of calculated Metrics to be retrieved. (str) Possible values:
+    * all : Default value (all calculated metrics possibles)
+    * shared : shared calculated metrics
+    * template : template calculated metrics
   * rsid_list : OPTIONAL : Filter list to only include segments tied to specified RSID list (list)
   * extended_info : OPTIONAL : additional segment metadata fields to include on response (list)
       additional infos: reportSuiteName,definition, ownerFullName, modified, tags, compatibility
@@ -339,7 +339,7 @@ Possible kwargs:
   * segment_id : REQUIRED : the segment id to retrieve.
   * full : OPTIONAL : Add all possible information. bool, default False
 
-getCalculatedMetric : Return a dictionary on the calculated metrics requested.
+* getCalculatedMetric : Return a dictionary on the calculated metrics requested.
   Arguments:
   * calculatedMetricId : REQUIRED : The calculated metric ID to be retrieved.
   * full : OPTIONAL : additional segment metadata fields to include on response (list)
@@ -362,16 +362,16 @@ getCalculatedMetric : Return a dictionary on the calculated metrics requested.
 
 * getUsageLogs : Retrieve the usage logs from the users of a login company:
   Arguments:
-  * startDate : REQUIRED : Start date, format : 2020-12-01T00:00:00-07.(default 3 month prior today)	
+  * startDate : REQUIRED : Start date, format : 2020-12-01T00:00:00-07.(default 3 month prior today)
   * endDate : REQUIRED : End date, format : 2020-12-15T14:32:33-07. (default today)
       Should be a maximum of a 3 month period between startDate and endDate.
-  * eventType : OPTIONAL : The numeric id for the event type you want to filter logs by. 
+  * eventType : OPTIONAL : The numeric id for the event type you want to filter logs by.
       Please reference the lookup table in the LOGS_EVENT_TYPE
-  * event : OPTIONAL : The event description you want to filter logs by. 
+  * event : OPTIONAL : The event description you want to filter logs by.
       No wildcards are permitted, but this filter is case insensitive and supports partial matches.
   * rsid : OPTIONAL : ReportSuite ID to filter on.
-  * login : OPTIONAL : The login value of the user you want to filter logs by. This filter functions as an exact match.	
-  * ip : OPTIONAL : The IP address you want to filter logs by. This filter supports a partial match.	
+  * login : OPTIONAL : The login value of the user you want to filter logs by. This filter functions as an exact match.
+  * ip : OPTIONAL : The IP address you want to filter logs by. This filter supports a partial match.
   * limit : OPTIONAL : Number of results per page.
   * max_result : OPTIONAL : Number of maximum amount of results if you want. If you want to cap the process. Ex : max_result=1000
   * format : OPTIONAL : If you wish to have a DataFrame ("df" - default) or list("raw") as output.
@@ -593,6 +593,21 @@ Results for Calculated Metric:
 'rsid' : "rsid",
 }
 ```
+
+## Decode AA requests
+
+The `decodeAArequests` method allows you to pass requests directly and get a dataframe back with the information held in these requests.\
+The `decodeAArequests` method can take either the request directly in a list of strings via the `url` parameter or by passing a file to open, via the `file` parameter.
+
+* decodeAArequests
+  Decode the urls requests from the list pass down via either file or list of string.
+  Returns a dataframe.
+  Arguments:
+  * file : OPTIONAL : file referencing the different requests saved (excel or txt)
+  * urls : OPTIONAL : list of requests (or a single request) that you want to decode.
+  * save : OPTIONAL : parameter to save your decode list into a csv file.
+possible kwargs:
+  * encoding : the type of encoding to decode the file
 
 ## Compare ReportSuite
 

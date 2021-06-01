@@ -46,14 +46,15 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        'pandas',
+        'pandas>1.0.0',
         'pathlib2',
         'pathlib',
         'requests',
         'PyJWT[crypto]',
         'PyJWT',
         "dicttoxml",
-        "pytest"
+        "pytest",
+        "openpyxl>2.6.0"
     ],
     classifiers=CLASSIFIERS,
     python_requires='>=3.6'

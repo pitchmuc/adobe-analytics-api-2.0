@@ -14,6 +14,7 @@ from itertools import tee
 # Non standard libraries
 import pandas as pd
 import requests
+from urllib import parse
 
 from aanalytics2 import config, connector, token_provider
 from .projects import *
@@ -41,129 +42,6 @@ def _checkToken(func):
             return func(*args, **kwargs)
 
     return checking  # return the function as object
-
-
-@_checkToken
-def getData(endpoint: str, params: dict = None, data: dict = None, headers: dict = None, *args, **kwargs):
-    """
-    Abstraction for getting data
-    """
-    header = headers
-    if params is not None and data is None:
-        res = requests.get(endpoint, headers=header, params=params)
-    elif params is None and data is not None:
-        res = requests.get(endpoint, headers=header, data=data)
-    elif params is not None and data is not None:
-        res = requests.get(endpoint, headers=header, params=params, data=data)
-    try:
-        result = res.json()
-    except ValueError:
-        result = {'error': ['Request Error']}
-    if res.status_code == 429:
-        result['status_code'] = 429
-    return result
-
-
-@_checkToken
-def postData(endpoint: str, params: dict = None, data=None, headers: dict = None, file: dict = None, *args, **kwargs):
-    """
-    Abstraction for getting data
-    """
-    header = headers
-    if params is not None and data is None and file is None:
-        res = requests.post(endpoint, headers=header, params=params)
-    elif params is None and data is not None and file is None:
-        res = requests.post(
-            endpoint, headers=header, data=json.dumps(data))
-    elif params is not None and data is not None and file is None:
-        res = requests.post(endpoint, headers=header,
-                            params=params, data=json.dumps(data=data))
-    elif file is not None:
-        res = requests.post(endpoint, headers=header, files=file)
-    try:
-        result = res.json()
-    except ValueError:
-        result = {'error': ['Request Error']}
-    if res.status_code == 429:
-        result['status_code'] = 429
-    return result
-
-
-@_checkToken
-def putData(endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
-    """
-    Abstraction for getting data
-    """
-    header = headers
-    if params is not None and data is None:
-        res = requests.put(endpoint, headers=header, params=params)
-    elif params is None and data is not None:
-        res = requests.put(
-            endpoint, headers=header, data=json.dumps(data))
-    elif params is not None and data is not None:
-        res = requests.put(endpoint, headers=header, params=params, data=json.dumps(data=data))
-    try:
-        result = res.json()
-    except ValueError:
-        result = {'error': ['Request Error']}
-    return result
-
-
-@_checkToken
-def deleteData(endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
-    """
-    Abstraction for getting data
-    """
-    header = headers
-    if params is not None and data is None:
-        res = requests.delete(endpoint, headers=header, params=params)
-    elif params is None and data is not None:
-        res = requests.delete(endpoint, headers=header, data=json.dumps(data))
-    elif params is not None and data is not None:
-        res = requests.delete(endpoint, headers=header, params=params, data=json.dumps(data=data))
-    elif params is None and data is None:
-        res = requests.delete(endpoint, headers=header)
-    try:
-        result = res.json()
-    except:
-        result = {'error': ['Request Error']}
-    return result
-
-
-@_checkToken
-def getCompanyId(infos: str = 'all'):
-    """
-    Retrieve the company id for later call for the properties.
-    Can return a string or a json object.
-    Arguments:
-        infos : OPTIONAL: returns the company id(s) specified. 
-        Possible values:
-            - all : returns the list of companies data (default value)
-            - first : returns the first id (string returned)
-            - <X> : number that gives the position of the id we want to return (string)
-            You need to already know your position. 
-    """
-    res = requests.get(
-        "https://analytics.adobe.io/discovery/me", headers=config.header)
-    json_res = res.json()
-    if infos == 'all':
-        try:
-            companies = json_res['imsOrgs'][0]['companies']
-            return companies
-        except:
-            print("exception when trying to get companies with parameter 'all'")
-            return None
-    elif infos != 'all':
-        try:
-            if infos == 'first':
-                infos = '0'  # set to first position
-            position = int(infos)
-            companies = json_res['imsOrgs'][0]['companies']
-            config.companyid = companies[position]['globalCompanyId']
-            return config.companyid
-        except:
-            print("exception when trying to get companies with parameter != 'all'")
-            return None
     
 def retrieveToken(verbose: bool = False, save: bool = False, **kwargs)->str:
     """
@@ -307,6 +185,54 @@ class Analytics:
             raise AttributeError(
                 'Expected "token" to be referenced.\nPlease ensure you pass the token.')
         self.header['Authorization'] = "Bearer " + token
+
+    def decodeAArequests(self,file:IO=None,urls:Union[list,str]=None,save:bool=False,**kwargs)->pd.DataFrame:
+        """
+        Takes any of the parameter to load adobe url and decompose the requests into a dataframe, that you can save if you want.
+        Arguments:
+            file : OPTIONAL : file referencing the different requests saved (excel, or txt)
+            urls : OPTIONAL : list of requests (or a single request) that you want to decode.
+            save : OPTIONAL : parameter to save your decode list into a csv file.
+        Returns a dataframe.
+        possible kwargs:
+            encoding : the type of encoding to decode the file
+        """
+        if file is None and urls is None:
+            raise ValueError("Require at least file or urls to contains data")
+        if file is not None:
+            if '.txt' in file:
+                with open(file,'r',encoding=kwargs.get('encoding','utf-8')) as f:
+                    urls = f.readlines() ## passing decoding to urls
+            elif '.xlsx' in file:
+                temp_df = pd.read_excel(file,header=None)
+                urls = list(temp_df[0]) ## passing decoding to urls
+        if urls is not None:
+            if type(urls) == str:
+                data = parse.parse_qsl(urls)
+                df = pd.DataFrame(data)
+                df.columns = ['index','request']
+                df.set_index('index',inplace=True)
+                if save:
+                    df.to_csv(f'request_{int(time.time())}.csv')
+                return df
+            elif type(urls) == list: ## decoding list of strings
+                tmp_list = [parse.parse_qsl(data) for data in urls]
+                tmp_dfs = [pd.DataFrame(data) for data in tmp_list]
+                tmp_dfs2 = []
+                for df, index in zip(tmp_dfs,range(len(tmp_dfs))):
+                    df.columns = ['index',f"request {index+1}"]
+                    ## cleanup timestamp from request url
+                    string = df.iloc[0,0]
+                    df.iloc[0,0] = re.search('http.*://(.+?)/s[0-9]+.*',string).group(1) # tracking server
+                    df.set_index('index',inplace=True)
+                    new_df = df
+                    tmp_dfs2.append(new_df)
+                df_full = pd.concat(tmp_dfs2,axis=1)
+        if save:
+            df_full.to_csv(f'requests_{int(time.time())}.csv')
+        return df_full
+
+        
 
     def getReportSuites(self, txt: str = None, rsid_list: str = None, limit: int = 100, extended_info: bool = False,
                         save: bool = False) -> list:
