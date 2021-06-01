@@ -5,7 +5,7 @@ The changes have been tracked starting version 0.1.0
 
 ## version 0.2.8
 
-* adding the `decodeAArequests` method.
+* adding the `decodeAArequests` method ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/main.md#decode-aa-requests)).
 * upgrading requirement libraries
 * cleaning legacy methods not supported anymore (getData,postData,putData,deleteData,getCompanyId)
 

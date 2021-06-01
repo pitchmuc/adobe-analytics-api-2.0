@@ -626,5 +626,3 @@ It also has several parameters that would allow for extensive comparison (with a
     * full (default) : compare name and settings
     * name : compare only names
 * save : OPTIONAL : if you want to save in a csv.
-
-**NOTE** : At the moment, description are not compared because could break the methods and were not deem critical.
