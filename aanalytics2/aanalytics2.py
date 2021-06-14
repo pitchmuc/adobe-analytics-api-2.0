@@ -1050,6 +1050,21 @@ class Analytics:
             headers=self.header
         )
         return dr
+    
+    def deleteDateRange(self, dateRangeID: str = None) -> object:
+        """
+        Method that deletes a specific date Range based on the id passed.
+        Arguments:
+            dateRangeID : REQUIRED : ID of Date Range  to be deleted
+        """
+        if dateRangeID is None:
+            print('No Date Range ID has been pushed')
+            return None
+        response = self.connector.deleteData(
+            self.endpoint_company + self._getDateRanges + '/' + dateRangeID,
+            headers=self.header
+        )
+        return response
 
     def getCalculatedFunctions(self, **kwargs) -> pd.DataFrame:
         """
