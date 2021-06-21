@@ -35,7 +35,7 @@ CLASSIFIERS = [
 setup(
     name='aanalytics2',
     version=get_version("aanalytics2/__version__.py"),
-    license='GPL',
+    license='Apache License 2.0',
     description='Adobe Analytics API 2.0 python wrapper',
     long_description=read("README.md"),
     long_description_content_type='text/markdown',
@@ -46,7 +46,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
-        'pandas>1.0.0',
+        'pandas>=0.25.3',
         'pathlib2',
         'pathlib',
         'requests',

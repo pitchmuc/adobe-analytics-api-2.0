@@ -8,6 +8,9 @@ The changes have been tracked starting version 0.1.0
 * adding the `decodeAArequests` method ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/main.md#decode-aa-requests)).
 * upgrading requirement libraries
 * cleaning legacy methods not supported anymore (getData,postData,putData,deleteData,getCompanyId)
+Patch:
+* adding `deleteDateRange` method
+* changing requirements back for pandas to 0.25.3
 
 ## version 0.2.7
 
