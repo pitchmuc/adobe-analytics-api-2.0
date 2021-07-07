@@ -10,6 +10,7 @@ from typing import IO, Union, List
 from collections import defaultdict
 import re
 from itertools import tee
+import logging
 
 # Non standard libraries
 import pandas as pd
@@ -21,27 +22,6 @@ from .projects import *
 
 JsonOrDataFrameType = Union[pd.DataFrame, dict]
 JsonListOrDataFrameType = Union[pd.DataFrame, List[dict]]
-
-
-def _checkToken(func):
-    """decorator that checks that the token is valid before calling the API"""
-
-    def checking(*args, **kwargs):  # if function is not wrapped, will fire
-        now = time.time()
-        if now > config.config_object["date_limit"] - 1000:
-            token_with_expiry = token_provider.get_token_and_expiry_for_config(config.config_object, *args,
-                                                                               **kwargs)
-            token = token_with_expiry['token']
-            config.config_object['token'] = token
-            config.config_object['date_limit'] = time.time() + token_with_expiry['expiry'] / 1000 - 500
-            config.header.update({'Authorization': f'Bearer {token}'})
-            if kwargs.get("headers", None) is not None:
-                kwargs['headers']['Authorization'] = "Bearer " + token
-            return func(*args, **kwargs)
-        else:  # need to return the function for decorator to return something
-            return func(*args, **kwargs)
-
-    return checking  # return the function as object
     
 def retrieveToken(verbose: bool = False, save: bool = False, **kwargs)->str:
     """
@@ -62,8 +42,9 @@ class Login:
     """
     Class to connect to the the login company.
     """
-
-    def __init__(self, config: dict = config.config_object, header: dict = config.header, retry: int = 0) -> None:
+    loggingEnabled = False
+    logger = None
+    def __init__(self, config: dict = config.config_object, header: dict = config.header, retry: int = 0,loggingObject:dict=None) -> None:
         """
         Instantiate the Loggin class.
         Arguments:
@@ -71,26 +52,47 @@ class Login:
             header : REQUIRED : dictionary of your header.
             retry : OPTIONAL : if you want to retry, the number of time to retry
         """
+        if loggingObject is not None and sorted(["level","stream","format","filename","file"]) == sorted(list(loggingObject.keys())):
+            self.loggingEnabled = True
+            self.logger = logging.getLogger(f"{__name__}.login")
+            self.logger.setLevel(loggingObject["level"])
+            formatter = logging.Formatter(loggingObject["format"])
+            if loggingObject["file"]:
+                fileHandler = logging.FileHandler(loggingObject["filename"])
+                fileHandler.setFormatter(formatter)
+                self.logger.addHandler(fileHandler)
+            if loggingObject["stream"]:
+                streamHandler = logging.StreamHandler()
+                streamHandler.setFormatter(formatter)
+                self.logger.addHandler(streamHandler)
         self.connector = connector.AdobeRequest(
-            config_object=config, header=header, retry=retry)
+            config_object=config, header=header, retry=retry,loggingEnabled=self.loggingEnabled,logger=self.logger)
         self.header = self.connector.header
         self.COMPANY_IDS = {}
         self.retry = retry
+            
 
-    def getCompanyId(self) -> dict:
+    def getCompanyId(self,verbose:bool=False) -> dict:
         """
         Retrieve the company ids for later call for the properties.
         """
+        if self.loggingEnabled:
+            self.logger.debug("getCompanyId start")
         res = self.connector.getData(
             "https://analytics.adobe.io/discovery/me", headers=self.header)
         json_res = res
+        if self.loggingEnabled:
+            self.logger.debug(f"getCompanyId reponse: {json_res}")
         try:
             companies = json_res['imsOrgs'][0]['companies']
             self.COMPANY_IDS = json_res['imsOrgs'][0]['companies']
             return companies
         except:
-            print("exception when trying to get companies with parameter 'all'")
-            print(json_res)
+            if verbose:
+                print("exception when trying to get companies with parameter 'all'")
+                print(json_res)
+            if self.loggingEnabled:
+                self.logger.error(f"Error trying to get companyId: {json_res}")
             return None
 
     def createAnalyticsConnection(self, companyId: str = None) -> object:
@@ -124,17 +126,35 @@ class Analytics:
     _getUsers = '/users'
     _getDateRanges = '/dateranges'
     _getReport = '/reports'
+    loggingEnabled = False
+    logger = None
 
     def __init__(self, company_id: str = None, config_object: dict = config.config_object, header: dict = config.header,
-                 retry: int = 0):
+                 retry: int = 0,loggingObject:dict=None):
         """
-        Instantiate the 
+        Instantiate the Analytics class.
+        The Analytics class will be automatically connected to the API 2.0.
+        You have possibility to review the connection detail by looking into the connector instance.
+        "header", "company_id" and "endpoint_company" are attribute accessible for debugging.
         """
         if company_id is None:
             raise AttributeError(
                 'Expected "company_id" to be referenced.\nPlease ensure you pass the globalCompanyId when instantiating this class.')
+        if loggingObject is not None and sorted(["level","stream","format","filename","file"]) == sorted(list(loggingObject.keys())):
+            self.loggingEnabled = True
+            self.logger = logging.getLogger(f"{__name__}.analytics")
+            self.logger.setLevel(loggingObject["level"])
+            formatter = logging.Formatter(loggingObject["format"])
+            if loggingObject["file"]:
+                fileHandler = logging.FileHandler(loggingObject["filename"])
+                fileHandler.setFormatter(formatter)
+                self.logger.addHandler(fileHandler)
+            if loggingObject["stream"]:
+                streamHandler = logging.StreamHandler()
+                streamHandler.setFormatter(formatter)
+                self.logger.addHandler(streamHandler)
         self.connector = connector.AdobeRequest(
-            config_object=config_object, header=header, retry=retry)
+            config_object=config_object, header=header, retry=retry,loggingEnabled=self.loggingEnabled,logger=self.logger)
         self.header = self.connector.header
         self.connector.header['x-proxy-global-company-id'] = company_id
         self.header['x-proxy-global-company-id'] = company_id
@@ -197,6 +217,8 @@ class Analytics:
         possible kwargs:
             encoding : the type of encoding to decode the file
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting decodeAArequests")
         if file is None and urls is None:
             raise ValueError("Require at least file or urls to contains data")
         if file is not None:
@@ -245,6 +267,8 @@ class Analytics:
             save : OPTIONAL : if set to True, it will save the list in a file. (Default False)
 
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getReportSuite")
         nb_error, nb_empty = 0, 0  # use for multi-thread loop
         params = {}
         params.update({'limit': str(limit)})
@@ -255,6 +279,8 @@ class Analytics:
             params.update({'rsids': str(rsid_list)})
         params.update(
             {"expansion": "name,parentRsid,currency,calendarType,timezoneZoneinfo"})
+        if self.loggingEnabled:
+            self.logger.debug(f"parameters : {params}")
         rsids = self.connector.getData(self.endpoint_company + self._getRS,
                                        params=params, headers=self.header)
         content = rsids['content']
@@ -291,10 +317,14 @@ class Analytics:
                 df_append = pd.DataFrame(list_data)
             df_rsids = df_rsids.append(df_append, ignore_index=True)
         if save:
+            if self.loggingEnabled:
+                self.logger.debug(f"saving rsids : {params}")
             df_rsids.to_csv('RSIDS.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
-            print(
-                f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
+            message = f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request'
+            print(message)
+            if self.loggingEnabled:
+                self.logger.warning(message)
         return df_rsids
 
     def getVirtualReportSuites(self, extended_info: bool = False, limit: int = 100, filterIds: str = None,
@@ -309,6 +339,8 @@ class Analytics:
             segmentIds : OPTIONAL : comma delimited list of segmentId contained in the VRSID
             save : OPTIONAL : if set to True, it will save the list in a file. (Default False)
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getVirtualReportSuites")
         expansion_values = "globalCompanyKey,parentRsid,parentRsidName,timezone,timezoneZoneinfo,currentTimezoneOffset,segmentList,description,modified,isDeleted,dataCurrentAsOf,compatibility,dataSchema,sessionDefinition,curatedComponents,type"
         params = {"limit": limit}
         nb_error = 0
@@ -323,6 +355,8 @@ class Analytics:
         if segmentIds is not None:
             params['segmentIds'] = segmentIds
         path = f"{self.endpoint_company}/reportsuites/virtualreportsuites"
+        if self.loggingEnabled:
+            self.logger.debug(f"params: {params}")
         vrsid = self.connector.getData(
             path, params=params, headers=self.header)
         content = vrsid['content']
@@ -360,8 +394,10 @@ class Analytics:
         if save:
             df_vrsids.to_csv('VRSIDS.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
-            print(
-                f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request')
+            message = f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request'
+            print(message)
+            if self.loggingEnabled:
+                self.logger.warning(message)
         return df_vrsids
 
     def getVirtualReportSuite(self, vrsid: str = None, extended_info: bool = False,
@@ -373,6 +409,8 @@ class Analytics:
             extended_info : OPTIONAL : boolean to add more information
             format : OPTIONAL : format of the output. 2 values "df" for dataframe and "raw" for raw json.
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getVirtualReportSuite")
         if vrsid is None:
             raise Exception("require a Virtual ReportSuite ID")
         expansion_values = "globalCompanyKey,parentRsid,parentRsidName,timezone,timezoneZoneinfo,currentTimezoneOffset,segmentList,description,modified,isDeleted,dataCurrentAsOf,compatibility,dataSchema,sessionDefinition,curatedComponents,type"
@@ -393,6 +431,8 @@ class Analytics:
             vrsid : REQUIRED : Virtual Report Suite ID
             nan_value : OPTIONAL : how to handle empty cells, default = ""
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getVirtualReportSuiteComponents")
         vrs_data = self.getVirtualReportSuite(extended_info=True, vrsid=vrsid)
         if "curatedComponents" not in vrs_data.index:
             return pd.DataFrame()
@@ -411,6 +451,8 @@ class Analytics:
             dataSchema : REQUIRED : Type of schema used for the VRSID. (default "Cache")
             data_dict : OPTIONAL : you can pass directly the dictionary.
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting createVirtualReportSuite")
         path = f"{self.endpoint_company}/reportsuites/virtualreportsuites"
         expansion_values = "globalCompanyKey,parentRsid,parentRsidName,timezone,timezoneZoneinfo,currentTimezoneOffset,segmentList,description,modified,isDeleted,dataCurrentAsOf,compatibility,dataSchema,sessionDefinition,curatedComponents,type"
         params = {'expansion': expansion_values}
@@ -424,8 +466,9 @@ class Analytics:
             }
         else:
             if 'name' not in data_dict.keys() or 'parentRsid' not in data_dict.keys() or 'segmentList' not in data_dict.keys() or 'dataSchema' not in data_dict.keys():
-                raise Exception(
-                    "Missing one or more fundamental keys : name, parentRsid, segmentList, dataSchema")
+                if self.loggingEnabled:
+                    self.logger.error(f"Missing one or more fundamental keys : name, parentRsid, segmentList, dataSchema")
+                raise Exception("Missing one or more fundamental keys : name, parentRsid, segmentList, dataSchema")
             body = data_dict
         res = self.connector.postData(
             path, params=params, data=body, headers=self.header)
@@ -440,9 +483,13 @@ class Analytics:
             vrsid : REQUIRED : The id of the virtual report suite to update
             data_dict : a json-like dictionary of the vrs data to update
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting updateVirtualReportSuite")
         path = f"{self.endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
         body = data_dict
         res = self.connector.putData(path, data=body, headers=self.header)
+        if self.loggingEnabled:
+            self.logger.debug(f"updateVirtualReportSuite response : {res}")
         return res
 
     def deleteVirtualReportSuite(self, vrsid: str = None) -> str:
@@ -453,8 +500,12 @@ class Analytics:
         """
         if vrsid is None:
             raise Exception("require a Virtual ReportSuite ID")
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting deleteVirtualReportSuite for {vrsid}")
         path = f"{self.endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
         res = self.connector.deleteData(path, headers=self.header)
+        if self.loggingEnabled:
+            self.logger.debug(f"deleteVirtualReportSuite {vrsid} response : {res}")
         return res
 
     def validateVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None,
@@ -468,6 +519,8 @@ class Analytics:
             dataSchema : REQUIRED : Type of schema used for the VRSID (default : Cache).
             data_dict : OPTIONAL : you can pass directly the dictionary.
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting validateVirtualReportSuite")
         path = f"{self.endpoint_company}/reportsuites/virtualreportsuites/validate"
         expansion_values = "globalCompanyKey, parentRsid, parentRsidName, timezone, timezoneZoneinfo, currentTimezoneOffset, segmentList, description, modified, isDeleted, dataCurrentAsOf, compatibility, dataSchema, sessionDefinition, curatedComponents, type"
         if data_dict is None:
@@ -484,6 +537,8 @@ class Analytics:
                     "Missing one or more fundamental keys : name, parentRsid, segmentList, dataSchema")
             body = data_dict
         res = self.connector.postData(path, data=body, headers=self.header)
+        if self.loggingEnabled:
+            self.logger.debug(f"validateVirtualReportSuite response : {res}")
         return res
 
     def getDimensions(self, rsid: str, tags: bool = False, description:bool=False, save=False, **kwargs) -> pd.DataFrame:
@@ -499,6 +554,8 @@ class Analytics:
             full : Boolean : Doesn't shrink the number of columns if set to true
             example : getDimensions(rsid,full=True)
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getDimensions")
         params = {}
         if tags:
             params.update({'expansion': 'tags'})
@@ -535,6 +592,8 @@ class Analytics:
         Possible kwargs:
             full : Boolean : Doesn't shrink the number of columns if set to true.
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getMetrics")
         params = {}
         if tags:
             params.update({'expansion': 'tags'})
@@ -570,6 +629,8 @@ class Analytics:
             limit :  Nummber of results per requests. Default 100.
             expansion : string list such as "lastAccess,createDate"  
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getUsers")
         list_urls = []
         nb_error, nb_empty = 0, 0  # use for multi-thread loop
         params = {'limit': kwargs.get('limit', 100)}
@@ -644,6 +705,8 @@ class Analytics:
 
         NOTE : Segment Endpoint doesn't support multi-threading. Default to 500. 
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getSegments")
         limit = int(kwargs.get('limit', 500))
         params = {'includeType': 'all', 'limit': limit}
         if extended_info:
@@ -710,6 +773,8 @@ class Analytics:
             - "definitionLastModified" : string : last definition of the segment
             - "categories" : string : categories of the segment
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getSegment")
         ValidArgs = ["reportSuiteName", "ownerFullName", "modified", "tags", "compatibility",
                      "definition", "publishingStatus", "publishingStatus", "definitionLastModified", "categories"]
         if segment_id is None:
@@ -731,6 +796,8 @@ class Analytics:
             segment : REQUIRED : either the ID of the segment or the full definition.
             verbose : OPTIONAL : print some comment.
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting scanSegment")
         if type(segment) == str:
             if verbose:
                 print('retrieving segment definition')
@@ -761,6 +828,8 @@ class Analytics:
             segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment.
             More information at this address <https://adobedocs.github.io/analytics-2.0-apis/#/segments/segments_createSegment>
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting createSegment")
         if segmentJSON is None:
             print('No segment data has been pushed')
             return None
@@ -779,6 +848,8 @@ class Analytics:
             segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment.
             More information at this address <https://adobedocs.github.io/analytics-2.0-apis/#/segments/segments_createSegment>
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting createSegmentValidate")
         if segmentJSON is None:
             print('No segment data has been pushed')
             return None
@@ -794,8 +865,12 @@ class Analytics:
             segmentID : REQUIRED : Segment ID to be updated
             segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment. 
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting updateSegment")
         if segmentJSON is None or segmentID is None:
             print('No segment or segmentID data has been pushed')
+            if self.loggingEnabled:
+                self.logger.error(f"No segment or segmentID data has been pushed")
             return None
         data = deepcopy(segmentJSON)
         seg = self.connector.putData(
@@ -814,6 +889,8 @@ class Analytics:
         if segmentID is None:
             print('No segmentID data has been pushed')
             return None
+        if self.loggingEnabled:
+            self.logger.debug(f"starting deleteSegment for {segmentID}")
         seg = self.connector.deleteData(self.endpoint_company +
                                         self._getSegments + '/' + segmentID, headers=self.header)
         return seg
@@ -846,6 +923,8 @@ class Analytics:
         Possible kwargs:
             limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.(int)
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getCalculatedMetrics")
         limit = int(kwargs.get('limit', 500))
         params = {'includeType': inclType, 'limit': limit}
         if name is not None:
@@ -896,6 +975,8 @@ class Analytics:
         """
         if calculatedMetricId is None:
             raise ValueError("Require a calculated metrics ID")
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getCalculatedMetric for {calculatedMetricId}")
         params = {}
         if full:
             params.update({'expansion': 'reportSuiteName,definition,ownerFullName,modified,tags,categories,compatibility'})
@@ -907,6 +988,8 @@ class Analytics:
         """
         Return a dictionary of metrics and dimensions used in the calculated metrics.
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting scanCalculatedMetric")
         if type(calculatedMetric) == str:
             if verbose:
                 print('retrieving calculated metrics definition')
@@ -941,10 +1024,16 @@ class Analytics:
             metricJSON : REQUIRED : Calculated Metrics information to create. (Required: name, definition, rsid)
             More information can be found at this address https://adobedocs.github.io/analytics-2.0-apis/#/calculatedmetrics/calculatedmetrics_createCalculatedMetric
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting createCalculatedMetric")
         if metricJSON is None or type(metricJSON) != dict:
+            if self.loggingEnabled:
+                self.logger.error(f'Expected a dictionary to create the calculated metrics')
             raise Exception(
                 "Expected a dictionary to create the calculated metrics")
         if 'name' not in metricJSON.keys() or 'definition' not in metricJSON.keys() or 'rsid' not in metricJSON.keys():
+            if self.loggingEnabled:
+                self.logger.error(f'Expected "name", "definition" and "rsid" in the data')
             raise KeyError(
                 'Expected "name", "definition" and "rsid" in the data')
         cm = self.connector.postData(self.endpoint_company +
@@ -958,10 +1047,14 @@ class Analytics:
             metricJSON : REQUIRED : Calculated Metrics information to create. (Required: name, definition, rsid)
             More information can be found at this address https://adobedocs.github.io/analytics-2.0-apis/#/calculatedmetrics/calculatedmetrics_createCalculatedMetric
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting createCalculatedMetricValidate")
         if metricJSON is None or type(metricJSON) != dict:
             raise Exception(
                 "Expected a dictionary to create the calculated metrics")
         if 'name' not in metricJSON.keys() or 'definition' not in metricJSON.keys() or 'rsid' not in metricJSON.keys():
+            if self.loggingEnabled:
+                self.logger.error(f'Expected "name", "definition" and "rsid" in the data')
             raise KeyError(
                 'Expected "name", "definition" and "rsid" in the data')
         path = "/calculatedmetrics/validate"
@@ -975,8 +1068,10 @@ class Analytics:
             calcID : REQUIRED : Calculated Metric ID to be updated
             calcJSON : REQUIRED : the dictionary that represents the JSON statement for the calculated metric.
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting updateCalculatedMetric")
         if calcJSON is None or calcID is None:
-            print('No calcMetric or calcMetric JSON data has been pushed')
+            print('No calcMetric or calcMetric JSON data has been passed')
             return None
         data = deepcopy(calcJSON)
         cm = self.connector.putData(
@@ -992,8 +1087,10 @@ class Analytics:
         Arguments:
             calcID : REQUIRED : Calculated Metrics ID to be deleted
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting deleteCalculatedMetric")
         if calcID is None:
-            print('No calculated metrics data has been pushed')
+            print('No calculated metrics data has been passed')
             return None
         cm = self.connector.deleteData(
             self.endpoint_company + self._getCalcMetrics + '/' + calcID,
@@ -1015,6 +1112,8 @@ class Analytics:
             limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.
             full : Boolean : Doesn't shrink the number of columns if set to true
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getDateRanges")
         limit = int(kwargs.get('limit', 500))
         includeType = includeType.split(',')
         params = {'limit': limit, 'includeType': includeType}
@@ -1040,6 +1139,8 @@ class Analytics:
             dateRangeID : REQUIRED : Calculated Metric ID to be updated
             dateRangeJSON : REQUIRED : the dictionary that represents the JSON statement for the calculated metric.
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting updateDateRange")
         if dateRangeJSON is None or dateRangeID is None:
             print('No calcMetric or calcMetric JSON data has been pushed')
             return None
@@ -1060,6 +1161,8 @@ class Analytics:
         if dateRangeID is None:
             print('No Date Range ID has been pushed')
             return None
+        if self.loggingEnabled:
+            self.logger.debug(f"starting deleteDateRange for {dateRangeID}")
         response = self.connector.deleteData(
             self.endpoint_company + self._getDateRanges + '/' + dateRangeID,
             headers=self.header
@@ -1070,6 +1173,8 @@ class Analytics:
         """
         Returns the calculated metrics functions.
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getCalculatedFunctions")
         path = "/calculatedmetrics/functions"
         limit = int(kwargs.get('limit', 500))
         params = {'limit': limit}
@@ -1087,6 +1192,8 @@ class Analytics:
         Arguments:
             limit : OPTIONAL : Amount of tag to be returned by request. Default 100
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getTags")
         path = "/componentmetadata/tags"
         params = {'limit': limit}
         if kwargs.get('page', False):
@@ -1106,6 +1213,8 @@ class Analytics:
         """
         if tagId is None:
             raise Exception("Require a tag ID for this method.")
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getTag for {tagId}")
         path = f"/componentmetadata/tags/{tagId}"
         res = self.connector.getData(self.endpoint_company + path, headers=self.header)
         return res
@@ -1121,6 +1230,8 @@ class Analytics:
         path = "/componentmetadata/tags/tagnames"
         if tagNames is None:
             raise Exception("Requires tag names to be provided")
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getComponentTagName for {tagNames}")
         if componentType is None:
             raise Exception("Requires a Component Type to be provided")
         params = {
@@ -1138,6 +1249,8 @@ class Analytics:
                 Available values : segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
             componentIds : REQUIRED : List of components Ids to use.
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting searchComponentsTags")
         if componentType is None:
             raise Exception("ComponentType is required")
         if componentIds is None or type(componentIds) != list:
@@ -1147,6 +1260,8 @@ class Analytics:
             "componentType": componentType,
             "componentIds": componentIds
         }
+        if self.loggingEnabled:
+            self.logger.debug(f"params {obj}")
         res = self.connector.postData(self.endpoint_company + path, data=obj, headers=self.header)
         return res
 
@@ -1175,9 +1290,13 @@ class Analytics:
         ]
 
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting createTags")
         if data is None:
             raise Exception("Requires a list of tags to be created")
         path = "​/componentmetadata​/tags"
+        if self.loggingEnabled:
+            self.logger.debug(f"data: {data}")
         res = self.connector.postData(self.endpoint_company + path, data=data, headers=self.header)
         return res
 
@@ -1189,6 +1308,8 @@ class Analytics:
             componentType : REQUIRED : The component type to operate on.
                 Available values : segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting deleteTags")
         if componentType is None:
             raise Exception("require a component type")
         if componentIds is None:
@@ -1209,6 +1330,8 @@ class Analytics:
         """
         if tagId is None:
             raise Exception("A tag ID is required")
+        if self.loggingEnabled:
+            self.logger.debug(f"starting deleteTag for {tagId}")
         path = "​/componentmetadata​/tags​/{tagId}"
         res = self.connector.deleteData(self.endpoint_company + path, headers=self.header)
         return res
@@ -1221,6 +1344,8 @@ class Analytics:
             componentType : REQUIRED : The component type to operate on.
                 segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getComponentTags")
         path = "/componentmetadata/tags/search"
         if componentType is None:
             raise Exception("require a component type")
@@ -1247,6 +1372,8 @@ class Analytics:
             }
         ]
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting updateComponentTags")
         if data is None or type(data) != list:
             raise Exception("require list of update to be sent.")
         path = "/componentmetadata/tags/tagitems"
@@ -1269,6 +1396,8 @@ class Analytics:
             cache : OPTIONAL : Boolean in case you want to cache the result in the "listProjectIds" attribute.
             save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getProjects")
         path = "/projects"
         params = {"includeType": includeType}
         if full:
@@ -1282,6 +1411,8 @@ class Analytics:
                 params["expansion"] += ',companyTemplate'
         if limit is not None:
             params['limit'] = limit
+        if self.loggingEnabled:
+            self.logger.debug(f"params: {params}")
         res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         if cache:
             self.listProjectIds = res
@@ -1316,18 +1447,24 @@ class Analytics:
         params = {
             'expansion': 'definition,ownerFullName,modified,favorite,approved,tags,shares,sharesFullName,reportSuiteName,companyTemplate,accessLevel'}
         path = f"/projects/{projectId}"
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getProject for {projectId}")
         res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header,retry=retry, verbose=verbose)
         if projectClass:
-            if verbose:
-                print('building an instance of Project class')
+            if self.loggingEnabled:
+                self.logger.info(f"building an instance of Project class")
             myProject = Project(res,rsidSuffix=rsidSuffix)
             return myProject
         if cache:
+            if self.loggingEnabled:
+                self.logger.info(f"caching the project as Project class")
             try:
                 self.projectsDetails[projectId] = Project(res)
             except:
                 if verbose:
                     print('WARNING : Cannot convert Project to Project class')
+                if self.loggingEnabled:
+                    self.logger.warning(f"Cannot convert Project to Project class")
         return res
     
     def getAllProjectDetails(self, projects:JsonListOrDataFrameType=None, filterNameProject:str=None, filterNameOwner:str=None, useAttribute:bool=True, cache:bool=False, rsidSuffix:bool=False, verbose:bool=False)->dict:
@@ -1347,25 +1484,37 @@ class Analytics:
             verbose : OPTIONAL : Set to True to print information.
         Not using filter may end up taking a while to retrieve the information.
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getAllProjectDetails")
         ## if no project data
         if projects is None:
+            if self.loggingEnabled:
+                self.logger.debug(f"No projects passed")
             if len(self.listProjectIds)>0 and useAttribute:
                 fullProjectIds = self.listProjectIds
             else:
                 fullProjectIds = self.getProjects(format='raw',cache=cache)
         ## if project data is passed
         elif projects is not None:
+            if self.loggingEnabled:
+                self.logger.debug(f"projects passed")
             if isinstance(projects,pd.DataFrame):
                 fullProjectIds = projects.to_dict(orient='records')
             elif isinstance(projects,list):
                 fullProjectIds = (proj['id'] for proj in projects)
         if filterNameProject is not None:
-                fullProjectIds = [project for project in fullProjectIds if filterNameProject in project['name']]
+            if self.loggingEnabled:
+                self.logger.debug(f"filterNameProject passed")
+            fullProjectIds = [project for project in fullProjectIds if filterNameProject in project['name']]
         if filterNameOwner is not None:
-                fullProjectIds = [project for project in fullProjectIds if filterNameOwner in project['owner'].get('name','')]
+            if self.loggingEnabled:
+                self.logger.debug(f"filterNameOwner passed")
+            fullProjectIds = [project for project in fullProjectIds if filterNameOwner in project['owner'].get('name','')]
         if verbose:
             print(f'{len(fullProjectIds)} project details to retrieve')
             print(f"estimated time required : {int(len(fullProjectIds)/60)} minutes")
+        if self.loggingEnabled:
+            self.logger.debug(f'{len(fullProjectIds)} project details to retrieve')
         projectIds = (project['id'] for project in fullProjectIds)
         projectsDetails = {projectId:self.getProject(projectId,projectClass=True,rsidSuffix=rsidSuffix) for projectId in projectIds}
         if filterNameProject is None and filterNameOwner is None:
@@ -1378,6 +1527,8 @@ class Analytics:
         Arguments:
             projectId : REQUIRED : the project ID to be deleted.
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting deleteProject")
         if projectId is None:
             raise Exception("Requires a projectId parameter")
         path = f"/projects/{projectId}"
@@ -1392,6 +1543,8 @@ class Analytics:
             projectObj : REQUIRED : the dictionary to replace the previous Workspace.
                 requires the following elements: name,description,rsid, definition, owner
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting updateProject")
         if projectId is None:
             raise Exception("Requires a projectId parameter")
         path = f"/projects/{projectId}"
@@ -1422,6 +1575,8 @@ class Analytics:
             projectObj : REQUIRED : the dictionary to create a new Workspace.
                 requires the following elements: name,description,rsid, definition, owner
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting createProject")
         path = "/projects/"
         if projectObj is None:
             raise Exception("Requires a projectId parameter")
@@ -1467,6 +1622,10 @@ class Analytics:
             resetProjectDetails : OPTIONAL : Set to false by default. If set to True, it will NOT use the cache.
             rsidSuffix : OPTIONAL : If you do not give projectDetails and you want to look for rsid usage in report for dimensions and metrics.
         """
+        if components is None or type(components) != list:
+            raise ValueError("components must be present as a list")
+        if self.loggingEnabled:
+            self.logger.debug(f"starting findComponentsUsage for {components}")
         listComponentProp = [comp for comp in components if 'prop' in comp]
         listComponentVar = [comp for comp in components if 'evar' in comp]
         listComponentEvent = [comp for comp in components if 'event' in comp]
@@ -1479,11 +1638,15 @@ class Analytics:
         regPartSeg = "('|\.)" ## ensure to not catch evar100 for evar10
         regPartProj = "($|\.|\::)" ## ensure to not catch evar100 for evar10
         if regexUsed:
+            if self.loggingEnabled:
+                self.logger.debug(f"regex is used")
             regPartSeg = ""
-            regPartPro = ""
+            regPartProj = ""
         ## Segments
         if verbose:
             print('retrieving segments')
+        if self.loggingEnabled:
+            self.logger.debug(f"retrieving segments")
         if len(self.segments) == 0 and segments is None:
             self.segments = self.getSegments(extended_info=True)
             mySegments = self.segments
@@ -1497,6 +1660,8 @@ class Analytics:
         ### Calculated Metrics
         if verbose:
             print('retrieving calculated metrics')
+        if self.loggingEnabled:
+            self.logger.debug(f"retrieving calculated metrics")
         if len(self.calculatedMetrics) == 0 and calculatedMetrics is None:
             self.calculatedMetrics = self.getCalculatedMetrics(extended_info=True)
             myMetrics = self.calculatedMetrics
@@ -1509,17 +1674,17 @@ class Analytics:
             myMetrics = calculatedMetrics
         ### Projects
         if (len(self.projectsDetails) == 0 and projectDetails is None) or resetProjectDetails:
-            if verbose:
-                print('retrieving projects details - long process')
+            if self.loggingEnabled:
+                self.logger.debug(f"retrieving projects details")
             self.projectDetails = self.getAllProjectDetails(verbose=verbose,rsidSuffix=rsidSuffix)
             myProjectDetails = (self.projectsDetails[key].to_dict() for key in self.projectsDetails)
         elif len(self.projectsDetails) > 0 and projectDetails is None and resetProjectDetails==False:
-            if verbose:
-                print('transforming projects details')
+            if self.loggingEnabled:
+                self.logger.debug(f"transforming projects details")
             myProjectDetails = (self.projectsDetails[key].to_dict() for key in self.projectsDetails)
         elif projectDetails is not None:
-            if verbose:
-                print('setting the project details')
+            if self.loggingEnabled:
+                self.logger.debug(f"setting the project details")
             if isinstance(projectDetails[0],Project):
                 myProjectDetails = (item.to_dict() for item in projectDetails)
             elif isinstance(projectDetails[0],dict):
@@ -1533,6 +1698,8 @@ class Analytics:
             print('search started')
             print(f'recursive option : {recursive}')
             print('start looking into segments')
+        if self.loggingEnabled:
+                self.logger.debug(f"Analyzing segments")
         for _,seg in mySegments.iterrows():
             for prop in listComponentProp:
                 if re.search(f"{prop+regPartSeg}",str(seg['definition'])):
@@ -1554,8 +1721,8 @@ class Analytics:
                     returnObj[element]['segments'].append({seg['name']:seg['id']})
                     if recursive:
                         listRecusion.append(seg['id'])
-        if verbose:
-            print('start looking into calculated metrics')
+        if self.loggingEnabled:
+                self.logger.debug(f"Analyzing calculated metrics")
         for _,met in myMetrics.iterrows():
             for prop in listComponentProp:
                 if re.search(f"{prop+regPartSeg}",str(met['definition'])):
@@ -1579,6 +1746,8 @@ class Analytics:
                         listRecusion.append(met['id'])
         if verbose:
             print('start looking into projects')
+        if self.loggingEnabled:
+                self.logger.debug(f"Analyzing projects")
         for proj in teeProjects[0]:
             ## mobile reports don't have dimensions.
             if proj['reportType'] == "desktop":
@@ -1618,6 +1787,8 @@ class Analytics:
         if recursive:
             if verbose:
                 print('start looking into recursive elements')
+            if self.loggingEnabled:
+                self.logger.debug(f"recursive option checked")
             for proj in teeProjects[1]:
                 for rec in listRecusion:
                     for element in proj.get('segments',[]):
@@ -1665,6 +1836,8 @@ class Analytics:
         possible kwargs:
             page : page number (default 0)
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getUsageLogs")
         import datetime
         now =  datetime.datetime.now()
         if startDate is None:
@@ -1683,9 +1856,8 @@ class Analytics:
             params['login'] = login
         if ip is not None:
             params['ip'] = ip
-        if verbose:
-            print("retrieving data with these parameters")
-            print(json.dumps(params,indent=2))
+        if self.loggingEnabled:
+            self.logger.debug(f"params: {params}")
         res = self.connector.getData(self.endpoint_company + path, params=params,verbose=verbose)
         data = res['content']
         lastPage = res['lastPage']
@@ -1721,6 +1893,8 @@ class Analytics:
             endDate : end date with format YYYY-MM-DD
             searchAnd, searchOr, searchNot, searchPhrase : Search element to be included (or not), partial match or not.
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getTopItems")
         path = "/reports/topItems"
         page = kwargs.get("page",0)
         if rsid is None:
@@ -1775,12 +1949,18 @@ class Analytics:
                 name : compare only names
             save : OPTIONAL : if you want to save in a csv.
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting compareReportSuites")
         if listRsids is None or type(listRsids) != list:
             raise ValueError("Require a list of rsids")
         if element=="dimensions":
+            if self.loggingEnabled:
+                self.logger.debug(f"dimensions selected")
             listDFs = [self.getDimensions(rsid,full=True) for rsid in listRsids]
         elif element == "metrics":
             listDFs = [self.getMetrics(rsid,full=True) for rsid in listRsids]
+            if self.loggingEnabled:
+                self.logger.debug(f"metrics selected")
         for df,rsid in zip(listDFs, listRsids):
             df['rsid']=rsid
             df.set_index('id',inplace=True)
@@ -1795,6 +1975,8 @@ class Analytics:
             df_name['different'] = ~temp_df.eq(temp_df.iloc[:,0],axis=0).all(1)
             if save:
                 df_name.to_csv(f'comparison_name_{int(time.time())}.csv')
+                if self.loggingEnabled:
+                    self.logger.debug(f'Name only comparison, file : comparison_name_{int(time.time())}.csv')
             return df_name
         ## retrieve main indexes from multi level indexes
         mainIndex = set([val[0] for val in list(df.columns)])
@@ -1810,6 +1992,8 @@ class Analytics:
         df['different'] = list(~df_bool.eq(df_bool.iloc[:,0],axis=0).all(1))
         if save:
             df.to_csv(f'comparison_full_{element}_{int(time.time())}.csv')
+            if self.loggingEnabled:
+                self.logger.debug(f'Full comparison, file : comparison_full_{element}_{int(time.time())}.csv')
         return df
         
 
@@ -1818,6 +2002,8 @@ class Analytics:
         read the request and returns an object with information about the request.
         It will be used in order to build the dataclass and the dataframe.
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting _dataDescriptor")
         obj = {}
         obj['dimension'] = json_request['dimension']
         obj['filters'] = {'globalFilters': [], 'metricsFilters': {}}
@@ -1860,6 +2046,8 @@ class Analytics:
             anomaly : OPTIONAL : Boolean to tell if the anomaly detection has been used. 
             cols : OPTIONAL : list of columns names
         """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting _readData")
         if cols is None:
             raise ValueError("list of columns must be specified")
         data_rows = deepcopy(data_rows)

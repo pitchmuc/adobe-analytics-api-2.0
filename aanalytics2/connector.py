@@ -14,12 +14,13 @@ class AdobeRequest:
     Attributes:
         restTime : Time to rest before sending new request when reaching too many request status code.
     """
-
     def __init__(self,
                  config_object: dict = config.config_object,
                  header: dict = config.header,
                  verbose: bool = False,
-                 retry: int = 0
+                 retry: int = 0,
+                 loggingEnabled:bool=False,
+                 logger:object=None
                 ) -> None:
         """
         Set the connector to be used for handling request to AAM
@@ -34,6 +35,8 @@ class AdobeRequest:
                 'You have to upload the configuration file with importConfigFile method.')
         self.config = deepcopy(config_object)
         self.header = deepcopy(header)
+        self.loggingEnabled = loggingEnabled
+        self.logger = logger
         self.restTime = 30
         self.retry = retry
         if self.config['token'] == '' or time.time() > self.config['date_limit']:
@@ -83,18 +86,27 @@ class AdobeRequest:
             while str(res.status_code) == "429":
                 if kwargs.get("verbose", False):
                     print(f'Too many requests: retrying in {self.restTime} seconds')
+                if self.loggingEnabled:
+                    self.logger.info(f"Too many requests: retrying in {self.restTime} seconds")
                 time.sleep(self.restTime)
                 res = requests.get(endpoint, headers=headers, params=params, data=data)
             res_json = res.json()
         except:
             ## handling 1.4
+            if self.loggingEnabled:
+                self.logger.warning(f"handling exception as res.json() cannot be managed")
             if kwargs.get('legacy',False):
                 try:
                     return json.loads(res.text)
                 except:
+                    if self.loggingEnabled:
+                        self.logger.error(f"GET method failed: {res.status}, {res.status}")
                     return res.text
+                    
             res_json = {'error': 'Request Error'}
             while internRetry > 0:
+                if self.loggingEnabled:
+                    self.logger.warning(f"Trying again with internal retry")
                 if kwargs.get("verbose", False):
                     print('Retry parameter activated')
                     print(f'{internRetry} retry left')
@@ -129,6 +141,8 @@ class AdobeRequest:
                 try:
                     return json.loads(res.text)
                 except:
+                    if self.loggingEnabled:
+                        self.logger.error(f"POST method failed: {res.status}, {res.text}")
                     return res.text
             res_json = {'error': 'Request Error'}
         return res_json
@@ -154,6 +168,8 @@ class AdobeRequest:
                 res = requests.patch(endpoint, headers=headers, params=params,data=json.dumps(data))
             res_json = res.json()
         except:
+            if self.loggingEnabled:
+                self.logger.error(f"PATCH method failed: {res.status}, {res.text}")
             res_json = {'error': 'Request Error'}
         return res_json
 
@@ -173,6 +189,8 @@ class AdobeRequest:
         try:
             status_code = res.json()
         except:
+            if self.loggingEnabled:
+                self.logger.error(f"PUT method failed: {res.status}, {res.text}")
             status_code = {'error': 'Request Error'}
         return status_code
 
@@ -195,5 +213,7 @@ class AdobeRequest:
                 res = requests.delete(endpoint, headers=headers, params=params)
             status_code = res.status_code
         except:
+            if self.loggingEnabled:
+                self.logger.error(f"DELETE method failed: {res.status}, {res.text}")
             status_code = {'error': 'Request Error'}
         return status_code

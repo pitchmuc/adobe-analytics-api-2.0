@@ -3,6 +3,12 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.2.9
+
+* Adding logging capability
+* Fixing some typo on regex used for `findComponentUsage`
+* Adding better docstring
+
 ## version 0.2.8
 
 * adding the `decodeAArequests` method ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/main.md#decode-aa-requests)).
