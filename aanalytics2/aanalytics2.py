@@ -14,7 +14,6 @@ import logging
 
 # Non standard libraries
 import pandas as pd
-import requests
 from urllib import parse
 
 from aanalytics2 import config, connector, token_provider
@@ -409,10 +408,10 @@ class Analytics:
             extended_info : OPTIONAL : boolean to add more information
             format : OPTIONAL : format of the output. 2 values "df" for dataframe and "raw" for raw json.
         """
-        if self.loggingEnabled:
-            self.logger.debug(f"Starting getVirtualReportSuite")
         if vrsid is None:
             raise Exception("require a Virtual ReportSuite ID")
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getVirtualReportSuite for {vrsid}")
         expansion_values = "globalCompanyKey,parentRsid,parentRsidName,timezone,timezoneZoneinfo,currentTimezoneOffset,segmentList,description,modified,isDeleted,dataCurrentAsOf,compatibility,dataSchema,sessionDefinition,curatedComponents,type"
         params = {}
         if extended_info:
@@ -483,8 +482,10 @@ class Analytics:
             vrsid : REQUIRED : The id of the virtual report suite to update
             data_dict : a json-like dictionary of the vrs data to update
         """
+        if vrsid is None:
+            raise Exception("require a virtual reportSuite ID")
         if self.loggingEnabled:
-            self.logger.debug(f"Starting updateVirtualReportSuite")
+            self.logger.debug(f"Starting updateVirtualReportSuite for {vrsid}")
         path = f"{self.endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
         body = data_dict
         res = self.connector.putData(path, data=body, headers=self.header)
@@ -773,12 +774,12 @@ class Analytics:
             - "definitionLastModified" : string : last definition of the segment
             - "categories" : string : categories of the segment
         """
-        if self.loggingEnabled:
-            self.logger.debug(f"Starting getSegment")
         ValidArgs = ["reportSuiteName", "ownerFullName", "modified", "tags", "compatibility",
                      "definition", "publishingStatus", "publishingStatus", "definitionLastModified", "categories"]
         if segment_id is None:
             raise Exception("Expected a segment id")
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getSegment for {segment_id}")
         path = f"/segments/{segment_id}"
         for element in args:
             if element not in ValidArgs:
@@ -1068,11 +1069,11 @@ class Analytics:
             calcID : REQUIRED : Calculated Metric ID to be updated
             calcJSON : REQUIRED : the dictionary that represents the JSON statement for the calculated metric.
         """
-        if self.loggingEnabled:
-            self.logger.debug(f"starting updateCalculatedMetric")
         if calcJSON is None or calcID is None:
             print('No calcMetric or calcMetric JSON data has been passed')
             return None
+        if self.loggingEnabled:
+            self.logger.debug(f"starting updateCalculatedMetric for {calcID}")
         data = deepcopy(calcJSON)
         cm = self.connector.putData(
             self.endpoint_company + self._getCalcMetrics + '/' + calcID,
@@ -1087,11 +1088,11 @@ class Analytics:
         Arguments:
             calcID : REQUIRED : Calculated Metrics ID to be deleted
         """
-        if self.loggingEnabled:
-            self.logger.debug(f"starting deleteCalculatedMetric")
         if calcID is None:
             print('No calculated metrics data has been passed')
             return None
+        if self.loggingEnabled:
+            self.logger.debug(f"starting deleteCalculatedMetric for {calcID}")
         cm = self.connector.deleteData(
             self.endpoint_company + self._getCalcMetrics + '/' + calcID,
             headers=self.header

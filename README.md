@@ -32,14 +32,16 @@ Functionalities that are covered :
 * Retrieve Tags
 * Retrieve Usage Logs from users
 * Retrieve Projects
+* Retrieve Scheduled Jobs / Projects
 * Update Segments
 * Update Calculated Metrics
 * Update Tags
 * Update Projects
-* DeleteSegments
-* DeleteCalculatedMetrics
-* DeleteVirtualReportSuite
-* DeleteProjects
+* Delete Segments
+* Delete CalculatedMetrics
+* Delete VirtualReportSuite
+* Delete Projects
+* Delete DateRange
 * createProject
 
 documentation on reporting [here](./docs/main.md)
@@ -61,6 +63,11 @@ More information in the [dedicated documentation for 1.4](./docs/legacyAnalytics
 
 There is a BETA feature to retrieve the Workspace projects and the components used.\
 Refer to this [documentation on Project](./docs/projects.md) for more information.
+
+## Logging capability
+
+In case you want to use the logging capability for your script.\
+You can look at the reference for this on the [logging documentation page](./docs/logging.md)
 
 ## Getting Started
 

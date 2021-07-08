@@ -147,7 +147,7 @@ def generateLoggingObject()->dict:
     Generates a dictionary for the logging object with basic configuration.
     You can find the information for the different possible values on the logging documentation.
         https://docs.python.org/3/library/logging.html
-    Arguments:
+    Output:
         level : Level of the logger to display information (NOTSET, DEBUG,INFO,WARNING,EROR,CRITICAL)
         stream : If the logger should display print statements
         file : If the logger should write the messages to a file
