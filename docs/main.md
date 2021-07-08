@@ -127,6 +127,8 @@ mycompany1 = loggin.createAnalyticsConnection('comp1')
 
 We will see later that you can also directly use the `Analytics` class.
 
+**Note**: you can enable logging capability for the class by passing an object in the `loggingObject` parameter. More information [here](./logging.md)
+
 ### Retry Parameter
 
 The latest version of the aanalytics2 module also provides a **retry** parameter.\
@@ -195,6 +197,8 @@ mycompany.refreshToken(token)
 
 With all of my API wrappers, I ususall separate the methody by the GET (fetching information), the CREATE methods (posting information), the DELETE methods, the UPDATE mehthods.
 This API is no exception.
+
+**Note**: you can enable logging capability for the class by passing an object in the `loggingObject` parameter. More information [here](./logging.md)
 
 ## The Project class
 
@@ -348,6 +352,16 @@ Possible kwargs:
 * getTags : Retrieve the list of Tags used on the company Login.
   Arguments:
   * limit : OPTIONAL : Amount of tag to be returned by request. Default 100
+
+* getScheduledJobs: Retrieve the list of scheduled Jobs for your login company.
+  Arguments:
+  * includeType : OPTIONAL : By default gets all non-expired or deleted projects. (default "all")
+      You can specify e.g. "all,shared,expired,deleted" to get more. 
+      Active schedules always get exported,so you need to use the `rsLocalExpirationTime` parameter in the `schedule` column to e.g. see which schedules are expired
+  * full : OPTIONAL : By default True. It returns the following additional information "ownerFullName,groups,tags,sharesFullName,modified,favorite,approved,scheduledItemName,scheduledUsersFullNames,deletedReason"
+  * limit : OPTIONAL : Number of element retrieved by request (default max 1000)
+  * format : OPTIONAL : Define the format you want to output the result. Default "df" for dataframe, other option "raw"
+  * verbose: OPTIONAL : set to True for debug output
 
 * getComponentTagName : Given a comma separated list of tag names, return component ids associated with them
   Arguments:

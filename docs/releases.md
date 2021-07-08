@@ -5,9 +5,10 @@ The changes have been tracked starting version 0.1.0
 
 ## version 0.2.9
 
-* Adding logging capability
+* Adding the `getScheduledJobs` endpoint
+* Adding logging capability ([documentation](./logging.md))
 * Fixing some typo on regex used for `findComponentUsage`
-* Adding better docstring
+* Adding better docstring for some methods.
 
 ## version 0.2.8
 
