@@ -1380,48 +1380,53 @@ class Analytics:
         res = self.connector.putData(self.endpoint_company + path, data=data, headers=self.header)
         return res
     
-    def getScheduledJobs(self, includeType: str = None, expansion: str = None, verbose: bool = False) -> pd.DataFrame:
+    def getScheduledJobs(self, includeType: str = "all", full: bool = True,limit:int=1000,format:str="df",verbose: bool = False) -> JsonListOrDataFrameType:
         """
         Get Scheduled Projects. You can retrieve the projectID out of the tasks column to see for which workspace a schedule
         Arguments:
-            includeType : OPTIONAL : By default gets all non-expired or deleted projects. You can specify e.g. "all,shared,expired,deleted" to get more. Active schedules always get exported,
-            so you need to use the `rsLocalExpirationTime` parameter in the `schedule` column to e.g. see which schedules are expired
-            expansion: OPTIONAL : By default gets "ownerFullName,groups,tags,sharesFullName,modified,favorite,approved,scheduledItemName,scheduledUsersFullNames,deletedReason"
+            includeType : OPTIONAL : By default gets all non-expired or deleted projects. (default "all")
+                You can specify e.g. "all,shared,expired,deleted" to get more. 
+                Active schedules always get exported,so you need to use the `rsLocalExpirationTime` parameter in the `schedule` column to e.g. see which schedules are expired
+            full : OPTIONAL : By default True. It returns the following additional information "ownerFullName,groups,tags,sharesFullName,modified,favorite,approved,scheduledItemName,scheduledUsersFullNames,deletedReason"
+            limit : OPTIONAL : Number of element retrieved by request (default max 1000)
+            format : OPTIONAL : Define the format you want to output the result. Default "df" for dataframe, other option "raw"
             verbose: OPTIONAL : set to True for debug output
         """
-        if includeType is None:
-            includeType = "all"
-        if expansion is None:
-            expansion = "ownerFullName,groups,tags,sharesFullName,modified,favorite,approved,scheduledItemName,scheduledUsersFullNames,deletedReason"
-        path = "/scheduler/scheduler/scheduledjobs/"
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getScheduledJobs")
         params = {"includeType": includeType,
                   "pagination": True,
-                  "expansion": expansion,
                   "locale": "en_US",
                   "page": 0,
-                  "limit": 1000
+                  "limit": limit
                   }
+        if full is None:
+            params["expansion"] = "ownerFullName,groups,tags,sharesFullName,modified,favorite,approved,scheduledItemName,scheduledUsersFullNames,deletedReason"
+        path = "/scheduler/scheduler/scheduledjobs/"
         if verbose:
             print(f"Getting Scheduled Jobs with Parameters {params}")
         res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         if res.get("content") is None:
             raise Exception(f"Scheduled Job had no content in response. Parameters were: {params}")
         # get Scheduled Jobs data into Data Frame
-        df = pd.DataFrame(res.get("content"))
-        last_page = res.get("lastPage")
+        data = res.get("content")
+        last_page = res.get("lastPage",True)
+        total_el = res.get("totalElements")
+        number_el = res.get("numberOfElements")
         if verbose:
             print(f"Last Page {last_page}, total elements: {total_el}, number_el: {number_el}")
-
         # iterate through pages if not on last page yet
-        if last_page is False:
-            while last_page is False:
+        while last_page == False:
+            if verbose:
                 print(f"last_page is {last_page}, next round")
-                params["page"] = params["page"] + 1
-                res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
-                df = df.append(res.get("content"))
-                last_page = res.get("lastPage")
-        df.reset_index(inplace=True, drop=True)
-        return df
+            params["page"] += 1
+            res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
+            data += res.get("content")
+            last_page = res.get("lastPage",True)
+        if format == "df":
+            df = pd.DataFrame(data)
+            return df
+        return data
     
     def getProjects(self, includeType: str = 'all', full: bool = False, limit: int = None, includeShared: bool = False,
                     includeTemplate: bool = False, format: str = 'df', cache:bool=False, save: bool = False) -> JsonListOrDataFrameType:
