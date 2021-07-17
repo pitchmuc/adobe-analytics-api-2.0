@@ -50,6 +50,7 @@ class Login:
             config : REQUIRED : dictionary with your configuration information.
             header : REQUIRED : dictionary of your header.
             retry : OPTIONAL : if you want to retry, the number of time to retry
+            loggingObject : OPTIONAL : If you want to set logging capability for your actions.
         """
         if loggingObject is not None and sorted(["level","stream","format","filename","file"]) == sorted(list(loggingObject.keys())):
             self.loggingEnabled = True
@@ -94,15 +95,16 @@ class Login:
                 self.logger.error(f"Error trying to get companyId: {json_res}")
             return None
 
-    def createAnalyticsConnection(self, companyId: str = None) -> object:
+    def createAnalyticsConnection(self, companyId: str = None,loggingObject:dict=None) -> object:
         """
         Returns an instance of the Analytics class so you can query the different elements from that instance.
         Arguments:
             companyId: REQUIRED : The globalCompanyId that you want to use in your connection
+            loggingObject : OPTIONAL : If you want to set logging capability for your actions.
         the retry parameter set in the previous class instantiation will be used here.
         """
         analytics = Analytics(company_id=companyId,
-                              config_object=self.connector.config, header=self.header, retry=self.retry)
+                              config_object=self.connector.config, header=self.header, retry=self.retry,loggingObject=loggingObject)
         return analytics
 
 
@@ -135,6 +137,12 @@ class Analytics:
         The Analytics class will be automatically connected to the API 2.0.
         You have possibility to review the connection detail by looking into the connector instance.
         "header", "company_id" and "endpoint_company" are attribute accessible for debugging.
+        Arguments:
+            company_id : REQUIRED : company ID retrieved by the getCompanyId
+            retry : OPTIONAL : Number of time you want to retrieve fail calls
+            loggingObject : OPTIONAL : logging object to log actions during runtime.
+            config_object : OPTIONAL : config object to be used for setting token (do not update if you do not know)
+            header : OPTIONAL : template header used for all requests (do not update if you do not know!) 
         """
         if company_id is None:
             raise AttributeError(

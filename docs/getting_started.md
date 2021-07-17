@@ -71,6 +71,7 @@ import aanalytics2 as api2
 
 api2.configure(oauth=True,org_id='XXXXXX@AdobeOrg',client_id='ysfn28d938z2een27z4',token='myToken')
 ```
+
 *NOTE*: The token will be valid for 22 hours and will not be refresh afterwards.
 
 ## 5. Get Company ID(s) & create your instance
