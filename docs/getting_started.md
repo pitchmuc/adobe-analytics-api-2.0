@@ -92,18 +92,6 @@ login.COMPANY_IDS
 ## returns the same result that cids.
 ```
 
-The legacy method is the _getCompanyId_, that will return you the different company ID attached to your account.\
-You will extract the *globalCompanyId* and use it to create your instance and use it later in the `Analytics` class . \
-This method **will be deprecated** some time in the future.
-
-```python
-import aanalytics2 as api2
-api2.importConfigFile('myconfig.json')
-cids = api2.getCompanyId()
-cid = cids[0]['globalCompanyId'] ## using the first one
-mycompany = api2.Analytics(cid)
-```
-
 From there, 2 methods can be used to create the Analytics class instance.
 
 ```python
