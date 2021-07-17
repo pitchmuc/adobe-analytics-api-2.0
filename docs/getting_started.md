@@ -109,7 +109,7 @@ From there, 2 methods can be used to create the Analytics class instance.
 mycompany = api2.Analytics(cid)
 
 # method directly in the Login class
-mycompany = loggin.createAnalyticsConnection(cid)
+mycompany = login.createAnalyticsConnection(cid)
 
 ```
 
