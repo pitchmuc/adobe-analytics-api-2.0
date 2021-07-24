@@ -1401,7 +1401,7 @@ class Analytics:
                   "page": 0,
                   "limit": limit
                   }
-        if full is None:
+        if full is True:
             params["expansion"] = "ownerFullName,groups,tags,sharesFullName,modified,favorite,approved,scheduledItemName,scheduledUsersFullNames,deletedReason"
         path = "/scheduler/scheduler/scheduledjobs/"
         if verbose:
