@@ -33,14 +33,14 @@ Functionalities that are covered :
 * Retrieve Usage Logs from users
 * Retrieve Projects
 * Retrieve Scheduled Jobs / Projects
-* Update Segments
-* Update Calculated Metrics
+* Update Segment
+* Update Calculated Metric
 * Update Tags
-* Update Projects
-* Delete Segments
-* Delete CalculatedMetrics
+* Update Project
+* Delete Segment
+* Delete CalculatedMetric
 * Delete VirtualReportSuite
-* Delete Projects
+* Delete Project
 * Delete DateRange
 * createProject
 
