@@ -1780,6 +1780,8 @@ class Analytics:
                         listRecusion.append(seg['id'])
         if self.loggingEnabled:
                 self.logger.debug(f"Analyzing calculated metrics")
+        if verbose:
+            print('start looking into calculated metrics')
         for _,met in myMetrics.iterrows():
             for prop in listComponentProp:
                 if re.search(f"{prop+regPartSeg}",str(met['definition'])):

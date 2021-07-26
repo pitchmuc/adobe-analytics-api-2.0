@@ -63,6 +63,7 @@ In that case, you usually ends up with the following information:
 * token
 
 In that case, you can use the configure `method` as well with some specific parameters.
+
 * oauth
 * token
 

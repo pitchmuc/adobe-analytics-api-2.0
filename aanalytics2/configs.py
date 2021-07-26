@@ -27,7 +27,7 @@ def find_path(path: str) -> Optional[Path]:
         return None
    
 
-def createConfigFile(verbose: bool = False, destination: str = 'config_analytics_template.json') -> None:
+def createConfigFile(destination: str = 'config_analytics_template.json',verbose: bool = False) -> None:
     """Creates a `config_admin.json` file with the pre-defined configuration format
     to store the access data in under the specified `destination`.
     """
@@ -38,11 +38,13 @@ def createConfigFile(verbose: bool = False, destination: str = 'config_analytics
         'secret': "<YourSecret>",
         'pathToKey': '<path/to/your/privatekey.key>',
     }
+    if '.json' not in destination:
+        destination += '.json'
     with open(destination, 'w') as cf:
         cf.write(json.dumps(json_data, indent=4))
     if verbose:
         print(
-            f" file created at this location : {os.getcwd()}{os.sep}config_analytics.json"
+            f" file created at this location : {os.getcwd()}{os.sep}{destination}.json"
         )
 
 def importConfigFile(path: str) -> None:
