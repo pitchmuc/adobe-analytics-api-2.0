@@ -3,16 +3,15 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
-## version 0.3.0
-
-* improve `createConfigFile` method
-
 ## version 0.2.9
 
 * Adding the `getScheduledJobs` endpoint
 * Adding logging capability ([documentation](./logging.md))
 * Fixing some typo on regex used for `findComponentUsage`
 * Adding better docstring for some methods.
+Patches:
+* Fix issue on `getScheduleJobs`
+* improve `createConfigFile` method
 
 ## version 0.2.8
 

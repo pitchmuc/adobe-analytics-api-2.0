@@ -41,7 +41,7 @@ setup(
     long_description_content_type='text/markdown',
     author='Julien Piccini',
     author_email='piccini.julien@gmail.com',
-    url='https://github.com/pitchmuc/adobe_analytics_api_2.0',
+    url='https://github.com/pitchmuc/adobe-analytics-api-2.0',
     keywords=['adobe', 'analytics', 'API', 'python'],
     packages=find_packages(),
     include_package_data=True,
