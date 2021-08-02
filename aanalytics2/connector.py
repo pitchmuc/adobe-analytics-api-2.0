@@ -30,6 +30,8 @@ class AdobeRequest:
             header : OPTIONAL : header of the config modules
             verbose : OPTIONAL : display comment on the request.
             retry : OPTIONAL : If you wish to retry failed GET requests
+            loggingEnabled : OPTIONAL : if the logging is enable for that instance.
+            logger : OPTIONAL : instance of the logger created 
         """
         if config_object['org_id'] == '':
             raise Exception(
