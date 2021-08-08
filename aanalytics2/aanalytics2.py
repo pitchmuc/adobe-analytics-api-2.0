@@ -1145,13 +1145,13 @@ class Analytics:
         """
         Method that updates a specific Date Range based on the dictionary passed to it.
         Arguments:
-            dateRangeID : REQUIRED : Calculated Metric ID to be updated
-            dateRangeJSON : REQUIRED : the dictionary that represents the JSON statement for the calculated metric.
+            dateRangeID : REQUIRED : Date Range ID to be updated
+            dateRangeJSON : REQUIRED : the dictionary that represents the JSON statement for the date Range.
         """
         if self.loggingEnabled:
             self.logger.debug(f"starting updateDateRange")
         if dateRangeJSON is None or dateRangeID is None:
-            print('No calcMetric or calcMetric JSON data has been pushed')
+            print('No date range or date range JSON data has been pushed')
             return None
         data = deepcopy(dateRangeJSON)
         dr = self.connector.putData(
