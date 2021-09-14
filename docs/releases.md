@@ -12,6 +12,8 @@ The changes have been tracked starting version 0.1.0
 Patches:
 * Fix issue on `getScheduleJobs`
 * improve `createConfigFile` method
+* improving Documentation
+* adding better log from the GET requests
 
 ## version 0.2.8
 
