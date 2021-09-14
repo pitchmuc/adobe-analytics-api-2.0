@@ -1670,7 +1670,7 @@ class Analytics:
         Arguments:
             components : REQUIRED : list of component to look for.
                         Example : evar10,event1,prop3,segmentId, calculatedMetricsId
-            ProjectDetails: OPTIONAL : list of project details.
+            ProjectDetails: OPTIONAL : list of instances of Project class.
             segments : OPTIONAL : If you wish to pass the segments to look for. (should contain definition)
             calculatedMetrics : OPTIONAL : If you wish to pass the segments to look for. (should contain definition)
             recursive : OPTIONAL : if set to True, will also find the reference where the meta component are used.
@@ -1878,7 +1878,7 @@ class Analytics:
         """
         Returns the Audit Usage Logs from your company analytics setup.
         Arguments:
-            startDate : REQUIRED : Start date, format : 2020-12-01T00:00:00-07.(default 3 month prior today)	
+            startDate : REQUIRED : Start date, format : 2020-12-01T00:00:00-07.(default 60 days prior today)	
             endDate : REQUIRED : End date, format : 2020-12-15T14:32:33-07. (default today)
                 Should be a maximum of a 3 month period between startDate and endDate.
             eventType : OPTIONAL : The numeric id for the event type you want to filter logs by. 
@@ -1900,7 +1900,7 @@ class Analytics:
         import datetime
         now =  datetime.datetime.now()
         if startDate is None:
-            startDate = datetime.datetime.isoformat(now - datetime.timedelta(weeks=4*3)).split('.')[0]
+            startDate = datetime.datetime.isoformat(now - datetime.timedelta(days=60)).split('.')[0]
         if endDate is None:
             endDate = datetime.datetime.isoformat(now).split('.')[0]
         path = "/auditlogs/usage"

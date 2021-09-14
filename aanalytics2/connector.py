@@ -104,14 +104,17 @@ class AdobeRequest:
             ## handling 1.4
             if self.loggingEnabled:
                 self.logger.warning(f"handling exception as res.json() cannot be managed")
+                self.logger.warning(f"status code: {res.status_code}")
             if kwargs.get('legacy',False):
                 try:
                     return json.loads(res.text)
                 except:
                     if self.loggingEnabled:
-                        self.logger.error(f"GET method failed: {res.status}, {res.status}")
+                        self.logger.error(f"GET method failed: {res.status_code}, {res.text}")
                     return res.text
-                    
+            else:
+                if self.loggingEnabled:
+                    self.logger.error(f"text: {res.text}")
             res_json = {'error': 'Request Error'}
             while internRetry > 0:
                 if self.loggingEnabled:

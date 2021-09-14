@@ -129,8 +129,8 @@ This method takes 7 possibles arguments.
 
 * components : REQUIRED : list of component to look for.
     Example : evar10,event1,prop3,segmentId, calculatedMetricsId
-* ProjectDetails: OPTIONAL : list of project details.
-    segments : OPTIONAL : If you wish to pass the segments to look for. (should contain definition)
+* ProjectDetails: OPTIONAL : list of instances of `Project` class.
+* segments : OPTIONAL : If you wish to pass the segments to look for. (should contain definition)
 * calculatedMetrics : OPTIONAL : If you wish to pass the segments to look for. (should contain definition)
 * recursive : OPTIONAL : if set to True, will also find the reference where the meta component are used.
     e.g. : segments based on your elements will also be searched to see where they are located..
