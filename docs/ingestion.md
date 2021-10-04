@@ -124,7 +124,7 @@ This API is the new supported API, part of the Adobe Analytics API 2.0 library.\
 In that regards, it requires user authentication and generation of a token.
 
 In order to use the Bulk Ingestion API, you will need to import the configuration JSON file that the aanalytics2 module generate.\
-For more information, read the [get-started documentation](./getting-started.md).
+For more information, read the [get-started documentation](./getting_started.md).
 
 It is **mandatory** to import the config file in order to instanciating the bulk-ingestion API.
 
