@@ -149,7 +149,7 @@ class Project:
             temp_data['metrics'].append(f"{node['component']['id']}{tmp_rsid}")
         elif componentType == "CalculatedMetric":
             temp_data['calculatedMetrics'].append(node['component']['id'])
-        elif componentType == "Segments":
+        elif componentType == "Segment":
             temp_data['segments'].append(node['component']['id'])
         elif componentType == "DimensionItem":
             old_id: str = node['component']['id']
