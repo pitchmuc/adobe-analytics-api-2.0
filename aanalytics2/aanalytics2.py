@@ -1922,7 +1922,6 @@ class Analytics:
         lastPage = res['lastPage']
         while lastPage == False:
             params["page"] += 1
-            print(f"fetching page{params['page']}")
             res = self.connector.getData(self.endpoint_company + path, params=params,verbose=verbose)
             data += res['content']
             lastPage = res['lastPage']
