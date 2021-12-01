@@ -6,7 +6,7 @@ from time import time
 
 class RequestCreator:
     """
-    A class to help build a request for CJA API getReport
+    A class to help build a request for Adobe Analytics API 2.0 getReport
     """
 
     template = {
@@ -23,7 +23,7 @@ class RequestCreator:
             "nonesBehavior": "exclude-nones",
         },
         "statistics": {"functions": ["col-max", "col-min"]},
-        "dataId": "",
+        "rsid": "",
     }
 
     def __init__(self, request: dict = None) -> None:
@@ -234,15 +234,15 @@ class RequestCreator:
             raise ValueError("A dimension must be passed")
         self.__request["dimension"] = dimension
 
-    def setDataViewId(self, dataViewId: str = None) -> None:
+    def setRSID(self, rsid: str = None) -> None:
         """
-        Set the dataView ID to be used for the reporting.
+        Set the reportSuite ID to be used for the reporting.
         Arguments:
-            dataViewId : REQUIRED : The Data View ID to be passed.
+            rsid : REQUIRED : The Data View ID to be passed.
         """
-        if dataViewId is None:
-            raise ValueError("A dataView ID must be passed")
-        self.__request["dataId"] = dataViewId
+        if rsid is None:
+            raise ValueError("A reportSuite ID must be passed")
+        self.__request["rsid"] = rsid
 
     def addGlobalFilter(self, filterId: str = None) -> None:
         """

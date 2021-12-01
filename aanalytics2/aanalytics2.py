@@ -720,7 +720,7 @@ class Analytics:
         params = {'includeType': 'all', 'limit': limit}
         if extended_info:
             params.update(
-                {'expansion': 'reportSuiteName,ownerFullName,modified,tags,compatibility,definition,shares'})
+                {'expansion': 'reportSuiteName,ownerFullName,created,modified,tags,compatibility,definition,shares'})
         if name is not None:
             params.update({'name': str(name)})
         if tagNames is not None:
@@ -1712,6 +1712,8 @@ class Analytics:
         elif segments is not None:
             if type(segments) == list:
                 mySegments = pd.DataFrame(segments)
+            elif type(segments) == pd.DataFrame:
+                mySegments = segments
         else:
             mySegments = segments
         ### Calculated Metrics
@@ -1727,6 +1729,8 @@ class Analytics:
         elif calculatedMetrics is not None:
             if type(calculatedMetrics) == list:
                 myMetrics = pd.DataFrame(calculatedMetrics)
+            elif type(calculatedMetrics) == pd.DataFrame:
+                myMetrics = calculatedMetrics
         else:
             myMetrics = calculatedMetrics
         ### Projects

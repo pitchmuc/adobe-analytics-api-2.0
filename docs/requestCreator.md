@@ -68,10 +68,10 @@ We will review the different methods available via the object.
   Arguments:
   * dimension : REQUIRED : the dimension to build your report on
 
-* `setDataViewId()`
-  Set the dataView ID to be used for the reporting.
+* `setRSID()`
+  Set the reportSuite ID to be used for the reporting.
   Arguments:
-  * dataViewId : REQUIRED : The Data View ID to be passed.
+  * rsid : REQUIRED : The reportSuite ID to be passed.
 
 * `addMetric()`
   Add a metric to the Request.
