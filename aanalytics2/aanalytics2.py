@@ -18,6 +18,7 @@ from urllib import parse
 
 from aanalytics2 import config, connector, token_provider
 from .projects import *
+from .requestCreator import RequestCreator
 
 JsonOrDataFrameType = Union[pd.DataFrame, dict]
 JsonListOrDataFrameType = Union[pd.DataFrame, List[dict]]
@@ -2140,7 +2141,7 @@ class Analytics:
 
     def getReport(
             self,
-            json_request: Union[dict, str, IO],
+            json_request: Union[dict, str, IO,RequestCreator],
             limit: int = 1000,
             n_result: Union[int, str] = 1000,
             save: bool = False,
@@ -2158,6 +2159,7 @@ class Analytics:
                 - a dictionary : It will be used as it is.
                 - a string that is a dictionary : It will be transformed to a dictionary / JSON.
                 - a path to a JSON file that contains the statement (must end with ".json"). 
+                - an instance of the RequestCreator class
             n_result : OPTIONAL : Number of result that you would like to retrieve. (default 1000)
                 if you want to have all possible data, use "inf".
             item_id : OPTIONAL : Boolean to define if you want to return the item id for sub requests (default False)
@@ -2184,6 +2186,8 @@ class Analytics:
                 request = json.loads(file_string)
             except:
                 raise TypeError("expected a parsable string")
+        elif isinstance(json_request,RequestCreator):
+            request = json_request.to_dict()
         request['settings']['limit'] = limit
         # info for creating report
         data_info = self._dataDescriptor(request)
