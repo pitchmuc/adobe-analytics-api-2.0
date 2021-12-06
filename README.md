@@ -59,6 +59,13 @@ This module provide limited support for the 1.4 API.
 It basically wrapped your request with some internal module and you can pass your request path, method, parameters and / or data.
 More information in the [dedicated documentation for 1.4](./docs/legacyAnalytics.md)
 
+## RequestCreator class
+
+The `aanalytics2` module enables you to generate request dictionary for the getReport method easily.\
+You will have no need to go to the UI in order to create a report template JSON anymore.\
+Do it automatically from the python interface.
+More information on the [`RequestCreator` documentation](./docs/requestCreator.md)
+
 ## Project Data
 
 There is a BETA feature to retrieve the Workspace projects and the components used.\

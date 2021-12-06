@@ -6,7 +6,7 @@ The changes have been tracked starting version 0.1.0
 ## version 0.3.0
 
 * Fix an issue where segments were not considered in findComponentUsage when they were used in columns
-* adding `RequestCreator` class
+* adding `RequestCreator` class ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/requestCreator.md))
 * fix issue when logging object error the output of failed calls.
 
 ## version 0.2.9
