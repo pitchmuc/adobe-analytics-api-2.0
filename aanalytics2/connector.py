@@ -154,9 +154,9 @@ class AdobeRequest:
                     return json.loads(res.text)
                 except:
                     if self.loggingEnabled:
-                        self.logger.error(f"POST method failed: {res.status}, {res.text}")
+                        self.logger.error(f"POST method failed: {res.status_code}, {res.text}")
                     return res.text
-            res_json = {'error': 'Request Error'}
+            res_json = {'error': res.get('status_code','Request Error')}
         return res_json
 
     def patchData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
@@ -181,8 +181,8 @@ class AdobeRequest:
             res_json = res.json()
         except:
             if self.loggingEnabled:
-                self.logger.error(f"PATCH method failed: {res.status}, {res.text}")
-            res_json = {'error': 'Request Error'}
+                self.logger.error(f"PATCH method failed: {res.status_code}, {res.text}")
+            res_json = {'error': res.get('status_code','Request Error')}
         return res_json
 
     def putData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
@@ -202,8 +202,8 @@ class AdobeRequest:
             status_code = res.json()
         except:
             if self.loggingEnabled:
-                self.logger.error(f"PUT method failed: {res.status}, {res.text}")
-            status_code = {'error': 'Request Error'}
+                self.logger.error(f"PUT method failed: {res.status_code}, {res.text}")
+            status_code = {'error': res.get('status_code','Request Error')}
         return status_code
 
     def deleteData(self, endpoint: str, params: dict = None, headers: dict = None, *args, **kwargs):
@@ -226,6 +226,6 @@ class AdobeRequest:
             status_code = res.status_code
         except:
             if self.loggingEnabled:
-                self.logger.error(f"DELETE method failed: {res.status}, {res.text}")
+                self.logger.error(f"DELETE method failed: {res.status_code}, {res.text}")
             status_code = {'error': 'Request Error'}
         return status_code
