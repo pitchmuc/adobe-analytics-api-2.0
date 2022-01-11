@@ -166,7 +166,7 @@ class Bulkapi:
         if file.endswith(".gz") == False:
             with open(file, "r",encoding=encoding) as f:
                 content = f.read()
-            data = gzip.compress(content.encode(encoding),
+            data = gzip.compress(content.encode('utf-8'),
                                  compresslevel=compress_level)
             filename = f"{file}.gz"
         elif file.endswith(".gz"):
@@ -206,11 +206,11 @@ class Bulkapi:
         else:  # if sending not gzipped file.
             new_folder = Path('tmp/')
             new_folder.mkdir(exist_ok=True)
-            with open(file, "rb") as f:
-                content = f.read(encoding=encoding)
+            with open(file, "r",encoding=encoding) as f:
+                content = f.read()
                 new_path = new_folder / f"{file}.gz"
                 with gzip.open(Path(new_path), 'wb') as f:
-                    f.write(content)
+                    f.write(content.encode('utf-8'))
                 # save the filename to delete
                 self._createdFiles.append(new_path)
             return new_path
@@ -236,7 +236,7 @@ class Bulkapi:
                 fileName = self._checkFiles(file,encoding=encoding)
                 files_gz.append(fileName)
         elif type(files) == str:
-            fileName = self._checkFiles(files)
+            fileName = self._checkFiles(files,encoding=encoding)
             files_gz.append(fileName)
         vgid_headers = [f"ingestion_{x}" for x in range(len(files_gz))]
         list_headers = [{**self.header, 'x-adobe-vgid': vgid}
