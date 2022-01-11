@@ -150,11 +150,12 @@ class Bulkapi:
         del self.header["Content-Type"]
         self._createdFiles = []
 
-    def validation(self, file: IO = None, **kwargs):
+    def validation(self, file: IO = None,encoding='utf-8', **kwargs):
         """
         Send the file to a validation endpoint. Return the response object from requests.
         Argument:
             file : REQUIRED : File in a string of byte format.
+            encoding : OPTIONAL : type of encoding used for the file.
         Possible kwargs:
             compress_level : handle the compression level, from 0 (no compression) to 9 (slow but more compressed). default 5.
         """
@@ -165,7 +166,7 @@ class Bulkapi:
         if file.endswith(".gz") == False:
             with open(file, "r") as f:
                 content = f.read()
-            data = gzip.compress(content.encode("utf-8"),
+            data = gzip.compress(content.encode(encoding),
                                  compresslevel=compress_level)
             filename = f"{file}.gz"
         elif file.endswith(".gz"):
