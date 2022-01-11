@@ -150,7 +150,7 @@ class Bulkapi:
         del self.header["Content-Type"]
         self._createdFiles = []
 
-    def validation(self, file: IO = None,encoding='utf-8', **kwargs):
+    def validation(self, file: IO = None,encoding:str='utf-8', **kwargs):
         """
         Send the file to a validation endpoint. Return the response object from requests.
         Argument:
@@ -164,7 +164,7 @@ class Bulkapi:
             raise Exception("Expecting a file")
         path = "/aa/collect/v1/events/validate"
         if file.endswith(".gz") == False:
-            with open(file, "r") as f:
+            with open(file, "r",encoding=encoding) as f:
                 content = f.read()
             data = gzip.compress(content.encode(encoding),
                                  compresslevel=compress_level)
@@ -197,7 +197,7 @@ class Bulkapi:
         if returnDF:
             return df
 
-    def _checkFiles(self, file: str = None):
+    def _checkFiles(self, file: str = None,encoding:str = "utf-8"):
         """
         Internal method that check content and format of the file
         """
@@ -207,7 +207,7 @@ class Bulkapi:
             new_folder = Path('tmp/')
             new_folder.mkdir(exist_ok=True)
             with open(file, "rb") as f:
-                content = f.read()
+                content = f.read(encoding=encoding)
                 new_path = new_folder / f"{file}.gz"
                 with gzip.open(Path(new_path), 'wb') as f:
                     f.write(content)
@@ -215,13 +215,14 @@ class Bulkapi:
                 self._createdFiles.append(new_path)
             return new_path
 
-    def sendFiles(self, files: Union[list, IO] = None, **kwargs):
+    def sendFiles(self, files: Union[list, IO] = None,encoding:str='utf-8',**kwargs):
         """
         Method to send the file(s) through the Bulk API. Returns a list with the different status file sent.
         Arguments:
             files : REQUIRED : file to be send to the aalytics collection server. It can be a list or the name of the file to be send.
-            If list is being send, we assume that each file are to be sent in different visitor groups.
-            If file are not gzipped, we will compress the file and saved it as gz in the folder.
+                If list is being send, we assume that each file are to be sent in different visitor groups.
+                If file are not gzipped, we will compress the file and saved it as gz in the folder.
+            encoding : OPTIONAL : if encoding is different that default utf-8.
         possible kwargs:
             workers : maximum amount of worker for parallele processing. (default 4)
         """
@@ -232,7 +233,7 @@ class Bulkapi:
         files_gz = list()
         if type(files) == list:
             for file in files:
-                fileName = self._checkFiles(file)
+                fileName = self._checkFiles(file,encoding=encoding)
                 files_gz.append(fileName)
         elif type(files) == str:
             fileName = self._checkFiles(files)

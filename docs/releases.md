@@ -9,7 +9,7 @@ The changes have been tracked starting version 0.1.0
 * adding `RequestCreator` class ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/requestCreator.md))
 * fix issue when logging object error the output of failed calls.
 Patch : 
-* adding encoding capability for `validation` method in the `Bulkapi` class.
+* adding encoding capability for `validation` and `sendFiles` method in the `Bulkapi` class.
 
 ## version 0.2.9
 
