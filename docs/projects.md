@@ -3,10 +3,6 @@
 This documentation will provide you with information on how to use the Project class and what can be accessed from it.\
 The projects are Adobe Workspace projects that can now be retrieved by the API.
 
-First of all the `getProjects` and `getProject` methods are BETA methods that are not supported by Adobe products.\
-Therefore, they may stop working at any point in time.\
-Due to that status, I will not put priority support on these features compare to other methods that are supported.
-
 ## Project class
 
 When requesting projects with the `getProjects`, you will be able to retrieve the ProjectId from the elements returned.\
@@ -15,7 +11,8 @@ The definition of the project with the different elements is returned and this i
 You can either call the `Project` class directly from `aanalytics2` or ask to return a class instance via the parameters.
 
 **NOTE**: The definition are not consistent over time, therefore the `Project` class may not work on old projects.\
-For that case, the solution is to open that Workspace project again and re-saved it. This will create a compatible version of the project definition.
+For that case, the solution is to open that Workspace project again and re-saved it. This will create a compatible version of the project definition.\
+In any case, projects created after 2020-01-01 should always be compatible.
 
 **NOTE 2**: When retrieving the project in the class, you can decide to returns the reportSuite ID (`rsid`) attached to the dimension and metrics.\
 In case of multiple reportSuites in the same project, which do not have the same setup, it helps to identify which dimension is used from which reportSuite.

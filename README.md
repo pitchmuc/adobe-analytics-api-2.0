@@ -68,7 +68,7 @@ More information on the [`RequestCreator` documentation](./docs/requestCreator.m
 
 ## Project Data
 
-There is a BETA feature to retrieve the Workspace projects and the components used.\
+There is a feature to retrieve the Workspace projects and the components used.\
 Refer to this [documentation on Project](./docs/projects.md) for more information.
 
 ## Logging capability
