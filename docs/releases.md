@@ -10,6 +10,7 @@ The changes have been tracked starting version 0.1.0
 * fix issue when logging object error the output of failed calls.
 Patch : 
 * adding encoding capability for `validation` and `sendFiles` method in the `Bulkapi` class.
+* Improving consistency for reading project dictionaries on `Project` class instanciation
 
 ## version 0.2.9
 

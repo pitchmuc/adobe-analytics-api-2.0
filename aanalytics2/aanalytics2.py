@@ -1525,7 +1525,7 @@ class Analytics:
                     self.logger.warning(f"Cannot convert Project to Project class")
         return res
     
-    def getAllProjectDetails(self, projects:JsonListOrDataFrameType=None, filterNameProject:str=None, filterNameOwner:str=None, useAttribute:bool=True, cache:bool=False, rsidSuffix:bool=False, verbose:bool=False)->dict:
+    def getAllProjectDetails(self, projects:JsonListOrDataFrameType=None, filterNameProject:str=None, filterNameOwner:str=None, useAttribute:bool=True, cache:bool=False, rsidSuffix:bool=False, output:str="dict", verbose:bool=False)->dict:
         """
         Retrieve all projects details. You can either pass the list of dataframe returned from the getProjects methods and some filters.
         Returns a dict of ProjectId and the value is the Project class for analysis.
@@ -1539,6 +1539,7 @@ class Analytics:
                 If you want to start from scratch on the retrieval process of your projects.
             rsidSuffix : OPTIONAL : If you want to add rsid as suffix of metrics and dimensions (::rsid)
             cache : OPTIONAL : If you want to cache the different elements retrieved for future usage.
+            output : OPTIONAL : If you want to return a "list" or "dict" from this method. (default "dict")
             verbose : OPTIONAL : Set to True to print information.
         Not using filter may end up taking a while to retrieve the information.
         """
@@ -1577,6 +1578,9 @@ class Analytics:
         projectsDetails = {projectId:self.getProject(projectId,projectClass=True,rsidSuffix=rsidSuffix) for projectId in projectIds}
         if filterNameProject is None and filterNameOwner is None:
             self.projectsDetails = projectsDetails
+        if output == "list":
+            list_projectsDetails = [projectsDetails[key] for key in projectsDetails]
+            return list_projectsDetails
         return projectsDetails
 
     def deleteProject(self, projectId: str = None) -> dict:

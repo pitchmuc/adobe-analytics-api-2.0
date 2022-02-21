@@ -16,7 +16,7 @@ class Project:
             rsidSuffix : OPTIONAL : If you want to have the rsid suffix to dimension and metrics.
         """
         if projectDict is None:
-            raise Exception("require a dictionary")
+            raise Exception("require a dictionary with project information. Retrievable via getProject")
         self.id: str = projectDict.get('id', '')
         self.name: str = projectDict.get('name', '')
         self.description: str = projectDict.get('description', '')
@@ -90,8 +90,8 @@ class Project:
             filters: list = panel.get('segmentGroups',[])
             if len(filters) > 0:
                 for element in filters:
-                    typeElement = element['componentOptions'][0]['component']['type']
-                    idElement = element['componentOptions'][0]['component']['id']
+                    typeElement = element['componentOptions'][0].get('component',{}).get('type','')
+                    idElement = element['componentOptions'][0].get('component',{}).get('id','')
                     if typeElement == "Segment":
                         dict_elements['segments'].append(idElement)
                     if typeElement == "DimensionItem":
@@ -108,7 +108,7 @@ class Project:
                         for row in rows["staticRows"]:
                             ## I have to get a temp dimension to clean them before loading them in order to avoid counting them multiple time for each rows.
                             temp_list_dim = []
-                            componentType: str = row['component']['type']
+                            componentType: str = row.get('component',{}).get('type','')
                             if componentType == "DimensionItem":
                                 temp_list_dim.append(f"{row['component']['id']}{tmp_rsid}")
                             elif componentType == "Segments" or componentType == "Segment":
@@ -144,7 +144,7 @@ class Project:
         if temp_data is None:
             temp_data: dict = {'dimensions': [], "metrics": [], 'segments': [], "reportSuites": [],
                                'calculatedMetrics': []}
-        componentType: str = node['component']['type']
+        componentType: str = node.get('component',{}).get('type','')
         if componentType == "Metric":
             temp_data['metrics'].append(f"{node['component']['id']}{tmp_rsid}")
         elif componentType == "CalculatedMetric":
