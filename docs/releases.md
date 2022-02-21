@@ -7,7 +7,7 @@ The changes have been tracked starting version 0.1.0
 
 * Fix an issue where segments were not considered in findComponentUsage when they were used in columns
 * adding `RequestCreator` class ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/requestCreator.md))
-* fix issue when logging object error the output of failed calls.
+* fix issue when logging object error the output of failed calls.\
 Patch : 
 * adding encoding capability for `validation` and `sendFiles` method in the `Bulkapi` class.
 * Improving consistency for reading project dictionaries on `Project` class instanciation
