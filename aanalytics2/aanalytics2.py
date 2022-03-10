@@ -19,6 +19,7 @@ from urllib import parse
 from aanalytics2 import config, connector, token_provider
 from .projects import *
 from .requestCreator import RequestCreator
+from .workspace import Workspace
 
 JsonOrDataFrameType = Union[pd.DataFrame, dict]
 JsonListOrDataFrameType = Union[pd.DataFrame, List[dict]]
@@ -2291,3 +2292,286 @@ class Analytics:
             print(
                 f'Report contains {(count_elements / total_elements) * 100} % of the available dimensions')
         return obj
+    
+    def _prepareData(
+        self,
+        dataRows: list = None,
+        reportType: str = "normal",
+    ) -> dict:
+        """
+        Read the data returned by the getReport and returns a dictionary used by the Workspace class.
+        Arguments:
+            dataRows : REQUIRED : data rows data from CJA API getReport
+            reportType : REQUIRED : "normal" or "static"
+        """
+        if dataRows is None:
+            raise ValueError("Require dataRows")
+        data_rows = deepcopy(dataRows)
+        expanded_rows = {}
+        if reportType == "normal":
+            for row in data_rows:
+                expanded_rows[row["itemId"]] = [row["value"]]
+                expanded_rows[row["itemId"]] += row["data"]
+        elif reportType == "static":
+            expanded_rows = data_rows
+        return expanded_rows
+
+    def _decrypteStaticData(
+        self, dataRequest: dict = None, response: dict = None
+    ) -> dict:
+        """
+        From the request dictionary and the response, decrypte the data to standardise the reading.
+        """
+        dataRows = []
+        ## retrieve StaticRow ID and segmentID
+        tableSegmentsRows = {
+            obj["id"]: obj["segmentId"]
+            for obj in dataRequest["metricContainer"]["metricFilters"]
+        }
+        ## retrieve place and segmentID
+        segmentApplied = {}
+        for obj in dataRequest["metricContainer"]["metricFilters"]:
+            if obj["id"].startswith("STATIC_ROW") == False:
+                if obj["type"] == "breakdown":
+                    segmentApplied[obj["id"]] = f"{obj['dimension']}:::{obj['itemId']}"
+                elif obj["type"] == "segment":
+                    segmentApplied[obj["id"]] = obj["segmentId"]
+                elif obj["type"] == "dateRange":
+                    segmentApplied[obj["id"]] = obj["dateRange"]
+        ### table columnIds and StaticRow IDs
+        tableColumnIds = {
+            obj["columnId"]: obj["filters"][0]
+            for obj in dataRequest["metricContainer"]["metrics"]
+        }
+        ### create relations for metrics with Filter on top
+        filterRelations = {
+            obj["filters"][0]: obj["filters"][1:]
+            for obj in dataRequest["metricContainer"]["metrics"]
+            if len(obj["filters"]) > 1
+        }
+        staticRows = set(val for val in tableSegmentsRows.values())
+        nb_rows = len(staticRows)  ## define  how many segment used as rows
+        nb_columns = int(
+            len(dataRequest["metricContainer"]["metrics"]) / nb_rows
+        )  ## use to detect rows
+        staticRows = set(val for val in tableSegmentsRows.values())
+        staticRowsNames = []
+        for row in staticRows:
+            if row.startswith("s") and "@AdobeOrg" in row:
+                filter = self.getFilter(row)
+                staticRowsNames.append(filter["name"])
+            else:
+                staticRowsNames.append(row)
+        staticRowDict = {
+            row: rowName for row, rowName in zip(staticRows, staticRowsNames)
+        }
+        ### metrics
+        dataRows = defaultdict(list)
+        for row in staticRowDict:  ## iter on the different static rows
+            for column, data in zip(
+                response["columns"]["columnIds"], response["summaryData"]["totals"]
+            ):
+                if tableSegmentsRows[tableColumnIds[column]] == row:
+                    ## check translation of metricId with Static Row ID
+                    if row not in dataRows[staticRowDict[row]]:
+                        dataRows[staticRowDict[row]].append(row)
+                    dataRows[staticRowDict[row]].append(data)
+                ## should ends like : {'segmentName' : ['STATIC',123,456]}
+        return nb_columns, tableColumnIds, segmentApplied, filterRelations, dataRows
+
+    def getReport2(
+        self,
+        request: Union[dict, IO] = None,
+        limit: int = 20000,
+        n_results: Union[int, str] = "inf",
+        allowRemoteLoad: str = "default",
+        useCache: bool = True,
+        useResultsCache: bool = False,
+        includeOberonXml: bool = False,
+        includePredictiveObjects: bool = False,
+        returnsNone: bool = None,
+        countRepeatInstances: bool = None,
+        ignoreZeroes: bool = None,
+        rsid: str = None,
+        resolveColumns: bool = True,
+        save: bool = False,
+        returnClass: bool = True,
+    ) -> Union[Workspace, dict]:
+        """
+        Return an instance of Workspace that contains the data requested.
+        Argumnents:
+            request : REQUIRED : either a dictionary of a JSON file that contains the request information.
+            limit : OPTIONAL : number of results per request (default 1000)
+            n_results : OPTIONAL : total number of results returns. Use "inf" to return everything (default "inf")
+            allowRemoteLoad : OPTIONAL : Controls if Oberon should remote load data. Default behavior is true with fallback to false if remote data does not exist
+            useCache : OPTIONAL : Use caching for faster requests (Do not do any report caching)
+            useResultsCache : OPTIONAL : Use results caching for faster reporting times (This is a pass through to Oberon which manages the Cache)
+            includeOberonXml : OPTIONAL : Controls if Oberon XML should be returned in the response - DEBUG ONLY
+            includePredictiveObjects : OPTIONAL : Controls if platform Predictive Objects should be returned in the response. Only available when using Anomaly Detection or Forecasting- DEBUG ONLY
+            returnsNone : OPTIONAL: Overwritte the request setting to return None values.
+            countRepeatInstances : OPTIONAL: Overwrite the request setting to count repeatInstances values.
+            ignoreZeroes : OPTIONAL : Ignore zeros in the results
+            rsid : OPTIONAL : Overwrite the ReportSuiteId used for report. Only works if the same components are presents.
+            resolveColumns: OPTIONAL : automatically resolve columns from ID to name for calculated metrics & segments. Default True. (works on returnClass only)
+            save : OPTIONAL : If you want to save the data (in JSON or CSV, depending the class is used or not)
+            returnClass : OPTIONAL : return the class building dataframe and better comprehension of data. (default yes)
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"Start getReport")
+        path = "/reports"
+        params = {
+            "allowRemoteLoad": allowRemoteLoad,
+            "useCache": useCache,
+            "useResultsCache": useResultsCache,
+            "includeOberonXml": includeOberonXml,
+            "includePlatformPredictiveObjects": includePredictiveObjects,
+        }
+        if type(request) == dict:
+            dataRequest = request
+        elif type(request) == RequestCreator:
+            dataRequest = request.to_dict()
+        elif ".json" in request:
+            with open(request, "r") as f:
+                dataRequest = json.load(f)
+        else:
+            raise ValueError("Require a JSON or Dictionary to request data")
+        ### Settings
+        dataRequest["settings"]["page"] = 0
+        dataRequest["settings"]["limit"] = limit
+        if returnsNone:
+            dataRequest["settings"]["nonesBehavior"] = "return-nones"
+        else:
+            dataRequest["settings"]["nonesBehavior"] = "exclude-nones"
+        if countRepeatInstances:
+            dataRequest["settings"]["countRepeatInstances"] = True
+        else:
+            dataRequest["settings"]["countRepeatInstances"] = False
+        if rsid is not None:
+            dataRequest["rsid"] = rsid
+        if ignoreZeroes:
+            dataRequest["statistics"]["ignoreZeroes"] = True
+        else:
+            dataRequest["statistics"]["ignoreZeroes"] = False
+        ### Request data
+        if self.loggingEnabled:
+            self.logger.debug(f"getReport request: {json.dumps(dataRequest,indent=4)}")
+        res = self.connector.postData(
+            self.endpoint_company + path, data=dataRequest, params=params
+        )
+        if "rows" in res.keys():
+            reportType = "normal"
+            if self.loggingEnabled:
+                self.logger.debug(f"reportType: {reportType}")
+            dataRows = res.get("rows")
+            columns = res.get("columns")
+            summaryData = res.get("summaryData")
+            totalElements = res.get("numberOfElements")
+            lastPage = res.get("lastPage", True)
+            if float(len(dataRows)) >= float(n_results):
+                ## force end of loop when a limit is set on n_results
+                lastPage = True
+            while lastPage != True:
+                dataRequest["settings"]["page"] += 1
+                res = self.connector.postData(
+                    self.endpoint_company + path, data=dataRequest, params=params
+                )
+                dataRows += res.get("rows")
+                lastPage = res.get("lastPage", True)
+                totalElements += res.get("numberOfElements")
+                if float(len(dataRows)) >= float(n_results):
+                    ## force end of loop when a limit is set on n_results
+                    lastPage = True
+            if self.loggingEnabled:
+                self.logger.debug(f"loop for report over: {len(dataRows)} results")
+            if returnClass == False:
+                return dataRows
+            ### create relation between metrics and filters applied
+            columnIdRelations = {
+                obj["columnId"]: obj["id"]
+                for obj in dataRequest["metricContainer"]["metrics"]
+            }
+            filterRelations = {
+                obj["columnId"]: obj["filters"]
+                for obj in dataRequest["metricContainer"]["metrics"]
+                if len(obj.get("filters", [])) > 0
+            }
+            metricFilters = {}
+            metricFilterTranslation = {}
+            for filter in dataRequest["metricContainer"].get("metricFilters", []):
+                filterId = filter["id"]
+                if filter["type"] == "breakdown":
+                    filterValue = f"{filter['dimension']}:{filter['itemId']}"
+                    metricFilters[filter["dimension"]] = filter["itemId"]
+                if filter["type"] == "dateRange":
+                    filterValue = f"{filter['dateRange']}"
+                    metricFilters[filterValue] = filterValue
+                if filter["type"] == "segment":
+                    filterValue = f"{filter['segmentId']}"
+                    if filterValue.startswith("s") and "@AdobeOrg" in filterValue:
+                        seg = self.getSegment(filterValue)
+                        metricFilters[filterValue] = seg["name"]
+                metricFilterTranslation[filterId] = filterValue
+            metricColumns = {}
+            for colId in columnIdRelations.keys():
+                metricColumns[colId] = columnIdRelations[colId]
+                for element in filterRelations.get(colId, []):
+                    metricColumns[colId] += f":::{metricFilterTranslation[element]}"
+        else:
+            if returnClass == False:
+                return res
+            reportType = "static"
+            if self.loggingEnabled:
+                self.logger.debug(f"reportType: {reportType}")
+            columns = None  ## no "columns" key in response
+            summaryData = res.get("summaryData")
+            (
+                nb_columns,
+                tableColumnIds,
+                segmentApplied,
+                filterRelations,
+                dataRows,
+            ) = self._decrypteStaticData(dataRequest=dataRequest, response=res)
+            ### Findings metrics
+            metricFilters = {}
+            metricColumns = []
+            for i in range(nb_columns):
+                metric: str = res["columns"]["columnIds"][i]
+                metricName = metric.split(":::")[0]
+                if metricName.startswith("cm"):
+                    calcMetric = self.getCalculatedMetric(metricName)
+                    metricName = calcMetric["name"]
+                correspondingStatic = tableColumnIds[metric]
+                ## if the static row has a filter
+                if correspondingStatic in list(filterRelations.keys()):
+                    ## finding segment applied to metrics
+                    for element in filterRelations[correspondingStatic]:
+                        segId = segmentApplied[element]
+                        metricName += f":::{segId}"
+                        metricFilters[segId] = segId
+                        if segId.startswith("s") and "@AdobeOrg" in segId:
+                            seg = self.getFilter(segId)
+                            metricFilters[segId] = seg["name"]
+                metricColumns.append(metricName)
+                ### ending with ['metric1','metric2 + segId',...]
+        ### preparing data points
+        if self.loggingEnabled:
+            self.logger.debug(f"preparing data")
+        preparedData = self._prepareData(dataRows, reportType=reportType)
+        if returnClass:
+            if self.loggingEnabled:
+                self.logger.debug(f"returning Workspace class")
+            ## Using the class
+            data = Workspace(
+                responseData=preparedData,
+                dataRequest=dataRequest,
+                columns=columns,
+                summaryData=summaryData,
+                analyticsConnector=self,
+                reportType=reportType,
+                metrics=metricColumns,  ## for normal type   ## for staticReport
+                metricFilters=metricFilters,
+                resolveColumns=resolveColumns,
+            )
+            if save:
+                data.to_csv()
+            return data

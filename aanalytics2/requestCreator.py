@@ -32,6 +32,9 @@ class RequestCreator:
         Arguments:
             request : OPTIONAL : overwrite the template with the definition provided.
         """
+        if '.json' in request and type(request) == str:
+            with open(request,'r') as f:
+                request = json.load(f)
         self.__request = deepcopy(request) or deepcopy(self.template)
         self.__metricCount = len(self.__request["metricContainer"]["metrics"])
         self.__metricFilterCount = len(
@@ -95,12 +98,44 @@ class RequestCreator:
             addMetric["sort"] = "desc"
         self.__request["metricContainer"]["metrics"].append(addMetric)
         self.__metricCount += 1
-
+    
+    def removeMetrics(self) -> None:
+        """
+        Remove all metrics.
+        """
+        self.__request["metricContainer"]["metrics"] = []
+        self.__metricCount = 0
+    
     def getMetrics(self) -> list:
         """
         return a list of the metrics used
         """
         return [metric["id"] for metric in self.__request["metricContainer"]["metrics"]]
+    
+    def setSearch(self,clause:str=None)->None:
+        """
+        Add a search clause in the Analytics request.
+        Arguments:
+            clause : REQUIRED : String to tell what search clause to add.
+                Examples: 
+                "( CONTAINS 'unspecified' ) OR ( CONTAINS 'none' ) OR ( CONTAINS '' )"
+                "( MATCH 'undefined' )"
+                "( NOT CONTAINS 'undefined' )"
+                "( BEGINS-WITH 'undefined' )"
+                "( BEGINS-WITH 'undefined' ) AND ( BEGINS-WITH 'none' )"
+        """
+        if clause is None:
+            raise ValueError("Require a clause to add to the request")
+        self.__request["search"] = {
+            "clause" : clause
+        }
+
+
+    def removeSearch(self)->None:
+        """
+        Remove the search associated with the request.
+        """
+        del self.__request["search"]
 
     def addMetricFilter(
         self, metricId: str = None, filterId: str = None, metricIndex: int = None

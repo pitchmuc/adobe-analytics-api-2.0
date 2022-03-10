@@ -5,6 +5,14 @@ The changes have been tracked starting version 0.1.0
 
 ## version 0.3.0
 
+* adding the `workspace` module that allow more dynamic and better presentation of the data.
+* Improving the RequestCreator class by adding 
+  * easy load of JSON files
+  * capability to setSearch
+  * remove all metrics
+
+## version 0.3.0
+
 * Fix an issue where segments were not considered in findComponentUsage when they were used in columns
 * adding `RequestCreator` class ([documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/requestCreator.md))
 * fix issue when logging object error the output of failed calls.\
