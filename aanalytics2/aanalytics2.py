@@ -2324,10 +2324,17 @@ class Analytics:
         """
         dataRows = []
         ## retrieve StaticRow ID and segmentID
-        tableSegmentsRows = {
-            obj["id"]: obj["segmentId"]
-            for obj in dataRequest["metricContainer"]["metricFilters"]
-        }
+        if len([metric for metric in dataRequest['metricContainer'].get('metricFilters',[]) if metric.get('id').startswith("STATIC_ROW_COMPONENT")])>0:
+            tableSegmentsRows = {
+                obj["id"]: obj["segmentId"]
+                for obj in dataRequest["metricContainer"]["metricFilters"]
+                if obj["id"].startswith("STATIC_ROW_COMPONENT")
+            }
+        else:
+            tableSegmentsRows = {
+                obj["id"]: obj["segmentId"]
+                for obj in dataRequest["metricContainer"]["metricFilters"]
+            }
         ## retrieve place and segmentID
         segmentApplied = {}
         for obj in dataRequest["metricContainer"]["metricFilters"]:
