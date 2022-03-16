@@ -900,7 +900,7 @@ class Analytics:
 
     def deleteSegment(self, segmentID: str = None) -> object:
         """
-        Method that updates a specific segment based on the dictionary passed to it.
+        Method that delete a specific segment based the ID passed.
         Arguments:
             segmentID : REQUIRED : Segment ID to be deleted
         """
@@ -1555,6 +1555,15 @@ class Analytics:
             scheduleId : REQUIRED : the jobs to be updated.
             scheduleObj : REQUIRED : The object to replace the current definition.
         """
+        if scheduleId is None:
+            raise ValueError("A schedule ID is required")
+        if scheduleObj is None:
+            raise ValueError('A schedule Object is required')
+        if self.loggingEnabled:
+            self.logger.debug(f"starting updateScheduleJob with ID: {scheduleId}")
+        path = f"/scheduler/scheduler/scheduledjobs/{scheduleId}"
+        res = self.connector.putData(self.endpoint_company+path,data=scheduleObj)
+        return res
 
 
     def deleteScheduleJob(self,scheduleId:str=None)->dict:
@@ -1605,7 +1614,7 @@ class Analytics:
     def createDeliverySetting(self,loginIds:list=None,emails:list=None,groupIds:list=None)->dict:
         """
         Create a delivery setting for a specific scheduled project.
-        Automatically created for email setting.
+        Automatically used when using `createScheduleJob`.
         Arguments:
             loginIds : REQUIRED : List of login ID to send the scheduled project to. Can be retrieved by the getUsers method.
             emails : OPTIONAL : In case the recipient are not in the analytics interface. 
@@ -1629,6 +1638,50 @@ class Analytics:
             "name" : "email-aanalytics2"
         }
         res = self.connector.postData(self.endpoint_company + path, data=data)
+        return res
+
+    def updateDeliverySetting(self,deliveryId:str=None,loginIds:list=None,emails:list=None,groupIds:list=None)->dict:
+        """
+        Create a delivery setting for a specific scheduled project.
+        Automatically created for email setting.
+        Arguments:
+            deliveryId : REQUIRED : the delivery setting ID to be updated
+            loginIds : REQUIRED : List of login ID to send the scheduled project to. Can be retrieved by the getUsers method.
+            emails : OPTIONAL : In case the recipient are not in the analytics interface. 
+            groupIds : OPTIONAL : List of group ID to send the scheduled project to.
+        """
+        if deliveryId is None:
+            raise ValueError("Require a delivery setting ID")
+        path = f"/scheduler/scheduler/deliverysettings/{deliveryId}"
+        if loginIds is None:
+            loginIds = []
+        if emails is None:
+            emails = []
+        if groupIds is None:
+            groupIds = []
+        data = {
+            "definition" : {
+                "allAdmins" : False,
+                "emailAddresses" : emails,
+                "groupIds" : groupIds,
+                "loginIds": loginIds,
+                "type": "email" 
+            },
+            "name" : "email-aanalytics2"
+        }
+        res = self.connector.putData(self.endpoint_company + path, data=data)
+        return res
+    
+    def deleteDeliverySetting(self,deliveryId:str=None)->dict:
+        """
+        Delete a delivery setting based on the ID passed.
+        Arguments:
+            deliveryId : REQUIRED : The delivery setting ID to be deleted.
+        """
+        if deliveryId is None:
+            raise ValueError("Require a delivery setting ID")
+        path = f"/scheduler/scheduler/deliverysettings/{deliveryId}"
+        res = self.connector.deleteData(self.endpoint_company + path)
         return res
     
     def getProjects(self, includeType: str = 'all', full: bool = False, limit: int = None, includeShared: bool = False,
@@ -2744,11 +2797,11 @@ class Analytics:
                 if correspondingStatic in list(filterRelations.keys()):
                     ## finding segment applied to metrics
                     for element in filterRelations[correspondingStatic]:
-                        segId = segmentApplied[element]
+                        segId:str = segmentApplied[element]
                         metricName += f":::{segId}"
                         metricFilters[segId] = segId
                         if segId.startswith("s") and "@AdobeOrg" in segId:
-                            seg = self.getFilter(segId)
+                            seg = self.getSegment(segId)
                             metricFilters[segId] = seg["name"]
                 metricColumns.append(metricName)
                 ### ending with ['metric1','metric2 + segId',...]

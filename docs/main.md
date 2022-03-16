@@ -393,6 +393,16 @@ Possible kwargs:
 possible kwargs:
   * page : page number (default 0)
 
+
+* getScheduledJob: Return a scheduled project definition.
+  Arguments:
+  * scheduleId : REQUIRED : Schedule project ID
+
+
+* getDeliverySettings: Retrieve the delivery setting from a scheduled project.
+  Argument
+  * deliverySettingId : REQUIRED : The delivery setting ID of the scheduled project.
+
 Example of getSegments usage:
 
 ```python
@@ -405,14 +415,11 @@ Example of getDimensions usage:
 mydims = mycompany.getDimensions('rsid')
 ```
 
-#### BETA Methods
+#### Project Methods
 
 I have implemented a `getProjects`, `getProject`, `updateProject` and `createProject` methods.
-These methods are not officially available in the documentation of Adobe API 2.0.
-Therefore, if they do stop working, this may not come from the API wrapper / SDK aanalytics2.
-Please refer to the docstring for these methods for now.
 
-From these beta methods, I have created other supported methods that are explained in the [Project documentation](./projects.md).
+From these methods, I have created other supported methods that are explained in the [Project documentation](./projects.md).
 
 ### Create
 
@@ -476,7 +483,98 @@ Here is the list of the possible create options.
   ]
   ```
 
-### Delete
+* createScheduleJob : 
+  Creates a schedule job based on the information provided as arguments.
+  Expiration will be in one year by default.
+  Arguments:
+    * projectId : REQUIRED : The workspace project ID to send.
+    * type : REQUIRED : how to send the project, default "pdf"
+    * schedule : REQUIRED : object to specify the schedule used.
+        example: {  
+                    "hour": 10,
+                    "minute": 45,
+                    "second": 25,
+                    "interval": 1,
+                    "type": "daily"
+                }
+                {
+                    'type': 'weekly',
+                    'second': 53,
+                    'minute': 0,
+                    'hour': 8,
+                    'daysOfWeek': [2],
+                    'interval': 1
+                }
+    * loginIds : REQUIRED : A list of login ID of the users that are recipient of the report. It can be retrieved by the getUsers method.
+    * emails : OPTIONAL : If users are not registered in AA, you can specify a list of email addresses.
+    * groupIds : OPTIONAL : Group Id to send the report to.
+
+* createDeliverySetting : Create a delivery setting for a specific scheduled project. Automatically used when using `createScheduleJob`.
+  Arguments:
+  * loginIds : REQUIRED : List of login ID to send the scheduled project to.   Can be retrieved by the getUsers method.
+  * emails : OPTIONAL : In case the recipient are not in the analytics interface. 
+  * groupIds : OPTIONAL : List of group ID to send the scheduled project to.
+
+### Update methods
+
+* updateVirtualReportSuite : Updates a Virtual Report Suite based on a JSON-like dictionary (same structure as createVirtualReportSuite)
+  Note that to update components, you need to supply ALL components currently associated with this suite.
+  Supplying only the components you want to change will remove all others from the VR Suite!
+  Arguments:
+  * vrsid : REQUIRED : The id of the virtual report suite to update
+  * data_dict : a json-like dictionary of the vrs data to update
+
+* updateSegment : Method that updates a specific segment based on the dictionary passed to it.
+  Arguments:
+  * segmentID : REQUIRED : Segment ID to be updated
+  * segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment.
+
+* updateCalculatedMetric: Method that updates a specific Calculated Metrics based on the dictionary passed to it.
+  Arguments:
+  * calcID : REQUIRED : Calculated Metric ID to be updated
+  * calcJSON : REQUIRED : the dictionary that represents the JSON statement for the calculated metric.
+
+* updateDateRange : Method that updates a specific Date Range based on the dictionary passed to it.
+  Arguments:
+  * dateRangeID : REQUIRED : Date Range ID to be updated
+  * dateRangeJSON : REQUIRED : the dictionary that represents the JSON statement for the date Range.
+
+* updateComponentTags : Overwrite the component Tags with the list send.
+  Arguments:
+  * data : REQUIRED : list of the components to be udpated with their respective list of tag names.
+
+  Object looks like the following:
+  [
+      {
+          "componentType": "string",
+          "componentId": "string",
+          "tags": [
+              "Unknown Type: Tag"
+          ]
+      }
+  ]
+
+* updateScheduleJob : Update a schedule Job based on its id and the definition attached to it.
+  Arguments:
+  * scheduleId : REQUIRED : the jobs to be updated.
+  * scheduleObj : REQUIRED : The object to replace the current definition.
+
+* updateDeliverySetting : Create a delivery setting for a specific scheduled project.
+  Automatically created for email setting.
+  Arguments:
+  * deliveryId : REQUIRED : the delivery setting ID to be updated
+  * loginIds : REQUIRED : List of login ID to send the scheduled project to.   Can be retrieved by the getUsers method.
+  * emails : OPTIONAL : In case the recipient are not in the analytics interface. 
+  * groupIds : OPTIONAL : List of group ID to send the scheduled project to.
+
+* updateProject : Update your project with the new object placed as parameter.
+  Arguments:
+  * projectId : REQUIRED : the project ID to be updated.
+  * projectObj : REQUIRED : the dictionary to replace the previous Workspace.
+      requires the following elements: name,description,rsid, definition, owner
+
+
+### Delete methods
 
 There is a possibility to delete some elements with the Adobe Analytics API 2.0. Please find below the different options that you can delete.
 
@@ -505,6 +603,14 @@ There is a possibility to delete some elements with the Adobe Analytics API 2.0.
 * deleteProject : Delete a Project basede on its id.
   Arguments:
   * projectId : REQUIRED : The project ID to be deleted.
+
+* deleteScheduleJob : Delete a schedule project based on its ID.
+  Arguments:
+  * scheduleId : REQUIRED : the schedule ID to be deleted.
+
+* deleteDeliverySetting : Delete a delivery setting based on the ID passed.
+  Arguments:
+  * deliveryId : REQUIRED : The delivery setting ID to be deleted.
 
 ### Get report
 

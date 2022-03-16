@@ -3,13 +3,25 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
-## version 0.3.0
+## version 0.3.1
 
 * adding the `workspace` module that allow more dynamic and better presentation of the data.
 * Improving the RequestCreator class by adding 
   * easy load of JSON files
   * capability to setSearch
   * remove all metrics
+* adding more scheduleJob methods:
+ * getScheduledJob for specific job
+ * createSchedule
+ * createScheduleJob
+ * deleteScheduleJob
+ * getDeliverySettings
+ * getDeliverySetting
+ * createDeliverySetting
+ * updateDeliverySetting
+ * deleteDeliverySetting
+* adding [update method documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/main.md#update-method.)
+
 
 ## version 0.3.0
 
