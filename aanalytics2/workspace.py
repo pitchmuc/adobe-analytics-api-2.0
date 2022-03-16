@@ -55,7 +55,7 @@ class Workspace:
         filters = []
         for filter in dataRequest["globalFilters"]:
             if filter["type"] == "segment":
-                seg = self.analyticsObject.getFilter(filter["segmentId"])
+                seg = self.analyticsObject.getSegment(filter["segmentId"])
                 filter["segmentName"] = seg["name"]
             filters.append(filter)
         self.globalFilters = filters

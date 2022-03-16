@@ -1,14 +1,12 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
-import json
-import os
-import time
+import json, os, re
+import time, datetime
 from concurrent import futures
 from copy import deepcopy
 from pathlib import Path
 from typing import IO, Union, List
 from collections import defaultdict
-import re
 from itertools import tee
 import logging
 
@@ -126,7 +124,6 @@ class Analytics:
     _getMetrics = '/metrics'
     _getSegments = '/segments'
     _getCalcMetrics = '/calculatedmetrics'
-    _getUsers = '/users'
     _getDateRanges = '/dateranges'
     _getReport = '/reports'
     loggingEnabled = False
@@ -647,8 +644,8 @@ class Analytics:
         params = {'limit': kwargs.get('limit', 100)}
         if kwargs.get("expansion", None) is not None:
             params["expansion"] = kwargs.get("expansion", None)
-        users = self.connector.getData(self.endpoint_company +
-                                       self._getUsers, params=params, headers=self.header)
+        path = "/users"
+        users = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         data = users['content']
         lastPage = users['lastPage']
         if not lastPage:  # check if lastpage is inversed of False
@@ -684,6 +681,16 @@ class Analytics:
             print(
                 f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve users or increase limit')
         return df_users
+    
+    def getUserMe(self,loginId:str=None)->dict:
+        """
+        Retrieve a single user based on its loginId
+        Argument:
+            loginId : REQUIRED : Login ID for the user
+        """
+        path = f"/users/me"
+        res = self.connector.getData(self.endpoint_company + path)
+        return res
 
     def getSegments(self, name: str = None, tagNames: str = None, inclType: str = 'all', rsids_list: list = None,
                     sidFilter: list = None, extended_info: bool = False, format: str = "df", save: bool = False,
@@ -1438,6 +1445,191 @@ class Analytics:
             df = pd.DataFrame(data)
             return df
         return data
+    
+    def getScheduledJob(self,scheduleId:str=None)->dict:
+        """
+        Return a scheduled project definition.
+        Arguments:
+            scheduleId : REQUIRED : Schedule project ID
+        """
+        if scheduleId is None:
+            raise ValueError("A schedule ID is required")
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getScheduledJob with ID: {scheduleId}")
+        path = f"/scheduler/scheduler/scheduledjobs/{scheduleId}"
+        params = {
+            'expansion': 'modified,favorite,approved,tags,shares,sharesFullName,reportSuiteName,schedule,triggerObject,tasks,deliverySetting'}
+        res = self.connector.getData(self.endpoint_company + path, params=params)
+        return res
+    
+    def createScheduleJob(self,projectId:str=None,type:str="pdf",schedule:dict=None,loginIds:list=None,emails:list=None,groupIds:list=None)->dict:
+        """
+        Creates a schedule job based on the information provided as arguments.
+        Expiration will be in one year by default.
+        Arguments:
+            projectId : REQUIRED : The workspace project ID to send.
+            type : REQUIRED : how to send the project, default "pdf"
+            schedule : REQUIRED : object to specify the schedule used.
+                example: {  
+                            "hour": 10,
+                            "minute": 45,
+                            "second": 25,
+                            "interval": 1,
+                            "type": "daily"
+                        }
+                        {
+                            'type': 'weekly',
+                            'second': 53,
+                            'minute': 0,
+                            'hour': 8,
+                            'daysOfWeek': [2],
+                            'interval': 1
+                        }
+            loginIds : REQUIRED : A list of login ID of the users that are recipient of the report. It can be retrieved by the getUsers method.
+            emails : OPTIONAL : If users are not registered in AA, you can specify a list of email addresses.
+            groupIds : OPTIONAL : Group Id to send the report to.
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting createScheduleJob")
+        path = f"/scheduler/scheduler/scheduledjobs/"
+        dateNow = datetime.datetime.now()
+        nowDateTime = datetime.datetime.isoformat(dateNow,timespec='seconds')
+        futureDate = datetime.datetime.isoformat(dateNow.replace(dateNow.year + 1),timespec='seconds')
+        deliveryId_res = self.createDeliverySetting(loginIds=loginIds, emails=emails,groupIds=groupIds)
+        deliveryId = deliveryId_res.get('id','')
+        if deliveryId == "":
+            if self.loggingEnabled:
+                self.logger.error(f"erro creating the delivery ID")
+                self.logger.error(json.dumps(deliveryId_res))
+            raise Exception("Error creating the delivery ID")
+        me = self.getUserMe()
+        projectDetail = self.getProject(projectId)
+        data = {
+            "approved" : False,
+            "complexity":{},
+            "curatedItem":False,
+            "description" : "",
+            "favorite" : False,
+            "hidden":False,
+            "internal":False,
+            "intrinsicIdentity" : False,
+            "isDeleted":False,
+            "isDisabled":False,
+            "locale":"en_US",
+            "noAccess":False,
+            "template":False,
+            "version":"1.0.1", 
+            "rsid":projectDetail.get('rsid',''),
+            "schedule":{
+                "rsLocalStartTime":nowDateTime,
+                "rsLocalExpirationTime":futureDate,
+                "triggerObject":schedule
+            },
+            "tasks":[
+                {  
+                    "tasktype":"generate",
+                    "tasksubtype":"analysisworkspace",
+                    "requestParams":{
+                        "artifacts":["pdf"],
+                        "imsOrgId": self.connector.config['org_id'],
+                        "imsUserId": me.get('imsUserId',''),
+                        "imsUserName":"API",
+                        "projectId" : projectDetail.get('id'),
+                        "projectName" : projectDetail.get('name')
+                    }
+                },
+                {
+                    "tasktype":"deliver",
+                    "artifactType":type,
+                    "deliverySettingId": deliveryId,
+                }
+            ]
+        }
+        res = self.connector.postData(self.endpoint_company+path,data=data)
+        return res
+
+    def updateScheduleJob(self,scheduleId:str=None,scheduleObj:dict=None)->dict:
+        """
+        Update a schedule Job based on its id and the definition attached to it.
+        Arguments:
+            scheduleId : REQUIRED : the jobs to be updated.
+            scheduleObj : REQUIRED : The object to replace the current definition.
+        """
+
+
+    def deleteScheduleJob(self,scheduleId:str=None)->dict:
+        """
+        Delete a schedule project based on its ID.
+        Arguments:
+            scheduleId : REQUIRED : the schedule ID to be deleted.
+        """
+        if scheduleId is None:
+            raise Exception("A schedule ID is required for deletion")
+        if self.loggingEnabled:
+            self.logger.debug(f"starting deleteScheduleJob with ID: {scheduleId}")
+        path = f"/scheduler/scheduler/scheduledjobs/{scheduleId}"
+        res = self.connector.deleteData(self.endpoint_company + path)
+        return res
+
+    def getDeliverySettings(self)->list:
+        """
+        Return a list of delivery settings.
+        """
+        path = f"/scheduler/scheduler/deliverysettings/"
+        params = {'expansion': 'definition',"limit" : 2000}
+        lastPage = False
+        page_nb = 0
+        data = []
+        while lastPage != True:
+            params['page'] = page_nb
+            res = self.connector.getData(self.endpoint_company + path, params=params)
+            data += res.get('content',[])
+            if len(res.get('content',[]))==params["limit"]:
+                lastPage = False
+            else:
+                lastPage = True
+            page_nb += 1
+        return data
+
+    def getDeliverySetting(self,deliverySettingId:str=None)->dict:
+        """
+        Retrieve the delivery setting from a scheduled project.
+        Argument:
+            deliverySettingId : REQUIRED : The delivery setting ID of the scheduled project.
+        """
+        path = f"/scheduler/scheduler/deliverysettings/{deliverySettingId}/"
+        params = {'expansion': 'definition'}
+        res = self.connector.getData(self.endpoint_company + path, params=params)
+        return res
+    
+    def createDeliverySetting(self,loginIds:list=None,emails:list=None,groupIds:list=None)->dict:
+        """
+        Create a delivery setting for a specific scheduled project.
+        Automatically created for email setting.
+        Arguments:
+            loginIds : REQUIRED : List of login ID to send the scheduled project to. Can be retrieved by the getUsers method.
+            emails : OPTIONAL : In case the recipient are not in the analytics interface. 
+            groupIds : OPTIONAL : List of group ID to send the scheduled project to.
+        """
+        path = f"/scheduler/scheduler/deliverysettings/"
+        if loginIds is None:
+            loginIds = []
+        if emails is None:
+            emails = []
+        if groupIds is None:
+            groupIds = []
+        data = {
+            "definition" : {
+                "allAdmins" : False,
+                "emailAddresses" : emails,
+                "groupIds" : groupIds,
+                "loginIds": loginIds,
+                "type": "email" 
+            },
+            "name" : "email-aanalytics2"
+        }
+        res = self.connector.postData(self.endpoint_company + path, data=data)
+        return res
     
     def getProjects(self, includeType: str = 'all', full: bool = False, limit: int = None, includeShared: bool = False,
                     includeTemplate: bool = False, format: str = 'df', cache:bool=False, save: bool = False) -> JsonListOrDataFrameType:
@@ -2324,7 +2516,7 @@ class Analytics:
         """
         dataRows = []
         ## retrieve StaticRow ID and segmentID
-        if len([metric for metric in dataRequest['metricContainer'].get('metricFilters',[]) if metric.get('id').startswith("STATIC_ROW_COMPONENT")])>0:
+        if len([metric for metric in dataRequest['metricContainer'].get('metricFilters',[]) if metric.get('id','').startswith("STATIC_ROW_COMPONENT")])>0:
             tableSegmentsRows = {
                 obj["id"]: obj["segmentId"]
                 for obj in dataRequest["metricContainer"]["metricFilters"]
@@ -2365,7 +2557,7 @@ class Analytics:
         staticRowsNames = []
         for row in staticRows:
             if row.startswith("s") and "@AdobeOrg" in row:
-                filter = self.getFilter(row)
+                filter = self.Segment(row)
                 staticRowsNames.append(filter["name"])
             else:
                 staticRowsNames.append(row)
