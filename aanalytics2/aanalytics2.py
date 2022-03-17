@@ -2422,13 +2422,16 @@ class Analytics:
         if unsafe and verbose:
             print('---- running the getReport in "unsafe" mode ----')
         obj = {}
-        if type(json_request) == str and '.json' not in json_request:
+        
+        if isinstance(json_request,RequestCreator):
+            request = json_request.to_dict()
+        elif type(json_request) == dict:
+            request = json_request
+        elif type(json_request) == str and '.json' not in json_request:
             try:
                 request = json.loads(json_request)
             except:
                 raise TypeError("expected a parsable string")
-        elif type(json_request) == dict:
-            request = json_request
         elif '.json' in json_request:
             try:
                 with open(Path(json_request), 'r') as file:
@@ -2436,8 +2439,6 @@ class Analytics:
                 request = json.loads(file_string)
             except:
                 raise TypeError("expected a parsable string")
-        elif isinstance(json_request,RequestCreator):
-            request = json_request.to_dict()
         request['settings']['limit'] = limit
         # info for creating report
         data_info = self._dataDescriptor(request)

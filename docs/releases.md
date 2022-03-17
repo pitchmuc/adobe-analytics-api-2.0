@@ -10,6 +10,7 @@ The changes have been tracked starting version 0.1.0
   * easy load of JSON files
   * capability to setSearch
   * remove all metrics
+* Support RequestCreator instance in the getReport methods
 * adding more scheduleJob methods:
  * getScheduledJob for specific job
  * createSchedule
