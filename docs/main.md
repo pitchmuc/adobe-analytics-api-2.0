@@ -746,3 +746,43 @@ It also has several parameters that would allow for extensive comparison (with a
     * full (default) : compare name and settings
     * name : compare only names
 * save : OPTIONAL : if you want to save in a csv.
+
+## GetReport2
+
+The `getReport2` is a more advanced version of the getReport method that was originally provided.\
+Compared to `getReport`, the `getReport2` method offers the possibility to return a `Workspace` class instance.[workspace documentation](./workspace.md)\
+It also provides capability to access more information on `summaryData` or do `breakdown`.
+
+First of all, you need to understand that this API is a replication of the Workspace interface.
+There is no additional features or way to bypass the limitation of Analytics Workspace by using this API.
+
+Some limitations:
+
+* A limit of 120 requests per minute is set, on top of a limit threshold of 12 requests for 6 seconds.\
+  Because of that limit, I didn't parallelize the report requests, as the report as the threshold can be hit quite rapidly.\
+  Therefore, requesting large amount of data is not the use-case for the Adobe Analytics API. It would infer a important waiting time.
+* There is no automatic breakdown for dimensions. As for the Workspace reporting, you can only request one dimension at a time.
+* Adobe Analytics reporting server usually allows 5 reports to be processed at the same time for your organization.\
+  The AA API will compete with the others users of your organization, so be careful on its (extensive) usage.
+
+Before going with examples, I will explain the method and its arguments:
+
+* getReport : Retrieve data from a JSON request.
+              Returns an dictionary of data or a `Workspace` instance containing the data in the dataframe attribute.
+  Arguments:
+  * request : REQUIRED : either a dictionary of a JSON file that contains the request information.
+  * limit : OPTIONAL : number of results per request (default 1000)
+  * n_results : OPTIONAL : total number of results returns. Use "inf" to return everything (default "inf")
+  * useCache : OPTIONAL : Use caching for faster requests (Do not do any report caching)
+  * useResultsCache : OPTIONAL : Use results caching for faster reporting times (This is a pass through to Oberon which manages the Cache)
+  * includePredictiveObjects : OPTIONAL : Controls if platform Predictive Objects should be returned in the response. Only available when using Anomaly Detection or Forecasting- DEBUG ONLY
+  * returnsNone : OPTIONAL: Overwritte the request setting to return None values.
+  * countRepeatInstance : OPTIONAL: Overwritte the request setting to count repeatInstances values.
+  * ignoreZeroes : OPTIONAL : Ignore zeros in the results
+  * rsid : OPTIONAL : Overwrite the reportSuite ID used for report. Only works if the same components are presents.
+  * resolveColumns: OPTIONAL : automatically resolve columns from ID to name for calculated metrics & segments. Default True. (works on returnClass only)
+  * save : OPTIONAL : If you want to save the data (in JSON or CSV, depending the class is used or not)
+  * returnClass : OPTIONAL : return the class building dataframe and better comprehension of data. (default yes)
+
+I am recommending to try using the `getReport2` instead of the `getReport` method, with returning the `Workspace` class as often as possible (default method).
+This will provide the more intelligible report for you.

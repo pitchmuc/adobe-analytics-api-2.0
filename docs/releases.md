@@ -5,7 +5,7 @@ The changes have been tracked starting version 0.1.0
 
 ## version 0.3.1
 
-* adding the `workspace` module that allow more dynamic and better presentation of the data.
+* adding the `workspace` module that allow more dynamic and better presentation of the data.[Documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/workspace.md)
 * Improving the RequestCreator class by adding 
   * easy load of JSON files
   * capability to setSearch
@@ -21,7 +21,7 @@ The changes have been tracked starting version 0.1.0
  * createDeliverySetting
  * updateDeliverySetting
  * deleteDeliverySetting
-* adding [update method documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/main.md#update-method.)
+* adding [update method documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/main.md#update-methods)
 
 
 ## version 0.3.0
