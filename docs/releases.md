@@ -23,6 +23,7 @@ The changes have been tracked starting version 0.1.0
   * updateDeliverySetting
   * deleteDeliverySetting
 * adding [update methods documentation](https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/main.md#update-methods)
+* Fixing references of the EventType for Audit Log `LOGS_EVENT_TYPE` attribute.
 
 
 ## version 0.3.0
