@@ -42,7 +42,8 @@ Functionalities that are covered :
 * Delete VirtualReportSuite
 * Delete Project
 * Delete DateRange
-* createProject
+* Create a Project
+* Create a Scheduling job for a Workspace Project
 
 documentation on reporting [here](./docs/main.md)
 
