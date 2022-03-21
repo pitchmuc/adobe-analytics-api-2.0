@@ -195,11 +195,11 @@ class Workspace:
             new_request.addMetricFilter(metricId=metric, filterId=breakdown)
         if n_results < 20000:
             new_request.setLimit(n_results)
-            report = self.analyticsObject.getReport(
+            report = self.analyticsObject.getReport2(
                 new_request.to_dict(), n_results=n_results
             )
         if n_results == "inf" or n_results > 20000:
-            report = self.analyticsObject.getReport(
+            report = self.analyticsObject.getReport2(
                 new_request.to_dict(), n_results=n_results
             )
         return report

@@ -483,7 +483,7 @@ Here is the list of the possible create options.
   ]
   ```
 
-* createScheduleJob : 
+* createScheduledJob : 
   Creates a schedule job based on the information provided as arguments.
   Expiration will be in one year by default.
   Arguments:
@@ -562,7 +562,7 @@ Here is the list of the possible create options.
       }
   ]
 
-* updateScheduleJob : Update a schedule Job based on its id and the definition attached to it.
+* updateScheduledJob : Update a schedule Job based on its id and the definition attached to it.
   Arguments:
   * scheduleId : REQUIRED : the jobs to be updated.
   * scheduleObj : REQUIRED : The object to replace the current definition.
@@ -612,7 +612,7 @@ There is a possibility to delete some elements with the Adobe Analytics API 2.0.
   Arguments:
   * projectId : REQUIRED : The project ID to be deleted.
 
-* deleteScheduleJob : Delete a schedule project based on its ID.
+* deleteScheduledJob : Delete a schedule project based on its ID.
   Arguments:
   * scheduleId : REQUIRED : the schedule ID to be deleted.
 

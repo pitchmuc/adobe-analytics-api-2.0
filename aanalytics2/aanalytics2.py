@@ -1462,7 +1462,7 @@ class Analytics:
         res = self.connector.getData(self.endpoint_company + path, params=params)
         return res
     
-    def createScheduleJob(self,projectId:str=None,type:str="pdf",schedule:dict=None,loginIds:list=None,emails:list=None,groupIds:list=None)->dict:
+    def createScheduledJob(self,projectId:str=None,type:str="pdf",schedule:dict=None,loginIds:list=None,emails:list=None,groupIds:list=None)->dict:
         """
         Creates a schedule job based on the information provided as arguments.
         Expiration will be in one year by default.
@@ -1556,7 +1556,7 @@ class Analytics:
         res = self.connector.postData(self.endpoint_company+path,data=data)
         return res
 
-    def updateScheduleJob(self,scheduleId:str=None,scheduleObj:dict=None)->dict:
+    def updateScheduledJob(self,scheduleId:str=None,scheduleObj:dict=None)->dict:
         """
         Update a schedule Job based on its id and the definition attached to it.
         Arguments:
@@ -1574,7 +1574,7 @@ class Analytics:
         return res
 
 
-    def deleteScheduleJob(self,scheduleId:str=None)->dict:
+    def deleteScheduledJob(self,scheduleId:str=None)->dict:
         """
         Delete a schedule project based on its ID.
         Arguments:
