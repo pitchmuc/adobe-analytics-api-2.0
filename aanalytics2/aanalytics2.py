@@ -653,7 +653,7 @@ class Analytics:
             list_params = [{'limit': params['limit'], 'page': page}
                            for page in range(1, callsToMake)]
             list_urls = [self.endpoint_company +
-                         self._getUsers for x in range(1, callsToMake)]
+                         "/users" for x in range(1, callsToMake)]
             listheaders = [self.header
                            for x in range(1, callsToMake)]
             workers = min(10, len(list_params))
@@ -1483,6 +1483,14 @@ class Analytics:
                             'minute': 0,
                             'hour': 8,
                             'daysOfWeek': [2],
+                            'interval': 1
+                        }
+                        {
+                            'type': 'monthly',
+                            'second': 53,
+                            'minute': 30,
+                            'hour': 16,
+                            'dayOfMonth': 21,
                             'interval': 1
                         }
             loginIds : REQUIRED : A list of login ID of the users that are recipient of the report. It can be retrieved by the getUsers method.
@@ -2571,11 +2579,18 @@ class Analytics:
         dataRows = []
         ## retrieve StaticRow ID and segmentID
         if len([metric for metric in dataRequest['metricContainer'].get('metricFilters',[]) if metric.get('id','').startswith("STATIC_ROW_COMPONENT")])>0:
-            tableSegmentsRows = {
-                obj["id"]: obj["segmentId"]
-                for obj in dataRequest["metricContainer"]["metricFilters"]
-                if obj["id"].startswith("STATIC_ROW_COMPONENT")
-            }
+            if  "dateRange" in list(dataRequest['metricContainer'].get('metricFilters',[])[0].keys()):
+                tableSegmentsRows = {
+                    obj["id"]: obj["dateRange"]
+                    for obj in dataRequest["metricContainer"]["metricFilters"]
+                    if obj["id"].startswith("STATIC_ROW_COMPONENT")
+                }
+            elif "segmentId" in list(dataRequest['metricContainer'].get('metricFilters',[])[0].keys()):
+                tableSegmentsRows = {
+                    obj["id"]: obj["segmentId"]
+                    for obj in dataRequest["metricContainer"]["metricFilters"]
+                    if obj["id"].startswith("STATIC_ROW_COMPONENT")
+                }
         else:
             tableSegmentsRows = {
                 obj["id"]: obj["segmentId"]
@@ -2634,7 +2649,7 @@ class Analytics:
 
     def getReport2(
         self,
-        request: Union[dict, IO] = None,
+        request: Union[dict, IO,RequestCreator] = None,
         limit: int = 20000,
         n_results: Union[int, str] = "inf",
         allowRemoteLoad: str = "default",
@@ -2681,7 +2696,7 @@ class Analytics:
         }
         if type(request) == dict:
             dataRequest = request
-        elif type(request) == RequestCreator:
+        elif isinstance(request,RequestCreator):
             dataRequest = request.to_dict()
         elif ".json" in request:
             with open(request, "r") as f:

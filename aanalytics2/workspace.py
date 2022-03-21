@@ -80,13 +80,13 @@ class Workspace:
                 if resolveColumns:
                     metricResolvedName = []
                     for metric in metricListName:
-                        if metric.startswith("cm") and "@AdobeOrg" in metric:
+                        if metric.startswith("cm"):
                             cm = self.analyticsObject.getCalculatedMetric(metric)
-                            metricName = cm["name"]
+                            metricName = cm.get("name",metric)
                             metricResolvedName.append(metricName)
-                        elif metric.startswith("s") and "@AdobeOrg" in metric:
+                        elif metric.startswith("s"):
                             seg = self.analyticsObject.getSegment(metric)
-                            segName = seg["name"]
+                            segName = seg.get("name",metric)
                             metricResolvedName.append(segName)
                         else:
                             metricResolvedName.append(metric)

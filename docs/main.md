@@ -491,19 +491,27 @@ Here is the list of the possible create options.
     * type : REQUIRED : how to send the project, default "pdf"
     * schedule : REQUIRED : object to specify the schedule used.
         example: {  
-                    "hour": 10,
-                    "minute": 45,
-                    "second": 25,
-                    "interval": 1,
-                    "type": "daily"
+                  "hour": 10,
+                  "minute": 45,
+                  "second": 25,
+                  "interval": 1,
+                  "type": "daily"
                 }
                 {
-                    'type': 'weekly',
-                    'second': 53,
-                    'minute': 0,
-                    'hour': 8,
-                    'daysOfWeek': [2],
-                    'interval': 1
+                  'type': 'weekly',
+                  'second': 53,
+                  'minute': 0,
+                  'hour': 8,
+                  'daysOfWeek': [2],
+                  'interval': 1
+                }
+                {
+                  'type': 'monthly',
+                  'second': 53,
+                  'minute': 30,
+                  'hour': 16,
+                  'dayOfMonth': 21,
+                  'interval': 1
                 }
     * loginIds : REQUIRED : A list of login ID of the users that are recipient of the report. It can be retrieved by the getUsers method.
     * emails : OPTIONAL : If users are not registered in AA, you can specify a list of email addresses.
