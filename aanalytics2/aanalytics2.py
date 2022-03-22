@@ -2717,9 +2717,9 @@ class Analytics:
         if rsid is not None:
             dataRequest["rsid"] = rsid
         if ignoreZeroes:
-            dataRequest["statistics"]["ignoreZeroes"] = True
+            dataRequest.get("statistics",{'ignoreZeroes':True})["ignoreZeroes"] = True
         else:
-            dataRequest["statistics"]["ignoreZeroes"] = False
+            dataRequest.get("statistics",{'ignoreZeroes':False})["ignoreZeroes"] = False
         ### Request data
         if self.loggingEnabled:
             self.logger.debug(f"getReport request: {json.dumps(dataRequest,indent=4)}")
