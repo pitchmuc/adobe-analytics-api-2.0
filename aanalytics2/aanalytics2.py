@@ -551,7 +551,7 @@ class Analytics:
 
     def getDimensions(self, rsid: str, tags: bool = False, description:bool=False, save=False, **kwargs) -> pd.DataFrame:
         """
-        Retrieve the list of dimensions from a specific reportSuite.Shrink columns to simplify output.
+        Retrieve the list of dimensions from a specific reportSuite. Shrink columns to simplify output.
         Returns the data frame of available dimensions.
         Arguments:
             rsid : REQUIRED : Report Suite ID from which you want the dimensions
@@ -1150,18 +1150,36 @@ class Analytics:
             df_dates.to_csv('date_range.csv', index=False)
         return df_dates
 
-    def updateDateRange(self, dateRangeID: str = None, dateRangeJSON: dict = None) -> object:
+    def getDateRange(self,dateRangeID:str=None)->dict:
+        """
+        Get a specific Data Range based on the ID
+        Arguments:
+            dateRangeID : REQUIRED : the date range ID to be retrieved.
+        """
+        if dateRangeID is None:
+            raise ValueError("No date range ID has been passed")
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getDateRange with ID: {dateRangeID}")
+        params ={
+            "expansion":"definition,ownerFullName,modified,tags"
+        }
+        dr = self.connector.getData(
+            self.endpoint_company + f"{self._getDateRanges}/{dateRangeID}",
+            params=params
+        )
+        return dr
+
+    def updateDateRange(self, dateRangeID: str = None, dateRangeJSON: dict = None) -> dict:
         """
         Method that updates a specific Date Range based on the dictionary passed to it.
         Arguments:
             dateRangeID : REQUIRED : Date Range ID to be updated
             dateRangeJSON : REQUIRED : the dictionary that represents the JSON statement for the date Range.
         """
+        if dateRangeJSON is None or dateRangeID is None:
+            raise ValueError("No date range or date range JSON data have been passed")
         if self.loggingEnabled:
             self.logger.debug(f"starting updateDateRange")
-        if dateRangeJSON is None or dateRangeID is None:
-            print('No date range or date range JSON data has been pushed')
-            return None
         data = deepcopy(dateRangeJSON)
         dr = self.connector.putData(
             self.endpoint_company + self._getDateRanges + '/' + dateRangeID,
@@ -2256,6 +2274,162 @@ class Analytics:
         df = pd.DataFrame(data)
         return df
     
+    def getAnnotations(self,full:bool=True,includeType:str='all',limit:int=1000,page:int=0)->list:
+        """
+        Returns a list of the available annotations 
+        Arguments:
+            full : OPTIONAL : If set to True (default), returned all available information of the annotation.
+            includeType : OPTIONAL : use to return only "shared" or "all"(default) annotation available.
+            limit : OPTIONAL : number of result per page (default 1000)
+            page : OPTIONAL : page used for pagination
+        """
+        params = {"includeType":includeType,"page":page}
+        if full:
+            params['expansion'] = "name,description,dateRange,color,applyToAllReports,scope,createdDate,modifiedDate,modifiedById,tags,shares,approved,favorite,owner,usageSummary,companyId,reportSuiteName,rsid"
+        path = f"/annotations"
+        lastPage = False
+        data = []
+        while lastPage == False:
+            res = self.connector.getData(self.endpoint_company + path,params=params)
+            data += res.get('content',[])
+            lastPage = res.get('lastPage',True)
+            params['page'] += 1
+        return data
+    
+    def getAnnotation(self,annotationId:str=None)->dict:
+        """
+        Return a specific annotation definition.
+        Arguments:
+            annotationId : REQUIRED : The annotation ID
+        """
+        if annotationId is None:
+            raise ValueError("Require an annotation ID")
+        path = f"/annotations/{annotationId}"
+        params ={
+            "expansion" : "name,description,dateRange,color,applyToAllReports,scope,createdDate,modifiedDate,modifiedById,tags,shares,approved,favorite,owner,usageSummary,companyId,reportSuiteName,rsid"
+        }
+        res = self.connector.getData(self.endpoint_company + path,params=params)
+        return res
+    
+    def deleteAnnotation(self,annotationId:str=None)->dict:
+        """
+        Delete a specific annotation definition.
+        Arguments:
+            annotationId : REQUIRED : The annotation ID to be deleted
+        """
+        if annotationId is None:
+            raise ValueError("Require an annotation ID")
+        path = f"/annotations/{annotationId}"
+        res = self.connector.deleteData(self.endpoint_company + path)
+        return res
+
+    def createAnnotation(self,
+                        name:str=None,
+                        dateRange:str=None,
+                        rsid:str=None,
+                        metricIds:list=None,
+                        dimensionObj:list=None,
+                        description:str=None,
+                        filterIds:list=None,
+                        applyToAllReports:bool=False,
+                        **kwargs)->dict:
+
+        """
+        Create an Annotation.
+        Arguments:
+            name : REQUIRED : Name of the annotation
+            dateRange : REQUIRED : Date range of the annotation to be used. 
+                Example: 2022-04-19T00:00:00/2022-04-19T23:59:59
+            rsid : REQUIRED : ReportSuite ID 
+            metricIds : OPTIONAL : List of metrics ID to be annotated
+            filterIds : OPTIONAL : List of Segments ID to apply for annotation for context.
+            dimensionObj : OPTIONAL : List of dimensions object specification:
+                {
+                    componentType: "dimension"
+                    dimensionType: "string"
+                    id: "variables/product"
+                    operator: "streq"
+                    terms: ["unknown"]
+                }
+            applyToAllReports : OPTIONAL : If the annotation apply to all ReportSuites.
+        possible kwargs:
+            colors: Color to be used, examples: "STANDARD1"
+            shares: List of userId for sharing the annotation
+            tags: List of tagIds to be applied
+            favorite: boolean to set the annotation as favorite (false by default)
+            approved: boolean to set the annotation as approved (false by default)
+        """
+        path = f"/annotations"
+        if name is None:
+            raise ValueError("A name must be specified")
+        if dateRange is None:
+            raise ValueError("A dateRange must be specified")
+        if rsid is None:
+            raise ValueError("a master ReportSuite ID must be specified")
+        description = description or "api generated"
+
+        data = {
+            "name": name,
+            "description": description,
+            "dateRange": dateRange,
+            "color": kwargs.get('colors',"STANDARD1"),
+            "applyToAllReports": applyToAllReports,
+            "scope": {
+                "metrics":[],
+                "filters":[]
+            },
+            "tags": [],
+            "approved": kwargs.get('approved',False),
+            "favorite": kwargs.get('favorite',False),
+            "rsid": rsid
+        }
+        if metricIds is not None and type(metricIds) == list:
+            for metric in metricIds:
+                data['scopes']['metrics'].append({
+                    "id" : metric,
+                    "componentType":"metric"
+                })
+        if filterIds is None and type(filterIds) == list:
+            for filter in filterIds:
+                data['scopes']['filters'].append({
+                    "id" : filter,
+                    "componentType":"segment"
+                })
+        if dimensionObj is not None and type(dimensionObj) == list:
+            for obj in dimensionObj:
+                data['scopes']['filters'].append(obj)
+        if kwargs.get("shares",None) is not None:
+            data['shares'] = []
+            for user in kwargs.get("shares",[]):
+                data['shares'].append({
+                    "shareToId" : user,
+                    "shareToType":"user"
+                })
+        if kwargs.get('tags',None) is not None:
+            for tag in kwargs.get('tags'):
+                res = self.getTag(tag)
+                data['tags'].append({
+                    "id":tag,
+                    "name":res['name']
+                })
+        res = self.connector.postData(self.endpoint_company + path,data=data)
+        return res       
+
+    def updateAnnotation(self,annotationId:str=None,annotationObj:dict=None)->dict:
+        """
+        Update an annotation based on its ID. PUT method.
+        Arguments:
+            annotationId : REQUIRED : The annotation ID to be updated
+            annotationObj : REQUIRED : The object to replace the annotation.
+        """
+        if annotationObj is None or type(annotationObj) != dict:
+            raise ValueError('Require a dictionary representing the annotation definition')
+        if annotationId is None:
+            raise ValueError('Require the annotation ID')
+        path = f"/annotations/{annotationId}"
+        res = self.connector.putData(self.endpoint_company+path,data=annotationObj)
+        return res
+
     def compareReportSuites(self,listRsids:list=None,element:str='dimensions',comparison:str="full",save: bool=False)->pd.DataFrame:
         """
         Compare reportSuite on dimensions (default) or metrics based on the comparison selected.
@@ -2401,12 +2575,13 @@ class Analytics:
             self,
             json_request: Union[dict, str, IO,RequestCreator],
             limit: int = 1000,
-            n_result: Union[int, str] = 1000,
+            n_results: Union[int, str] = 1000,
             save: bool = False,
             item_id: bool = False,
             unsafe: bool = False,
             verbose: bool = False,
-            debug=False
+            debug=False,
+            **kwargs,
     ) -> object:
         """
         Retrieve data from a JSON request.Returns an object containing meta info and dataframe. 
@@ -2418,7 +2593,7 @@ class Analytics:
                 - a string that is a dictionary : It will be transformed to a dictionary / JSON.
                 - a path to a JSON file that contains the statement (must end with ".json"). 
                 - an instance of the RequestCreator class
-            n_result : OPTIONAL : Number of result that you would like to retrieve. (default 1000)
+            n_results : OPTIONAL : Number of result that you would like to retrieve. (default 1000)
                 if you want to have all possible data, use "inf".
             item_id : OPTIONAL : Boolean to define if you want to return the item id for sub requests (default False)
             unsafe : OPTIONAL : If set to True, it will not check "lastPage" parameter and assume first request is complete. 
@@ -2457,10 +2632,11 @@ class Analytics:
         columns = [data_info['dimension']] + data_info['metrics']
         # preparing for the loop
         # in case "inf" has been used. Turn it to a number
-        n_result = float(n_result)
-        if n_result != float('inf') and n_result < request['settings']['limit']:
+        n_results = kwargs.get('n_result',n_results)
+        n_results = float(n_results)
+        if n_results != float('inf') and n_results < request['settings']['limit']:
             # making sure we don't call more than set in wrapper
-            request['settings']['limit'] = n_result
+            request['settings']['limit'] = n_results
         data_list = []
         last_page = False
         page_nb, count_elements, total_elements = 0, 0, 0
@@ -2524,8 +2700,8 @@ class Analytics:
             if verbose and total_elements != 0:
                 print(
                     f'% of total elements retrieved: {round((count_elements / total_elements) * 100, 2)} %')
-            if last_page == False and n_result != float('inf'):
-                if count_elements >= n_result:
+            if last_page == False and n_results != float('inf'):
+                if count_elements >= n_results:
                     last_page = True
             data = report['rows']
             data_list += deepcopy(data)  # do a deepcopy

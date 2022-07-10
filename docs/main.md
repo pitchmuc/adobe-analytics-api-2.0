@@ -322,6 +322,11 @@ There are several get methods.
   * limit : number of segments retrieved by request. default 500: Limited to 1000 by the Analytics API.
   * full : Boolean : Doesn't shrink the number of columns if set to true
 
+* getDateRange
+  Get a specific Data Range based on the ID
+  Arguments:
+  * dateRangeID : REQUIRED : the date range ID to be retrieved.
+
 * getCalculatedMetrics : Return the calculated metrics of your login company (dataframe by default).
   Arguments:
   * name : OPTIONAL : Filter to only include calculated metrics that contains the name (str)
@@ -402,6 +407,17 @@ possible kwargs:
 * getDeliverySettings: Retrieve the delivery setting from a scheduled project.
   Argument
   * deliverySettingId : REQUIRED : The delivery setting ID of the scheduled project.
+
+* getAnnotations: Returns a list of the available annotations 
+  Arguments:
+  * full : OPTIONAL : If set to True (default), returned all available information of the annotation.
+  * includeType : OPTIONAL : use to return only "shared" or "all"(default) annotation available.
+  * limit : OPTIONAL : number of result per page (default 1000)
+  * page : OPTIONAL : page used for pagination
+
+* getAnnotation: Return a specific annotation definition.
+  Arguments:
+  * annotationId : REQUIRED : The annotation ID
 
 Example of getSegments usage:
 
@@ -523,6 +539,30 @@ Here is the list of the possible create options.
   * emails : OPTIONAL : In case the recipient are not in the analytics interface. 
   * groupIds : OPTIONAL : List of group ID to send the scheduled project to.
 
+* createAnnotation : Create an Annotation.
+  Arguments:
+  * name : REQUIRED : Name of the annotation
+  * dateRange : REQUIRED : Date range of the annotation to be used. 
+      Example: 2022-04-19T00:00:00/2022-04-19T23:59:59
+  * rsid : REQUIRED : ReportSuite ID 
+  * metricIds : OPTIONAL : List of metrics ID to be annotated
+  * filterIds : OPTIONAL : List of Segments ID to apply for annotation for context.
+  * dimensionObj : OPTIONAL : List of dimensions object specification:
+      {
+          componentType: "dimension"
+          dimensionType: "string"
+          id: "variables/product"
+          operator: "streq"
+          terms: ["unknown"]
+      }
+  * applyToAllReports : OPTIONAL : If the annotation apply to all ReportSuites.
+  * possible kwargs:
+  * colors: Color to be used, examples: "STANDARD1"
+  * shares: List of userId for sharing the annotation
+  * tags: List of tagIds to be applied
+  * favorite: boolean to set the annotation as favorite (false by default)
+  * approved: boolean to set the annotation as approved (false by default)
+
 ### Update methods
 
 * updateVirtualReportSuite : Updates a Virtual Report Suite based on a JSON-like dictionary (same structure as createVirtualReportSuite)
@@ -581,6 +621,11 @@ Here is the list of the possible create options.
   * projectObj : REQUIRED : the dictionary to replace the previous Workspace.
       requires the following elements: name,description,rsid, definition, owner
 
+* updateAnnotation : Update an annotation based on its ID. PUT method.
+  Arguments:
+  * annotationId : REQUIRED : The annotation ID to be updated
+  * annotationObj : REQUIRED : The object to replace the annotation.
+
 
 ### Delete methods
 
@@ -619,6 +664,10 @@ There is a possibility to delete some elements with the Adobe Analytics API 2.0.
 * deleteDeliverySetting : Delete a delivery setting based on the ID passed.
   Arguments:
   * deliveryId : REQUIRED : The delivery setting ID to be deleted.
+
+* deleteAnnotation : Delete a specific annotation definition.
+  Arguments:
+  * annotationId : REQUIRED : The annotation ID to be deleted
 
 ### Get report
 
