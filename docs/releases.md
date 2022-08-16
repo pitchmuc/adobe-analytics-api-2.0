@@ -11,7 +11,10 @@ The changes have been tracked starting version 0.1.0
   * createAnnotation
   * updateAnnotation
   * deleteAnnotation
-* Add a `getDateRange` method
+* Add a `getDateRange` method\
+Patch:
+* adding the width parameter on scheduling report.
+* parameterization of the logger generation + add new info for logging info on GET requests
 
 ## version 0.3.1
 

@@ -75,6 +75,9 @@ class AdobeRequest:
         """
         internRetry = kwargs.get("retry",  self.retry)
         self._checkingDate()
+        if self.loggingEnabled:
+            self.logger.info(f"endpoint: {endpoint}")
+            self.logger.info(f"params: {params}")
         if headers is None:
             headers = self.header
         if params is None and data is None:

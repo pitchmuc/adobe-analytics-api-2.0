@@ -144,23 +144,23 @@ def get_private_key_from_config(config: dict) -> str:
         private_key = f.read()
     return private_key
 
-def generateLoggingObject()->dict:
+def generateLoggingObject(level:str="WARNING",stream:bool=True,file:bool=False,filename:str="aanalytics2.log",format:str="%(asctime)s::%(name)s::%(funcName)s::%(levelname)s::%(message)s::%(lineno)d")->dict:
     """
     Generates a dictionary for the logging object with basic configuration.
     You can find the information for the different possible values on the logging documentation.
         https://docs.python.org/3/library/logging.html
-    Output:
+    Arguments:
         level : Level of the logger to display information (NOTSET, DEBUG,INFO,WARNING,EROR,CRITICAL)
         stream : If the logger should display print statements
         file : If the logger should write the messages to a file
         filename : name of the file where log are written
-        format : format of the logs 
+        format : format of the log to be written.
     """
     myObject = {
-        "level" : "WARNING",
-        "stream" : True,
-        "file" : False,
+        "level" : level,
+        "stream" : stream,
+        "file" : file,
         "format" : "%(asctime)s::%(name)s::%(funcName)s::%(levelname)s::%(message)s::%(lineno)d",
-        "filename":"aanalytics2.log"
+        "filename":filename
     }
     return myObject
