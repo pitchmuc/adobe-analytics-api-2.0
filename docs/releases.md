@@ -3,6 +3,10 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.3.3
+* adding the width parameter on scheduling report.
+* parameterization of the logger generation + add new info for logging info on GET requests
+
 ## version 0.3.2
 
 * Adding annotation methods
@@ -11,10 +15,7 @@ The changes have been tracked starting version 0.1.0
   * createAnnotation
   * updateAnnotation
   * deleteAnnotation
-* Add a `getDateRange` method\
-Patch:
-* adding the width parameter on scheduling report.
-* parameterization of the logger generation + add new info for logging info on GET requests
+* Add a `getDateRange` method
 
 ## version 0.3.1
 
