@@ -74,6 +74,11 @@ class Workspace:
             columns_data.append(dataRequest["dimension"])
             ### adding metrics in columns names
             columnIds = columns["columnIds"]
+            # To get readable names of template metrics and Success Events, we need to get the full list of metrics for the Report Suite first. 
+            # But we won't do this if there are no such metrics in the report.
+            if (resolveColumns is True) & (
+                    len([metric for metric in metrics.values() if metric.startswith("metrics/")]) > 0):
+                rsMetricsList = self.analyticsObject.getMetrics(rsid=dataRequest["rsid"])
             for col in columnIds:
                 metrics: dict = metrics  ## case when dict is used
                 metricListName: list = metrics[col].split(":::")
@@ -88,6 +93,9 @@ class Workspace:
                             seg = self.analyticsObject.getSegment(metric)
                             segName = seg.get("name",metric)
                             metricResolvedName.append(segName)
+                        elif metric.startswith("metrics/"):
+                            metricName = rsMetricsList[rsMetricsList["id"] == metric]["name"].iloc[0]
+                            metricResolvedName.append(metricName)
                         else:
                             metricResolvedName.append(metric)
                     colName = ":::".join(metricResolvedName)
