@@ -2606,7 +2606,36 @@ class Analytics:
                 self.logger.debug(f'Full comparison, file : comparison_full_{element}_{int(time.time())}.csv')
         return df
         
+    def shareComponent(self, componentId: str = None, componentType: str = None, shareToId: int = None,
+                       shareToImsId: int = None, shareToType: str = None, shareToLogin: str = None,
+                       accessLevel: str = None, shareFromImsId: str = None) -> dict:
+        """
+        Shares a component with an individual or a group (product profile ID) a dictionary on the calculated metrics requested.
+        Returns the JSON response from the API. 
+        Arguments:
+            componentId : REQUIRED : The component ID to share.
+            componentType : REQUIRED : The component Type ("calculatedMetric", "segment", "project", "dateRange")
+            shareToId: ID of the user or the group to share to
+            shareToImsId: IMS ID of the user to share to (alternative to ID)
+            shareToLogin: Login of the user to share to (alternative to ID)                
+            shareToType: "group" => share to a group (product profile), "user" => share to a user, "all" => share to all users (in this case, no shareToId or shareToImsId is needed)
+        """
 
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting to share component ID {componentId} with parameters: {locals()}")
+        path = f"/componentmetadata/shares/"
+        data = {
+            "accessLevel": accessLevel,
+            "componentId": componentId,
+            "componentType": componentType,
+            "shareToId": shareToId,
+            "shareToImsId": shareToImsId,
+            "shareToLogin": shareToLogin,
+            "shareToType": shareToType
+        }
+        res = self.connector.postData(self.endpoint_company + path, data=data)
+        return res
+        
     def _dataDescriptor(self, json_request: dict):
         """
         read the request and returns an object with information about the request.
