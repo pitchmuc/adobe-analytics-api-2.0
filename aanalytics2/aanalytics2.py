@@ -2611,18 +2611,14 @@ class Analytics:
                        accessLevel: str = None, shareFromImsId: str = None) -> dict:
         """
         Shares a component with an individual or a group (product profile ID) a dictionary on the calculated metrics requested.
+        Returns the JSON response from the API. 
         Arguments:
-            calculatedMetricId : REQUIRED : The calculated metric ID to be retrieved.
-            full : OPTIONAL : additional segment metadata fields to include on response (list)
-                additional infos: reportSuiteName,definition, ownerFullName, modified, tags, compatibility
-                @param accessLevel: for project sharing: "view", "edit", "duplicate"
-                @param componentId: REQUIRED: ID of the component to share
-                @param componentType: REQUIRED: Type of the component to share ("calculatedMetric", "segment", "project", "dateRange")
-                @param shareToId: ID of the user or the group to share to
-                @param shareToImsId: IMS ID of the user to share to (alternative to ID)
-                @param shareToLogin: Login of the user to share to (alternative to ID)                
-                @param shareToType: "group" => share to a group (product profile), "user" => share to a user, "all" => share to all users (in this case, no shareToId or shareToImsId is needed)
-                @return: response from the API
+            componentId : REQUIRED : The component ID to share.
+            componentType : REQUIRED : The component Type ("calculatedMetric", "segment", "project", "dateRange")
+            shareToId: ID of the user or the group to share to
+            shareToImsId: IMS ID of the user to share to (alternative to ID)
+            shareToLogin: Login of the user to share to (alternative to ID)                
+            shareToType: "group" => share to a group (product profile), "user" => share to a user, "all" => share to all users (in this case, no shareToId or shareToImsId is needed)
         """
 
         if self.loggingEnabled:
