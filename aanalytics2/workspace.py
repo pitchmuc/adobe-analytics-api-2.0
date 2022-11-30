@@ -55,8 +55,17 @@ class Workspace:
         filters = []
         for filter in dataRequest["globalFilters"]:
             if filter["type"] == "segment":
-                seg = self.analyticsObject.getSegment(filter["segmentId"])
-                filter["segmentName"] = seg["name"]
+                segmentId = filter.get("segmentId",None)
+                if segmentId is not None:
+                    seg = self.analyticsObject.getSegment(filter["segmentId"])
+                    filter["segmentName"] = seg["name"]
+                else:
+                    context = filter.get('segmentDefinition',{}).get('container',{}).get('context')
+                    description = filter.get('segmentDefinition',{}).get('container',{}).get('pred',{}).get('description')
+                    listName = ','.join(filter.get('segmentDefinition',{}).get('container',{}).get('pred',{}).get('list',[]))
+                    function = filter.get('segmentDefinition',{}).get('container',{}).get('pred',{}).get('func')
+                    filter["segmentId"] = f"Dynamic: {context} {description} {function} {listName}"
+                    filter["segmentName"] = f"{context} {description} {listName}"
             filters.append(filter)
         self.globalFilters = filters
         self.metricFilters = metricFilters
