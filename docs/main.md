@@ -6,6 +6,25 @@ You can find the swagger documentation [here](https://adobedocs.github.io/analyt
 
 The different section will quickly explain the methods available in the different part of this API.
 
+- [Core Component](#core-components)
+  - [Config File](#createconfigfile)
+    - [Create a Config file](#createconfigfile)
+    - [Import a Config file](#importconfigfile)
+- [Login Class](#login-class)
+  - [Retry Parameter](#retry-parameter)
+- [Analytics Class](#analytics-class)
+  - [The get methods](#the-get-methods)
+  - [The create methods](#create)
+  - [The update methods](#update-methods)
+  - [The delete methods](#delete-methods)
+  - [The scan method](#the-scan-methods)
+  - [Decoding Adobe Analytics requests](#decode-aa-requests)
+  - [Comparing Report Suite](#compare-reportsuite)
+- [The getReport](#getreport)
+- [The getReport2](#getreport2)
+- [The Project Class](#the-project-class)
+
+
 ## Core components
 
 The methods available directly from the module are the following:
@@ -669,77 +688,6 @@ There is a possibility to delete some elements with the Adobe Analytics API 2.0.
   Arguments:
   * annotationId : REQUIRED : The annotation ID to be deleted
 
-### Get report
-
-The get report from Adobe Analytics, I will recommend you to watch the [video](https://youtu.be/j1kI3peSXhY) that explains how you can generate the JSON file for requesting the report through API.
-This getReport methods is a bit special because it is mostly what users would have liked to have from this API, so it is a separate part.
-
-First of all, you need to understand that this API is a replicate of Adobe Analytics Workspace interface.
-There is no additional feautres or way to bypass the limitation of Analytics Workspace from this API.
-It means that the (low traffic) will still appear and also the filters are different requests.
-Also, there is a limit of 120 requests per minute, and a limit threshold of 12 requests for 6 seconds.
-Therefore, requesting large amount of data is not the use-case for the API 2.0.
-
-When you have generated your request through the UI interface you can directly saved it in a json file.
-You can then either directly use it with the aanalytics2 module or rework it in python.
-
-Before going with examples, I will explain the method and its arguments:
-
-* getReport : Retrieve data from a JSON request.Returns an object containing meta info and dataframe.
-  Arguments:
-  * json_request: REQUIRED : JSON statement that contains your request for Analytics API 2.0.
-  The argument can be :
-    * a dictionary : It will be used as it is.
-    * a string that is a dictionary : It will be transformed to a dictionary / JSON.
-    * a path to a JSON file that contains the statement (must end with ".json").
-  * n_result : OPTIONAL : Number of result that you would like to retrieve. (default 1000)
-    if you want to have all possible data, use "inf".
-  * item_id : OPTIONAL : Boolean to define if you want to return the item id for sub requests (default False)
-  * save : OPTIONAL : If you would like to save the data within a CSV file. (default False)
-  * verbose : OPTIONAL : If you want to have comment display (default False)
-
-As you can see, you can use the getReport with different variable types (string, path or dictionary).
-
-The object that is being returned is hosting the information about your request. In case you need to have the context during your usage of the data.
-Example of the object being returned :
-
-```python
-{'dimension': 'variables/eVarX',
-    'filters': {'globalFilters': ['2019-11-01T00:00:00.000/2019-12-01T00:00:00.000'],
-    'metricsFilters': {}},##if any filters have been applied.
-    'rsid': 'my.rsid',
-    'metrics': ['metrics/visits'],
-    'data': #pandas DataFrame.
-}
-```
-
-As you can see it returns the actual data of your request in the "data" key, as a dataframe.
-Therefore, you can use the data by doing the extraction of the data.
-Example:
-
-```python
-myreport = mycompany.getReport('myReport.json')
-mydata = myreport['data']
-```
-
-**Note** : It can be that some data are not returned by the API (unknown reason for me). The exception is then handle by setting "missing_value" to these items.\
-Because a dictionary is being built before returning the dataframe, it means that all missing value will be set as "missing_value" and only the last key will remain.
-
-**Handling Throttle** : The throttle limit of 12 requests per 6 seconds or 120 requests per minute is handle automatically. It automatically pause the requests for 50 seconds when the limit is reached.
-
-### The create methods
-
-Adobe Analytics API 2.0 currently, limiting number of creation.
-You can only create Calculated Metrics and Segments so far.
-
-* createSegment:
-  Arguments:
-  * segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment.
-
-* createCalculatedMetrics:
-  Arguments:
-  * metricJSON : REQUIRED : the dictionary that represents the JSON statement for the  Calculated Metrics.
-    Required in the dictionary :  name, definition, rsid
 
 ### The scan methods
 
@@ -803,6 +751,65 @@ It also has several parameters that would allow for extensive comparison (with a
     * full (default) : compare name and settings
     * name : compare only names
 * save : OPTIONAL : if you want to save in a csv.
+
+## GetReport
+
+The get report from Adobe Analytics, I will recommend you to watch the [video](https://youtu.be/j1kI3peSXhY) that explains how you can generate the JSON file for requesting the report through API.
+This getReport methods is a bit special because it is mostly what users would have liked to have from this API, so it is a separate part.
+
+First of all, you need to understand that this API is a replicate of Adobe Analytics Workspace interface.
+There is no additional feautres or way to bypass the limitation of Analytics Workspace from this API.
+It means that the (low traffic) will still appear and also the filters are different requests.
+Also, there is a limit of 120 requests per minute, and a limit threshold of 12 requests for 6 seconds.
+Therefore, requesting large amount of data is not the use-case for the API 2.0.
+
+When you have generated your request through the UI interface you can directly saved it in a json file.
+You can then either directly use it with the aanalytics2 module or rework it in python.
+
+Before going with examples, I will explain the method and its arguments:
+
+* getReport : Retrieve data from a JSON request.Returns an object containing meta info and dataframe.
+  Arguments:
+  * json_request: REQUIRED : JSON statement that contains your request for Analytics API 2.0.
+  The argument can be :
+    * a dictionary : It will be used as it is.
+    * a string that is a dictionary : It will be transformed to a dictionary / JSON.
+    * a path to a JSON file that contains the statement (must end with ".json").
+  * limit : OPTIONAL : number of result per request (defaut 1000)
+  * n_result : OPTIONAL : Number of result that you would like to retrieve. (default 1000)
+    if you want to have all possible data, use "inf".
+  * item_id : OPTIONAL : Boolean to define if you want to return the item id for sub requests (default False)
+  * save : OPTIONAL : If you would like to save the data within a CSV file. (default False)
+  * verbose : OPTIONAL : If you want to have comment display (default False)
+
+As you can see, you can use the getReport with different variable types (string, path or dictionary).
+
+The object that is being returned is hosting the information about your request. In case you need to have the context during your usage of the data.
+Example of the object being returned :
+
+```python
+{'dimension': 'variables/eVarX',
+    'filters': {'globalFilters': ['2019-11-01T00:00:00.000/2019-12-01T00:00:00.000'],
+    'metricsFilters': {}},##if any filters have been applied.
+    'rsid': 'my.rsid',
+    'metrics': ['metrics/visits'],
+    'data': #pandas DataFrame.
+}
+```
+
+As you can see it returns the actual data of your request in the "data" key, as a dataframe.
+Therefore, you can use the data by doing the extraction of the data.
+Example:
+
+```python
+myreport = mycompany.getReport('myReport.json')
+mydata = myreport['data']
+```
+
+**Note** : It can be that some data are not returned by the API (unknown reason for me). The exception is then handle by setting "missing_value" to these items.\
+Because a dictionary is being built before returning the dataframe, it means that all missing value will be set as "missing_value" and only the last key will remain.
+
+**Handling Throttle** : The throttle limit of 12 requests per 6 seconds or 120 requests per minute is handle automatically. It automatically pause the requests for 50 seconds when the limit is reached.
 
 ## GetReport2
 
