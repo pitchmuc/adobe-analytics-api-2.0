@@ -43,6 +43,7 @@ def get_token_and_expiry_for_config(config: dict, verbose: bool = False, save: b
     except KeyError:
         print('Issue retrieving token')
         print(json_response)
+        raise Exception(str(json_response))
     expiry = json_response['expires_in']
     if save:
         with open('token.txt', 'w') as f:
