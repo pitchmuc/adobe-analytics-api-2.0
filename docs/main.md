@@ -789,7 +789,7 @@ Example of the object being returned :
 
 ```python
 {'dimension': 'variables/eVarX',
-    'filters': {'globalFilters': ['2019-11-01T00:00:00.000/2019-12-01T00:00:00.000'],
+    'filters': {'globalFilters': ['2019-11-01T00:00:00.000/2019-12-01T00:00:00.000']},
     'metricsFilters': {}},##if any filters have been applied.
     'rsid': 'my.rsid',
     'metrics': ['metrics/visits'],
