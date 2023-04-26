@@ -15,7 +15,6 @@ class RequestCreator:
             "metrics": [],
             "metricFilters": [],
         },
-        "dimension": "",
         "settings": {
             "countRepeatInstances": True,
             "limit": 20000,

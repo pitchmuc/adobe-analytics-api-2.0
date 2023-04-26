@@ -2644,7 +2644,8 @@ class Analytics:
         if self.loggingEnabled:
             self.logger.debug(f"starting _dataDescriptor")
         obj = {}
-        obj['dimension'] = json_request['dimension']
+        if json_request.get('dimension',None) is not None:
+            obj['dimension'] = json_request.get('dimension')
         obj['filters'] = {'globalFilters': [], 'metricsFilters': {}}
         obj['rsid'] = json_request['rsid']
         metrics_info = json_request['metricContainer']
@@ -2731,12 +2732,12 @@ class Analytics:
         Retrieve data from a JSON request.Returns an object containing meta info and dataframe. 
         Arguments:
             json_request: REQUIRED : JSON statement that contains your request for Analytics API 2.0.
-            limit : OPTIONAL : number of result per request (defaut 1000)
-            The argument can be : 
+                The argument can be : 
                 - a dictionary : It will be used as it is.
                 - a string that is a dictionary : It will be transformed to a dictionary / JSON.
                 - a path to a JSON file that contains the statement (must end with ".json"). 
                 - an instance of the RequestCreator class
+            limit : OPTIONAL : number of result per request (defaut 1000)
             n_results : OPTIONAL : Number of result that you would like to retrieve. (default 1000)
                 if you want to have all possible data, use "inf".
             item_id : OPTIONAL : Boolean to define if you want to return the item id for sub requests (default False)
@@ -2891,7 +2892,7 @@ class Analytics:
         return expanded_rows
 
     def _decrypteStaticData(
-        self, dataRequest: dict = None, response: dict = None
+        self, dataRequest: dict = None, response: dict = None,resolveColumns:bool=False
     ) -> dict:
         """
         From the request dictionary and the response, decrypte the data to standardise the reading.
@@ -2950,9 +2951,14 @@ class Analytics:
                 staticRowsNames.append(filter["name"])
             else:
                 staticRowsNames.append(row)
-        staticRowDict = {
-            row: rowName for row, rowName in zip(staticRows, staticRowsNames)
-        }
+        if resolveColumns:
+            staticRowDict = {
+                row: self.getSegment(rowName).get('name',rowName) for row, rowName in zip(staticRows, staticRowsNames)
+            }
+        else:
+            staticRowDict = {
+                row: rowName for row, rowName in zip(staticRows, staticRowsNames)
+            }
         ### metrics
         dataRows = defaultdict(list)
         for row in staticRowDict:  ## iter on the different static rows
@@ -3118,7 +3124,7 @@ class Analytics:
                 segmentApplied,
                 filterRelations,
                 dataRows,
-            ) = self._decrypteStaticData(dataRequest=dataRequest, response=res)
+            ) = self._decrypteStaticData(dataRequest=dataRequest, response=res,resolveColumns=resolveColumns)
             ### Findings metrics
             metricFilters = {}
             metricColumns = []

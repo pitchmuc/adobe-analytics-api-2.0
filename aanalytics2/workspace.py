@@ -38,7 +38,7 @@ class Workspace:
             reportType : OPTIONAL : define type of report retrieved.(normal, static, multi)
             metrics : OPTIONAL : dictionary of the columns Id for normal report and list of columns name for Static report
             metricFilters : OPTIONAL : Filter name for the id of the filter
-            resolveColumns : OPTIONAL :
+            resolveColumns : OPTIONAL : If you want to resolve the column name and returning ID instead of name
         """
         for filter in dataRequest["globalFilters"]:
             if filter["type"] == "dateRange":
@@ -77,7 +77,7 @@ class Workspace:
         if reportType == "normal":
             columns_data = ["itemId"]
         elif reportType == "static":
-            columns_data = ["FilterName"]
+            columns_data = ["SegmentName"]
         ### adding dimensions & metrics in columns names when reportType is "normal"
         if "dimension" in dataRequest.keys() and reportType == "normal":
             columns_data.append(dataRequest["dimension"])
@@ -113,7 +113,7 @@ class Workspace:
                     columns_data.append(metrics[col])
         elif reportType == "static":
             metrics: list = metrics  ## case when a list is used
-            columns_data.append("FilterId")
+            columns_data.append("SegmentId")
             columns_data += metrics
         if df_init.empty == False and (
             reportType == "static" or reportType == "normal"

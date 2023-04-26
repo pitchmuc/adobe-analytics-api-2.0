@@ -4,12 +4,16 @@ This page will give you the change that are occuring when a new version has been
 The changes have been tracked starting version 0.1.0
 
 ## version 0.3.3
+
+
+## version 0.3.3
 * adding the width parameter on scheduling report.
 * parameterization of the logger generation + add new info for logging info on GET requests
 Patch: \
 * adding `shareComponent` method (from @loldenburg)
 * resolving metrics name (from @loldenburg)
 * fixing issue when using dynamic filter on report for `getReport2` method.
+* supporting requests for getReport2 for static row and resolve column
 
 ## version 0.3.2
 
