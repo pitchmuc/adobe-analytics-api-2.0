@@ -14,6 +14,7 @@ Patch: \
 * resolving metrics name (from @loldenburg)
 * fixing issue when using dynamic filter on report for `getReport2` method.
 * supporting requests for getReport2 for static row and resolve column
+* fix issue that getReport2 does not respect the JSON configure option for none-behavior and countRepeatInstances
 
 ## version 0.3.2
 

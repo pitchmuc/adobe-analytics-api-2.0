@@ -3034,18 +3034,20 @@ class Analytics:
         dataRequest["settings"]["limit"] = limit
         if returnsNone:
             dataRequest["settings"]["nonesBehavior"] = "return-nones"
+        elif dataRequest['settings'].get('nonesBehavior',False) != False:
+            pass ## keeping current settings
         else:
             dataRequest["settings"]["nonesBehavior"] = "exclude-nones"
         if countRepeatInstances:
             dataRequest["settings"]["countRepeatInstances"] = True
+        elif dataRequest["settings"].get("countRepeatInstances",False) != False:
+            pass ## keeping current settings
         else:
             dataRequest["settings"]["countRepeatInstances"] = False
         if rsid is not None:
             dataRequest["rsid"] = rsid
         if ignoreZeroes:
             dataRequest.get("statistics",{'ignoreZeroes':True})["ignoreZeroes"] = True
-        else:
-            dataRequest.get("statistics",{'ignoreZeroes':False})["ignoreZeroes"] = False
         ### Request data
         if self.loggingEnabled:
             self.logger.debug(f"getReport request: {json.dumps(dataRequest,indent=4)}")
