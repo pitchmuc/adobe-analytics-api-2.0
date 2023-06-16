@@ -3,10 +3,15 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.4.0
+
+* supporting Oauth Token V2 
+* Oauth Token V2 is the new default support when creating a config file
+* better respecting existing parameter via getReport2
+* raising exception on error for generating token
+
 ## version 0.3.3
 
-
-## version 0.3.3
 * adding the width parameter on scheduling report.
 * parameterization of the logger generation + add new info for logging info on GET requests
 Patch: \
