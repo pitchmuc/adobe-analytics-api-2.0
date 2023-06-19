@@ -9,6 +9,7 @@ The changes have been tracked starting version 0.1.0
 * Oauth Token V2 is the new default support when creating a config file
 * better respecting existing parameter via getReport2
 * raising exception on error for generating token
+* deepcopying the request made to `getReport2` method to avoid modification on original variable. 
 
 ## version 0.3.3
 

@@ -36,7 +36,16 @@ import aanalytics2 as api2
 api2.createConfigFile()
 ```
 
+
 This will create a JSON and you will need to fill it with the information available in your adobe io account.
+
+**NOTE**: starting version 0.4.0 the `createConfigFile` will by default create a Oauth Server to Server configuration file.
+You can always use the argument to change the behavior.
+
+Arguments for `createConfigFile`:
+
+* destination : OPTIONAL : the name of the file + path if you want
+* auth_type : OPTIONAL : The type of Oauth type you want to use for your config file. Possible value: "jwt" or "oauthV2"
 
 ## 4. Import the configuration file
 
@@ -47,6 +56,8 @@ I would recommend to store the config file and the key in the folder that you ar
 import aanalytics2 as api2
 api2.importConfigFile('myconfig.json')
 ```
+
+**Note**: starting version 0.4.0 the `importConfigFile` will check dynamically for the keys used to define the type of Auth. The check is Oauth V2 and then JWT. You can force the usage of a specific setup by passing the type of auth you want to priorize.
 
 ### Alternative 1 : Using the configure method
 
