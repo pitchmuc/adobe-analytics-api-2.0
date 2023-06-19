@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aanalytics2"
+authors = [
+    {name = "Julien Piccini", email = "piccini.julien@gmail.com"},
+]
+description = "Adobe Analytics API 2.0 and 1.4 python wrapper"
+readme = "README.md"
+requires-python = ">=3.7"
+keywords = ["adobe", "analytics", "API", "python"]
+license = {text = "Apache License 2.0"}
+classifiers = [
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Development Status :: 4 - Beta"
+]
+dependencies = [
+    'pandas>=0.25.3',
+    'pathlib2',
+    'pathlib',
+    'requests',
+    'PyJWT[crypto]',
+    'PyJWT',
+    "dicttoxml",
+    "pytest",
+    "openpyxl>2.6.0"
+]
+dynamic = ["version"]
+
+[project.urls]
+homepage = "https://github.com/pitchmuc/adobe-analytics-api-2.0"
+changelog = "https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/docs/releases.md"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["aanalytics2"]
+[tool.setuptools.package-data]
+mypkg = ["*.pickle"]
+
+[project.optional-dependencies]
+dynamic = ["version"]
