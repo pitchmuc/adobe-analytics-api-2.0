@@ -70,8 +70,7 @@ def get_oauth_token_and_expiry_for_config(config:dict,verbose:bool=False,save:bo
             "scope": config["scopes"]
         }
         response = requests.post(
-            config["oauthTokenEndpointV2"], data=oauth_payload, verify=False
-        )
+            config["oauthTokenEndpointV2"], data=oauth_payload)
         json_response = response.json()
         if 'access_token' in json_response.keys():
             token = json_response['access_token']

@@ -125,7 +125,7 @@ def configure(org_id: str = None,
         raise ValueError("`org_id` must be specified in the configuration.")
     if not client_id:
         raise ValueError("`client_id` must be specified in the configuration.")
-    if not tech_id and oauth == False:
+    if not tech_id and oauth == False and not scopes:
         raise ValueError("`tech_id` must be specified in the configuration.")
     if not secret and oauth == False:
         raise ValueError("`secret` must be specified in the configuration.")
