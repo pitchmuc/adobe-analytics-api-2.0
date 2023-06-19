@@ -3030,6 +3030,7 @@ class Analytics:
         else:
             raise ValueError("Require a JSON or Dictionary to request data")
         ### Settings
+        dataRequest = deepcopy(dataRequest)
         dataRequest["settings"]["page"] = 0
         dataRequest["settings"]["limit"] = limit
         if returnsNone:
@@ -3048,6 +3049,7 @@ class Analytics:
             dataRequest["rsid"] = rsid
         if ignoreZeroes:
             dataRequest.get("statistics",{'ignoreZeroes':True})["ignoreZeroes"] = True
+        deepCopyRequest = deepcopy(dataRequest)
         ### Request data
         if self.loggingEnabled:
             self.logger.debug(f"getReport request: {json.dumps(dataRequest,indent=4)}")
@@ -3159,7 +3161,7 @@ class Analytics:
             ## Using the class
             data = Workspace(
                 responseData=preparedData,
-                dataRequest=dataRequest,
+                dataRequest=deepCopyRequest,
                 columns=columns,
                 summaryData=summaryData,
                 analyticsConnector=self,
