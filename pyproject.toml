@@ -44,8 +44,6 @@ changelog = "https://github.com/pitchmuc/adobe-analytics-api-2.0/blob/master/doc
 [tool.setuptools]
 include-package-data = true
 
-[tool.setuptools.packages.find]
-where = ["aanalytics2"]
 [tool.setuptools.package-data]
 mypkg = ["*.pickle"]
 
