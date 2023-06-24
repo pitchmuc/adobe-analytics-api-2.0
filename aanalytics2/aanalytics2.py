@@ -26,7 +26,7 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs)->str:
     """
     LEGACY retrieve token directly following the importConfigFile or Configure method.
     """
-    token_with_expiry = token_provider.get_token_and_expiry_for_config(config.config_object,**kwargs)
+    token_with_expiry = token_provider.get_jwt_token_and_expiry_for_config(config.config_object,**kwargs)
     token = token_with_expiry['token']
     config.config_object['token'] = token
     config.config_object['date_limit'] = time.time() + token_with_expiry['expiry'] / 1000 - 500
