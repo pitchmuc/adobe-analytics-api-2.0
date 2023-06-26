@@ -26,7 +26,7 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs)->str:
     """
     LEGACY retrieve token directly following the importConfigFile or Configure method.
     """
-    token_with_expiry = token_provider.get_token_and_expiry_for_config(config.config_object,**kwargs)
+    token_with_expiry = token_provider.get_jwt_token_and_expiry_for_config(config.config_object,**kwargs)
     token = token_with_expiry['token']
     config.config_object['token'] = token
     config.config_object['date_limit'] = time.time() + token_with_expiry['expiry'] / 1000 - 500
@@ -1877,6 +1877,30 @@ class Analytics:
         path = f"/projects/{projectId}"
         res = self.connector.deleteData(self.endpoint_company + path, headers=self.header)
         return res
+    
+    def validateProject(self,projectObj:dict = None)->dict:
+        """
+        Validate a project definition based on the definition passed.
+        Arguments:
+            projectObj : REQUIRED : the dictionary that represents the Workspace definition.
+                requires the following elements: name,description,rsid, definition, owner
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting validateProject")
+        if projectObj is None and type(projectObj) != dict :
+            raise Exception("Requires a projectObj data to be sent to the server.")
+        if 'project' in projectObj.keys():
+            rsid = projectObj['project'].get('rsid',None)
+        else:
+            rsid = projectObj.get('rsid',None)
+            projectObj = {'project':projectObj}
+        if rsid is None:
+            raise Exception("Could not find a rsid parameter in your project definition")
+        path = "/projects/validate"
+        params = {'rsid':rsid}
+        res = self.connector.postData(self.endpoint_company + path, data=projectObj, headers=self.header,params=params)
+        return res
+
 
     def updateProject(self, projectId: str = None, projectObj: dict = None) -> dict:
         """
@@ -1892,7 +1916,7 @@ class Analytics:
             raise Exception("Requires a projectId parameter")
         path = f"/projects/{projectId}"
         if projectObj is None:
-            raise Exception("Requires a projectId parameter")
+            raise Exception("Requires a projectObj parameter")
         if 'name' not in projectObj.keys():
             raise KeyError("Requires name key in the project object")
         if 'description' not in projectObj.keys():
