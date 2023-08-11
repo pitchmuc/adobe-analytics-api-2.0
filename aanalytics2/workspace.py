@@ -166,7 +166,7 @@ class Workspace:
         """
         if filename is None:
             filename = f"cjapy_{int(time.time())}.csv"
-        self.df_init.to_csv(filename, delimiter=delimiter, index=index)
+        self.dataframe.to_csv(filename, sep=delimiter, index=index)
 
     def to_json(self, filename: str = None, orient: str = "index") -> IO:
         """
