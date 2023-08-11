@@ -177,7 +177,7 @@ class Workspace:
         """
         if filename is None:
             filename = f"cjapy_{int(time.time())}.json"
-        self.df_init.to_json(filename, orient=orient)
+        self.dataframe.to_json(filename, orient=orient)
 
     def breakdown(
         self,
