@@ -3,6 +3,12 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.4.1
+
+* updating legacy methods to support new system
+* migrating to V3 auth token generation
+* fixing the `Project` class for dynamic dimensions
+
 ## version 0.4.0
 
 * supporting Oauth Token V2 
@@ -14,6 +20,7 @@ The changes have been tracked starting version 0.1.0
 PATCH:
 * adding the `validateProject` method
 * Supporting the old version for the legacy `retrieveToken` method with the new method for JWT.
+* changing some methods to support new pandas version
 
 ## version 0.3.3
 

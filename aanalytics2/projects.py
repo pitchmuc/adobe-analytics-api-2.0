@@ -90,14 +90,20 @@ class Project:
             filters: list = panel.get('segmentGroups',[])
             if len(filters) > 0:
                 for element in filters:
-                    typeElement = element['componentOptions'][0].get('component',{}).get('type','')
-                    idElement = element['componentOptions'][0].get('component',{}).get('id','')
+                    if 'dynamicDimension' in element.keys():
+                        typeElement = element["dynamicDimension"]["type"]
+                        idElement = element["dynamicDimension"]["id"]
+                    else:
+                        typeElement = element['componentOptions'][0].get('component',{}).get('type','')
+                        idElement = element['componentOptions'][0].get('component',{}).get('id','')
                     if typeElement == "Segment":
                         dict_elements['segments'].append(idElement)
                     if typeElement == "DimensionItem":
                         clean_id: str = idElement[:idElement.find(
                             '::')]  ## cleaning this type of element : 'variables/evar7.6::3000623228'
                         dict_elements['dimensions'].append(clean_id)
+                    if typeElement == "Dimension":
+                        dict_elements["dimensions"].append(idElement)
             for subPanel in panel['subPanels']:
                 if subPanel['reportlet']['type'] == "FreeformReportlet":
                     reportlet = subPanel['reportlet']

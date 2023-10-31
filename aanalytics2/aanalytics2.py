@@ -257,7 +257,10 @@ class Analytics:
                     df.columns = ['index',f"request {index+1}"]
                     ## cleanup timestamp from request url
                     string = df.iloc[0,0]
-                    df.iloc[0,0] = re.search('http.*://(.+?)/s[0-9]+.*',string).group(1) # tracking server
+                    if 'http' in string:
+                        df.iloc[0,0] = re.search('http.*://(.+?)/s[0-9]+.*',string).group(1) # tracking server
+                    else:
+                        df.iloc[0,0] = string
                     df.set_index('index',inplace=True)
                     new_df = df
                     tmp_dfs2.append(new_df)
@@ -327,7 +330,7 @@ class Analytics:
                 df_append = pd.DataFrame(list_append)
             else:
                 df_append = pd.DataFrame(list_data)
-            df_rsids = df_rsids.append(df_append, ignore_index=True)
+            df_rsids = pd.concat([df_rsids,df_append], ignore_index=True)
         if save:
             if self.loggingEnabled:
                 self.logger.debug(f"saving rsids : {params}")
@@ -402,7 +405,7 @@ class Analytics:
                 df_append = pd.DataFrame(list_append)
             else:
                 df_append = pd.DataFrame(list_data)
-            df_vrsids = df_vrsids.append(df_append, ignore_index=True)
+            df_vrsids = pd.concat([df_vrsids,df_append], ignore_index=True)
         if save:
             df_vrsids.to_csv('VRSIDS.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
