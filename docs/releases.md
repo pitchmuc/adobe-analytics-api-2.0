@@ -8,7 +8,10 @@ The changes have been tracked starting version 0.1.0
 * updating legacy methods to support new system
 * migrating to V3 auth token generation
 * fixing the `Project` class for dynamic dimensions
-* supporting pandas 2.0.0 for concatenation
+* supporting pandas 2.0.0 for concatenation\
+Patch:
+* fix on full extract for `dimensions` and `metrics`.
+* fix on save to `getReport2`
 
 ## version 0.4.0
 

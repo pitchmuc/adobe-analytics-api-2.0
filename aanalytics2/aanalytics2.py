@@ -588,9 +588,8 @@ class Analytics:
         if description:
             columns.append('description')
         if kwargs.get('full', False):
-            support_columns = list(set([item for sublist in df_dims.support for item in sublist]))
             new_cols = pd.DataFrame(df_dims.support.values.tolist(),
-                                    columns=support_columns)  # extract list in column
+                                    columns=['support_oberon', 'support_dw','support_realtime'])  # extract list in column
             new_df = df_dims.merge(new_cols, right_index=True, left_index=True)
             new_df.drop(['reportable', 'support'], axis=1, inplace=True)
             df_dims = new_df
@@ -629,8 +628,7 @@ class Analytics:
         if description:
             columns.append('description')
         if kwargs.get('full', False):
-            support_columns = list(set([item for sublist in df_metrics.support for item in sublist]))
-            new_cols = pd.DataFrame(df_metrics.support.values.tolist(), columns=support_columns)
+            new_cols = pd.DataFrame(df_metrics.support.values.tolist(), columns=['support_oberon', 'support_dw','support_realtime'])
             new_df = df_metrics.merge(
                 new_cols, right_index=True, left_index=True)
             new_df.drop('support', axis=1, inplace=True)
