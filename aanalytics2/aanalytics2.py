@@ -582,6 +582,9 @@ class Analytics:
         df_dims = pd.DataFrame(dims)
         columns = ['id', 'name', 'category', 'type',
                    'parent', 'pathable']
+        for col in columns:
+            if col not in df_dims.columns:
+                df_dims[col] = ""
         if description:
             columns.append('description')
         if kwargs.get('full', False):
