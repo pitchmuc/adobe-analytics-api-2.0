@@ -203,15 +203,15 @@ class Bulkapi:
         """
         if file.endswith(".gz"):
             return file
-        else:  # if sending not gzipped file.
-            new_folder = Path('tmp/')
+        else:  # if sending not gzipped file. Need to convert them to gzip.
+            new_folder = Path('tmp/') # new folder where the temporary file will be located
             new_folder.mkdir(exist_ok=True)
             with open(file, "r",encoding=encoding) as f:
                 content = f.read()
                 new_path = new_folder / f"{file}.gz"
                 with gzip.open(Path(new_path), 'wb') as f:
-                    f.write(content.encode('utf-8'))
-                # save the filename to delete
+                    f.write(content.encode(encoding))
+                # save the filename to delete later
                 self._createdFiles.append(new_path)
             return new_path
 

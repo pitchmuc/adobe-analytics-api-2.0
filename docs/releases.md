@@ -12,6 +12,7 @@ The changes have been tracked starting version 0.1.0
 Patch:
 * fix on full extract for `dimensions` and `metrics`.
 * fix on save to `getReport2`
+* adding support for other folder location for ingestion files.
 
 ## version 0.4.0
 
