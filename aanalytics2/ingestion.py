@@ -208,7 +208,8 @@ class Bulkapi:
             new_folder.mkdir(exist_ok=True)
             with open(file, "r",encoding=encoding) as f:
                 content = f.read()
-                new_path = new_folder / f"{file}.gz"
+                file_name = Path(file).name
+                new_path = new_folder / f"{file_name}.gz"
                 with gzip.open(Path(new_path), 'wb') as f:
                     f.write(content.encode(encoding))
                 # save the filename to delete later
