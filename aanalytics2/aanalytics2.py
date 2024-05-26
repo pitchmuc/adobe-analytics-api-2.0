@@ -129,6 +129,7 @@ class Analytics:
     _getCalcMetrics = '/calculatedmetrics'
     _getDateRanges = '/dateranges'
     _getReport = '/reports'
+    _getAlerts = '/1.0/alerts'
     loggingEnabled = False
     logger = None
 
@@ -3208,3 +3209,44 @@ class Analytics:
             if save:
                 data.to_csv()
             return data
+
+
+    def getAlerts(self, definition: bool=False, format: str="df") -> JsonListOrDataFrameType:
+        """
+        Get Alerts.
+        Arguments:
+            includeType : OPTIONAL : By default gets all Alerts. (default "all")
+                You can specify e.g. "shared" to get only the ones shared to you.
+            definition : OPTIONAL : Gets the full definition per Alert with used segments, metrics, and operators
+            format : OPTIONAL : Define the format you want to output the result. Default "df" for dataframe, other option "raw"
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getAlerts")
+        params = {"includeType": "all",
+                  "pagination": True,
+                  "locale": "en_US",
+                  "page": 0,
+                  "limit": 1000,
+                  "expansion": "definition"
+                  }
+        path = self._getAlerts
+        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
+        if res.get("content") is None:
+            raise Exception(f"Get Alerts Job had no content in response. Parameters were: {params}")
+        # get Alerts into Data Frame
+        data = res.get("content")
+        last_page = res.get("lastPage",True)
+        total_el = res.get("totalElements")
+        number_el = res.get("numberOfElements")
+        # iterate through pages if not on last page yet
+        while last_page == False:
+            if self.loggingEnabled:
+                self.logger.debug(f"last_page is {last_page}, next round")
+            params["page"] += 1
+            res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
+            data += res.get("content")
+            last_page = res.get("lastPage",True)
+        if format == "df":
+            df = pd.DataFrame(data)
+            return df
+        return data
