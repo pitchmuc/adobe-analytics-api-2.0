@@ -3,6 +3,26 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.4.2
+
+* adding `getAlerts` method
+* adding `classifications` methods.
+  * getClassificationDatasets
+  * getClassificationDataset
+  * getClassificationJobs
+  * getClassificationJob
+  * deleteClassification
+  * importClassification
+  * createExportClassification
+  * getExportClassificationFile
+  * getClassificationTemplate
+* adding `datawarehouse` methods.
+  * getDataWarehouseReports
+  * getDataWarehouseReport
+  * resendDataWarehouseReport
+  * getDataWarehouseScheduledRequests
+  * getDataWarehouseScheduledRequest
+
 ## version 0.4.1
 
 * updating legacy methods to support new system
