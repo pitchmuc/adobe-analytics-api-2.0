@@ -3524,8 +3524,9 @@ class Analytics:
                   "locale": "en_US",
                   "page": 0,
                   "limit": 1000,
-                  "expansion": "definition"
                   }
+        if definition:
+            params["expansion"] = "definition"
         path = self._getAlerts
         res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         if res.get("content") is None:
@@ -3533,8 +3534,6 @@ class Analytics:
         # get Alerts into Data Frame
         data = res.get("content")
         last_page = res.get("lastPage", True)
-        total_el = res.get("totalElements")
-        number_el = res.get("numberOfElements")
         # iterate through pages if not on last page yet
         while last_page == False:
             if self.loggingEnabled:
@@ -3551,54 +3550,69 @@ class Analytics:
     def getAlert(self, alertId: str) -> dict:
         """
         gets an individual Alert as a dictionary
-        @param alertId: Alert ID
+        Arguments:
+            alertId : REQUIRED : Alert ID to be retrieved
         """
+        if alertId is None:
+            raise ValueError("alertId is required")
         path = f"{self._getAlerts}/{alertId}"
         res = self.connector.getData(self.endpoint_company + path, headers=self.header)
         return res
 
-    def updateAlert(self, alertId: str, data: dict) -> dict:
+    def updateAlert(self, alertId: str = None, data: dict = None) -> dict:
         """
         Wrapper for all methods to update an Alert.
         Arguments:
             alertId : REQUIRED : Alert ID to change
             data : REQUIRED : Parameters to change
         """
+        if alertId is None:
+            raise ValueError("Require an alert ID")
+        if data is None:
+            raise ValueError("Require the data to be passed for update")
         path = f"{self._getAlerts}/{alertId}"
         return self.connector.putData(self.endpoint_company + path, data=data, headers=self.header)
 
-    def disableAlert(self, alertId: str) -> dict:
+    def disableAlert(self, alertId: str = None) -> dict:
         """
         Disable an Alert.
         Arguments:
             alertId : REQUIRED : Alert ID to disable
         """
-
+        if alertId is None:
+            raise ValueError("Alert ID is required")
         return self.updateAlert(alertId=alertId, data={"isDisabled": True})
 
-    def enableAlert(self, alertId: str) -> dict:
+    def enableAlert(self, alertId: str = None) -> dict:
         """
         Enable an Alert.
         Arguments:
             alertId : REQUIRED : Alert ID to enable
         """
-
+        if alertId is None:
+            raise ValueError("Require an alert ID")
         return self.updateAlert(alertId=alertId, data={"isDisabled": False})
 
-    def deleteAlert(self, alertId: str) -> int:
+    def deleteAlert(self, alertId: str=None) -> int:
         """
         Delete an Alert. Returns 200 if successful.
         Arguments:
             alertId : REQUIRED : ID of Alert to delete
         """
+        if alertId is None:
+            raise ValueError("Alert ID should be provided")
         path = f"{self._getAlerts}/{alertId}"
         return self.connector.deleteData(self.endpoint_company + path, headers=self.header)
 
-    def renewAlerts(self, alertIds: list) -> list:  # todo
+    def renewAlerts(self, alertIds: list=None) -> list:  # todo
         """
         Renew a list of Alerts. Returns a list of dictionaries with the status per Alert ID.
         Arguments:
             alertId : REQUIRED : IDs of Alerts to renew
         """
+        if alertIds is None:
+            raise ValueError("Require alertIds list to be passed")
+        if type(alertIds) != list:
+            raise TypeError("alertIds must be a list")
         path = f"{self._getAlerts}/reenable"
         return self.connector.putData(self.endpoint_company + path, data=alertIds, headers=self.header)
