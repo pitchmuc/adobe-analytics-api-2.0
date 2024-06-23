@@ -21,12 +21,13 @@ from .workspace import Workspace
 
 JsonOrDataFrameType = Union[pd.DataFrame, dict]
 JsonListOrDataFrameType = Union[pd.DataFrame, List[dict]]
-    
-def retrieveToken(verbose: bool = False, save: bool = False, **kwargs)->str:
+
+
+def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
     """
     LEGACY retrieve token directly following the importConfigFile or Configure method.
     """
-    token_with_expiry = token_provider.get_jwt_token_and_expiry_for_config(config.config_object,**kwargs)
+    token_with_expiry = token_provider.get_jwt_token_and_expiry_for_config(config.config_object, **kwargs)
     token = token_with_expiry['token']
     config.config_object['token'] = token
     config.config_object['date_limit'] = time.time() + token_with_expiry['expiry'] / 1000 - 500
@@ -36,14 +37,15 @@ def retrieveToken(verbose: bool = False, save: bool = False, **kwargs)->str:
     return token
 
 
-
 class Login:
     """
     Class to connect to the the login company.
     """
     loggingEnabled = False
     logger = None
-    def __init__(self, config: dict = config.config_object, header: dict = config.header, retry: int = 0,loggingObject:dict=None) -> None:
+
+    def __init__(self, config: dict = config.config_object, header: dict = config.header, retry: int = 0,
+                 loggingObject: dict = None) -> None:
         """
         Instantiate the Loggin class.
         Arguments:
@@ -52,7 +54,8 @@ class Login:
             retry : OPTIONAL : if you want to retry, the number of time to retry
             loggingObject : OPTIONAL : If you want to set logging capability for your actions.
         """
-        if loggingObject is not None and sorted(["level","stream","format","filename","file"]) == sorted(list(loggingObject.keys())):
+        if loggingObject is not None and sorted(["level", "stream", "format", "filename", "file"]) == sorted(
+                list(loggingObject.keys())):
             self.loggingEnabled = True
             self.logger = logging.getLogger(f"{__name__}.login")
             self.logger.setLevel(loggingObject["level"])
@@ -69,13 +72,12 @@ class Login:
                 streamHandler.setFormatter(formatter)
                 self.logger.addHandler(streamHandler)
         self.connector = connector.AdobeRequest(
-            config_object=config, header=header, retry=retry,loggingEnabled=self.loggingEnabled,logger=self.logger)
+            config_object=config, header=header, retry=retry, loggingEnabled=self.loggingEnabled, logger=self.logger)
         self.header = self.connector.header
         self.COMPANY_IDS = {}
         self.retry = retry
-            
 
-    def getCompanyId(self,verbose:bool=False) -> dict:
+    def getCompanyId(self, verbose: bool = False) -> dict:
         """
         Retrieve the company ids for later call for the properties.
         """
@@ -98,7 +100,7 @@ class Login:
                 self.logger.error(f"Error trying to get companyId: {json_res}")
             return None
 
-    def createAnalyticsConnection(self, companyId: str = None,loggingObject:dict=None) -> object:
+    def createAnalyticsConnection(self, companyId: str = None, loggingObject: dict = None) -> object:
         """
         Returns an instance of the Analytics class so you can query the different elements from that instance.
         Arguments:
@@ -107,7 +109,8 @@ class Login:
         the retry parameter set in the previous class instantiation will be used here.
         """
         analytics = Analytics(company_id=companyId,
-                              config_object=self.connector.config, header=self.header, retry=self.retry,loggingObject=loggingObject)
+                              config_object=self.connector.config, header=self.header, retry=self.retry,
+                              loggingObject=loggingObject)
         return analytics
 
 
@@ -135,7 +138,7 @@ class Analytics:
     logger = None
 
     def __init__(self, company_id: str = None, config_object: dict = config.config_object, header: dict = config.header,
-                 retry: int = 0,loggingObject:dict=None):
+                 retry: int = 0, loggingObject: dict = None):
         """
         Instantiate the Analytics class.
         The Analytics class will be automatically connected to the API 2.0.
@@ -146,12 +149,13 @@ class Analytics:
             retry : OPTIONAL : Number of time you want to retrieve fail calls
             loggingObject : OPTIONAL : logging object to log actions during runtime.
             config_object : OPTIONAL : config object to be used for setting token (do not update if you do not know)
-            header : OPTIONAL : template header used for all requests (do not update if you do not know!) 
+            header : OPTIONAL : template header used for all requests (do not update if you do not know!)
         """
         if company_id is None:
             raise AttributeError(
                 'Expected "company_id" to be referenced.\nPlease ensure you pass the globalCompanyId when instantiating this class.')
-        if loggingObject is not None and sorted(["level","stream","format","filename","file"]) == sorted(list(loggingObject.keys())):
+        if loggingObject is not None and sorted(["level", "stream", "format", "filename", "file"]) == sorted(
+                list(loggingObject.keys())):
             self.loggingEnabled = True
             self.logger = logging.getLogger(f"{__name__}.analytics")
             self.logger.setLevel(loggingObject["level"])
@@ -168,7 +172,8 @@ class Analytics:
                 streamHandler.setFormatter(formatter)
                 self.logger.addHandler(streamHandler)
         self.connector = connector.AdobeRequest(
-            config_object=config_object, header=header, retry=retry,loggingEnabled=self.loggingEnabled,logger=self.logger)
+            config_object=config_object, header=header, retry=retry, loggingEnabled=self.loggingEnabled,
+            logger=self.logger)
         self.header = self.connector.header
         self.connector.header['x-proxy-global-company-id'] = company_id
         self.header['x-proxy-global-company-id'] = company_id
@@ -196,23 +201,23 @@ class Analytics:
         except:
             self.LOGS_EVENT_TYPE = "no data"
 
-    def __str__(self)->str:
+    def __str__(self) -> str:
         obj = {
-            "endpoint" : self.endpoint_company,
-            "companyId" : self.company_id,
-            "header" : self.header,
-            "token" : self.connector.config['token']
+            "endpoint": self.endpoint_company,
+            "companyId": self.company_id,
+            "header": self.header,
+            "token": self.connector.config['token']
         }
-        return json.dumps(obj,indent=4)
-    
-    def __repr__(self)->str:
+        return json.dumps(obj, indent=4)
+
+    def __repr__(self) -> str:
         obj = {
-            "endpoint" : self.endpoint_company,
-            "companyId" : self.company_id,
-            "header" : self.header,
-            "token" : self.connector.config['token']
+            "endpoint": self.endpoint_company,
+            "companyId": self.company_id,
+            "header": self.header,
+            "token": self.connector.config['token']
         }
-        return json.dumps(obj,indent=4)
+        return json.dumps(obj, indent=4)
 
     def refreshToken(self, token: str = None):
         if token is None:
@@ -220,7 +225,8 @@ class Analytics:
                 'Expected "token" to be referenced.\nPlease ensure you pass the token.')
         self.header['Authorization'] = "Bearer " + token
 
-    def decodeAArequests(self,file:IO=None,urls:Union[list,str]=None,save:bool=False,**kwargs)->pd.DataFrame:
+    def decodeAArequests(self, file: IO = None, urls: Union[list, str] = None, save: bool = False,
+                         **kwargs) -> pd.DataFrame:
         """
         Takes any of the parameter to load adobe url and decompose the requests into a dataframe, that you can save if you want.
         Arguments:
@@ -237,50 +243,48 @@ class Analytics:
             raise ValueError("Require at least file or urls to contains data")
         if file is not None:
             if '.txt' in file:
-                with open(file,'r',encoding=kwargs.get('encoding','utf-8')) as f:
-                    urls = f.readlines() ## passing decoding to urls
+                with open(file, 'r', encoding=kwargs.get('encoding', 'utf-8')) as f:
+                    urls = f.readlines()  ## passing decoding to urls
             elif '.xlsx' in file:
-                temp_df = pd.read_excel(file,header=None)
-                urls = list(temp_df[0]) ## passing decoding to urls
+                temp_df = pd.read_excel(file, header=None)
+                urls = list(temp_df[0])  ## passing decoding to urls
         if urls is not None:
             if type(urls) == str:
                 data = parse.parse_qsl(urls)
                 df = pd.DataFrame(data)
-                df.columns = ['index','request']
-                df.set_index('index',inplace=True)
+                df.columns = ['index', 'request']
+                df.set_index('index', inplace=True)
                 if save:
                     df.to_csv(f'request_{int(time.time())}.csv')
                 return df
-            elif type(urls) == list: ## decoding list of strings
+            elif type(urls) == list:  ## decoding list of strings
                 tmp_list = [parse.parse_qsl(data) for data in urls]
                 tmp_dfs = [pd.DataFrame(data) for data in tmp_list]
                 tmp_dfs2 = []
-                for df, index in zip(tmp_dfs,range(len(tmp_dfs))):
-                    df.columns = ['index',f"request {index+1}"]
+                for df, index in zip(tmp_dfs, range(len(tmp_dfs))):
+                    df.columns = ['index', f"request {index + 1}"]
                     ## cleanup timestamp from request url
-                    string = df.iloc[0,0]
+                    string = df.iloc[0, 0]
                     if 'http' in string:
-                        df.iloc[0,0] = re.search('http.*://(.+?)/s[0-9]+.*',string).group(1) # tracking server
+                        df.iloc[0, 0] = re.search('http.*://(.+?)/s[0-9]+.*', string).group(1)  # tracking server
                     else:
-                        df.iloc[0,0] = string
-                    df.set_index('index',inplace=True)
+                        df.iloc[0, 0] = string
+                    df.set_index('index', inplace=True)
                     new_df = df
                     tmp_dfs2.append(new_df)
-                df_full = pd.concat(tmp_dfs2,axis=1)
+                df_full = pd.concat(tmp_dfs2, axis=1)
         if save:
             df_full.to_csv(f'requests_{int(time.time())}.csv')
         return df_full
-
-        
 
     def getReportSuites(self, txt: str = None, rsid_list: str = None, limit: int = 100, extended_info: bool = False,
                         save: bool = False) -> list:
         """
         Get the reportSuite IDs data. Returns a dataframe of reportSuite name and report suite id.
-        Arguments: 
+        Arguments:
             txt : OPTIONAL : returns the reportSuites that matches a speific text field
             rsid_list : OPTIONAL : returns the reportSuites that matches the list of rsids set
-            limit : OPTIONAL : How many reportSuite retrieves per serverCall 
+            limit : OPTIONAL : How many reportSuite retrieves per serverCall
             save : OPTIONAL : if set to True, it will save the list in a file. (Default False)
 
         """
@@ -332,7 +336,7 @@ class Analytics:
                 df_append = pd.DataFrame(list_append)
             else:
                 df_append = pd.DataFrame(list_data)
-            df_rsids = pd.concat([df_rsids,df_append], ignore_index=True)
+            df_rsids = pd.concat([df_rsids, df_append], ignore_index=True)
         if save:
             if self.loggingEnabled:
                 self.logger.debug(f"saving rsids : {params}")
@@ -407,7 +411,7 @@ class Analytics:
                 df_append = pd.DataFrame(list_append)
             else:
                 df_append = pd.DataFrame(list_data)
-            df_vrsids = pd.concat([df_vrsids,df_append], ignore_index=True)
+            df_vrsids = pd.concat([df_vrsids, df_append], ignore_index=True)
         if save:
             df_vrsids.to_csv('VRSIDS.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
@@ -484,7 +488,8 @@ class Analytics:
         else:
             if 'name' not in data_dict.keys() or 'parentRsid' not in data_dict.keys() or 'segmentList' not in data_dict.keys() or 'dataSchema' not in data_dict.keys():
                 if self.loggingEnabled:
-                    self.logger.error(f"Missing one or more fundamental keys : name, parentRsid, segmentList, dataSchema")
+                    self.logger.error(
+                        f"Missing one or more fundamental keys : name, parentRsid, segmentList, dataSchema")
                 raise Exception("Missing one or more fundamental keys : name, parentRsid, segmentList, dataSchema")
             body = data_dict
         res = self.connector.postData(
@@ -560,7 +565,8 @@ class Analytics:
             self.logger.debug(f"validateVirtualReportSuite response : {res}")
         return res
 
-    def getDimensions(self, rsid: str, tags: bool = False, description:bool=False, save=False, **kwargs) -> pd.DataFrame:
+    def getDimensions(self, rsid: str, tags: bool = False, description: bool = False, save=False,
+                      **kwargs) -> pd.DataFrame:
         """
         Retrieve the list of dimensions from a specific reportSuite. Shrink columns to simplify output.
         Returns the data frame of available dimensions.
@@ -591,7 +597,8 @@ class Analytics:
             columns.append('description')
         if kwargs.get('full', False):
             new_cols = pd.DataFrame(df_dims.support.values.tolist(),
-                                    columns=['support_oberon', 'support_dw','support_realtime'])  # extract list in column
+                                    columns=['support_oberon', 'support_dw',
+                                             'support_realtime'])  # extract list in column
             new_df = df_dims.merge(new_cols, right_index=True, left_index=True)
             new_df.drop(['reportable', 'support'], axis=1, inplace=True)
             df_dims = new_df
@@ -601,14 +608,15 @@ class Analytics:
             df_dims.to_csv(f'dimensions_{rsid}.csv')
         return df_dims
 
-    def getMetrics(self, rsid: str, tags: bool = False, save=False, description:bool=False, dataGroup:bool=False, **kwargs) -> pd.DataFrame:
+    def getMetrics(self, rsid: str, tags: bool = False, save=False, description: bool = False, dataGroup: bool = False,
+                   **kwargs) -> pd.DataFrame:
         """
         Retrieve the list of metrics from a specific reportSuite. Shrink columns to simplify output.
         Returns the data frame of available metrics.
         Arguments:
             rsid : REQUIRED : Report Suite ID from which you want the dimensions (str)
             tags : OPTIONAL : If you would like to have additional information, such as tags.(bool : default False)
-            dataGroup : OPTIONAL : Adding dataGroups to the column exported. Default False. 
+            dataGroup : OPTIONAL : Adding dataGroups to the column exported. Default False.
                 May break the report.
             save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
         Possible kwargs:
@@ -630,7 +638,8 @@ class Analytics:
         if description:
             columns.append('description')
         if kwargs.get('full', False):
-            new_cols = pd.DataFrame(df_metrics.support.values.tolist(), columns=['support_oberon', 'support_dw','support_realtime'])
+            new_cols = pd.DataFrame(df_metrics.support.values.tolist(),
+                                    columns=['support_oberon', 'support_dw', 'support_realtime'])
             new_df = df_metrics.merge(
                 new_cols, right_index=True, left_index=True)
             new_df.drop('support', axis=1, inplace=True)
@@ -645,10 +654,10 @@ class Analytics:
         """
         Retrieve the list of users for a login company.Returns a data frame.
         Arguments:
-            save : OPTIONAL : Save the data in a file (bool : default False). 
-        Possible kwargs: 
+            save : OPTIONAL : Save the data in a file (bool : default False).
+        Possible kwargs:
             limit :  Nummber of results per requests. Default 100.
-            expansion : string list such as "lastAccess,createDate"  
+            expansion : string list such as "lastAccess,createDate"
         """
         if self.loggingEnabled:
             self.logger.debug(f"Starting getUsers")
@@ -694,8 +703,8 @@ class Analytics:
             print(
                 f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve users or increase limit')
         return df_users
-    
-    def getUserMe(self,loginId:str=None)->dict:
+
+    def getUserMe(self, loginId: str = None) -> dict:
         """
         Retrieve a single user based on its loginId
         Argument:
@@ -709,11 +718,11 @@ class Analytics:
                     sidFilter: list = None, extended_info: bool = False, format: str = "df", save: bool = False,
                     verbose: bool = False, **kwargs) -> JsonListOrDataFrameType:
         """
-        Retrieve the list of segments. Returns a data frame. 
+        Retrieve the list of segments. Returns a data frame.
         Arguments:
             name : OPTIONAL : Filter to only include segments that contains the name (str)
             tagNames : OPTIONAL : Filter list to only include segments that contains one of the tags (string delimited with comma, can be list as well)
-            inclType : OPTIONAL : type of segments to be retrieved.(str) Possible values: 
+            inclType : OPTIONAL : type of segments to be retrieved.(str) Possible values:
                 - all : Default value (all segments possibles)
                 - shared : shared segments
                 - template : template segments
@@ -725,7 +734,7 @@ class Analytics:
             extended_info : OPTIONAL : additional segment metadata fields to include on response (bool : default False)
                 if set to true, returns reportSuiteName, ownerFullName, modified, tags, compatibility, definition
             format : OPTIONAL : defined the format returned by the query. (Default df)
-                possibe values : 
+                possibe values :
                     "df" : default value that return a dataframe
                     "raw": return a list of value. More or less what is return from server.
             save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
@@ -734,7 +743,7 @@ class Analytics:
         Possible kwargs:
             limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.
 
-        NOTE : Segment Endpoint doesn't support multi-threading. Default to 500. 
+        NOTE : Segment Endpoint doesn't support multi-threading. Default to 500.
         """
         if self.loggingEnabled:
             self.logger.debug(f"Starting getSegments")
@@ -783,11 +792,11 @@ class Analytics:
                 print(
                     f'Saving data in file : {os.getcwd()}{os.sep}segments_{int(time.time())}.csv')
         elif save and format == "raw":
-            with open(f"segments_{int(time.time())}.csv","w") as f:
-                f.write(json.dumps(segments,indent=4))
+            with open(f"segments_{int(time.time())}.csv", "w") as f:
+                f.write(json.dumps(segments, indent=4))
         return segments
 
-    def getSegment(self, segment_id: str = None,full:bool=False, *args) -> dict:
+    def getSegment(self, segment_id: str = None, full: bool = False, *args) -> dict:
         """
         Get a specific segment from the ID. Returns the object of the segment.
         Arguments:
@@ -819,8 +828,8 @@ class Analytics:
             params = {'expansion': ','.join(ValidArgs)}
         res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         return res
-    
-    def scanSegment(self,segment:Union[str,dict],verbose:bool=False)->dict:
+
+    def scanSegment(self, segment: Union[str, dict], verbose: bool = False) -> dict:
         """
         Return the dimensions, metrics and reportSuite used and the main scope of the segment.
         Arguments:
@@ -832,7 +841,7 @@ class Analytics:
         if type(segment) == str:
             if verbose:
                 print('retrieving segment definition')
-            defSegment = self.getSegment(segment,full=True)
+            defSegment = self.getSegment(segment, full=True)
         elif type(segment) == dict:
             defSegment = deepcopy(segment)
             if 'definition' not in defSegment.keys():
@@ -840,15 +849,15 @@ class Analytics:
             if verbose:
                 print('copied segment definition')
         mydef = str(defSegment['definition'])
-        dimensions : list = re.findall("'(variables/.+?)'",mydef)
-        metrics : list = re.findall("'(metrics/.+?)'",mydef)
+        dimensions: list = re.findall("'(variables/.+?)'", mydef)
+        metrics: list = re.findall("'(metrics/.+?)'", mydef)
         reportSuite = defSegment['rsid']
-        scope = re.search("'context': '(.+)'}[^'context']+",mydef)
+        scope = re.search("'context': '(.+)'}[^'context']+", mydef)
         res = {
-            'dimensions' : set(dimensions) if len(dimensions)>0 else {},
-            'metrics' : set(metrics) if len(metrics)>0 else {},
-            'rsid' : reportSuite,
-            'scope' : scope.group(1)
+            'dimensions': set(dimensions) if len(dimensions) > 0 else {},
+            'metrics': set(metrics) if len(metrics) > 0 else {},
+            'rsid': reportSuite,
+            'scope': scope.group(1)
         }
         return res
 
@@ -871,7 +880,7 @@ class Analytics:
             headers=self.header
         )
         return seg
-    
+
     def createSegmentValidate(self, segmentJSON: dict = None) -> object:
         """
         Method that validate a new segment based on the dictionary passed to it.
@@ -886,7 +895,7 @@ class Analytics:
             return None
         data = deepcopy(segmentJSON)
         path = "/segments/validate"
-        seg = self.connector.postData(self.endpoint_company +path,data=data)
+        seg = self.connector.postData(self.endpoint_company + path, data=data)
         return seg
 
     def updateSegment(self, segmentID: str = None, segmentJSON: dict = None) -> object:
@@ -894,7 +903,7 @@ class Analytics:
         Method that updates a specific segment based on the dictionary passed to it.
         Arguments:
             segmentID : REQUIRED : Segment ID to be updated
-            segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment. 
+            segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment.
         """
         if self.loggingEnabled:
             self.logger.debug(f"starting updateSegment")
@@ -934,15 +943,15 @@ class Analytics:
             rsids_list: list = None,
             extended_info: bool = False,
             save=False,
-            format:str='df',
+            format: str = 'df',
             **kwargs
     ) -> pd.DataFrame:
         """
-        Retrieve the list of calculated metrics. Returns a data frame. 
+        Retrieve the list of calculated metrics. Returns a data frame.
         Arguments:
             name : OPTIONAL : Filter to only include calculated metrics that contains the name (str)
             tagNames : OPTIONAL : Filter list to only include calculated metrics that contains one of the tags (string delimited with comma, can be list as well)
-            inclType : OPTIONAL : type of calculated Metrics to be retrieved. (str) Possible values: 
+            inclType : OPTIONAL : type of calculated Metrics to be retrieved. (str) Possible values:
                 - all : Default value (all calculated metrics possibles)
                 - shared : shared calculated metrics
                 - template : template calculated metrics
@@ -988,15 +997,15 @@ class Analytics:
                 lastPage = metrics['lastPage']
         if format == "raw":
             if save:
-                with open(f'calculated_metrics_{int(time.time())}.json','w') as f:
-                    f.write(json.dumps(data,indent=4))
+                with open(f'calculated_metrics_{int(time.time())}.json', 'w') as f:
+                    f.write(json.dumps(data, indent=4))
             return data
         df_calc_metrics = pd.DataFrame(data)
         if save:
             df_calc_metrics.to_csv(f'calculated_metrics_{int(time.time())}.csv', sep='\t')
         return df_calc_metrics
 
-    def getCalculatedMetric(self,calculatedMetricId:str=None,full:bool=True)->dict:
+    def getCalculatedMetric(self, calculatedMetricId: str = None, full: bool = True) -> dict:
         """
         Return a dictionary on the calculated metrics requested.
         Arguments:
@@ -1010,12 +1019,13 @@ class Analytics:
             self.logger.debug(f"starting getCalculatedMetric for {calculatedMetricId}")
         params = {}
         if full:
-            params.update({'expansion': 'reportSuiteName,definition,ownerFullName,modified,tags,categories,compatibility'})
+            params.update(
+                {'expansion': 'reportSuiteName,definition,ownerFullName,modified,tags,categories,compatibility'})
         path = f"/calculatedmetrics/{calculatedMetricId}"
-        res = self.connector.getData(self.endpoint_company+path,params=params)
+        res = self.connector.getData(self.endpoint_company + path, params=params)
         return res
-    
-    def scanCalculatedMetric(self,calculatedMetric:Union[str,dict],verbose:bool=False)->dict:
+
+    def scanCalculatedMetric(self, calculatedMetric: Union[str, dict], verbose: bool = False) -> dict:
         """
         Return a dictionary of metrics and dimensions used in the calculated metrics.
         """
@@ -1024,7 +1034,7 @@ class Analytics:
         if type(calculatedMetric) == str:
             if verbose:
                 print('retrieving calculated metrics definition')
-            cm = self.getCalculatedMetric(calculatedMetric,full=True)
+            cm = self.getCalculatedMetric(calculatedMetric, full=True)
         elif type(calculatedMetric) == dict:
             cm = deepcopy(calculatedMetric)
             if 'definition' not in cm.keys():
@@ -1032,21 +1042,20 @@ class Analytics:
             if verbose:
                 print('copied calculated metrics definition')
         mydef = str(cm['definition'])
-        segments:list = cm['compatibility'].get('segments',[])
-        res = {"dimensions":[],'metrics':[]}
+        segments: list = cm['compatibility'].get('segments', [])
+        res = {"dimensions": [], 'metrics': []}
         for segment in segments:
             if verbose:
                 print(f"retrieving segment {segment} definition")
-            tmp:dict = self.scanSegment(segment)
+            tmp: dict = self.scanSegment(segment)
             res['dimensions'] += [dim for dim in tmp['dimensions']]
             res['metrics'] += [met for met in tmp['metrics']]
-        metrics : list = re.findall("'(metrics/.+?)'",mydef)
+        metrics: list = re.findall("'(metrics/.+?)'", mydef)
         res['metrics'] += metrics
         res['rsid'] = cm['rsid']
-        res['metrics'] = set(res['metrics']) if len(res['metrics'])>0 else {}
-        res['dimensions'] = set(res['dimensions']) if len(res['dimensions'])>0 else {}
+        res['metrics'] = set(res['metrics']) if len(res['metrics']) > 0 else {}
+        res['dimensions'] = set(res['dimensions']) if len(res['dimensions']) > 0 else {}
         return res
-
 
     def createCalculatedMetric(self, metricJSON: dict = None) -> dict:
         """
@@ -1070,8 +1079,8 @@ class Analytics:
         cm = self.connector.postData(self.endpoint_company +
                                      self._getCalcMetrics, headers=self.header, data=metricJSON)
         return cm
-    
-    def createCalculatedMetricValidate(self,metricJSON: dict=None)->dict:
+
+    def createCalculatedMetricValidate(self, metricJSON: dict = None) -> dict:
         """
         Method that validate a specific calculated metrics definition based on the dictionary passed to it.
         Arguments:
@@ -1089,7 +1098,7 @@ class Analytics:
             raise KeyError(
                 'Expected "name", "definition" and "rsid" in the data')
         path = "/calculatedmetrics/validate"
-        cm = self.connector.postData(self.endpoint_company+path, data=metricJSON)
+        cm = self.connector.postData(self.endpoint_company + path, data=metricJSON)
         return cm
 
     def updateCalculatedMetric(self, calcID: str = None, calcJSON: dict = None) -> object:
@@ -1129,7 +1138,8 @@ class Analytics:
         )
         return cm
 
-    def getDateRanges(self, extended_info: bool = False, save: bool = False, includeType: str = 'all',verbose:bool=False,
+    def getDateRanges(self, extended_info: bool = False, save: bool = False, includeType: str = 'all',
+                      verbose: bool = False,
                       **kwargs) -> pd.DataFrame:
         """
         Get the list of date ranges available for the user.
@@ -1138,7 +1148,7 @@ class Analytics:
                 additional infos: reportSuiteName, ownerFullName, modified, tags, compatibility, definition
             save : OPTIONAL : If set to True, it will save the info in a csv file (Default False)
             includeType : Include additional date ranges not owned by user. The "all" option takes precedence over "shared"
-                Possible values are all, shared, templates. You can add all of them as comma separated string. 
+                Possible values are all, shared, templates. You can add all of them as comma separated string.
         Possible kwargs:
             limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.
             full : Boolean : Doesn't shrink the number of columns if set to true
@@ -1163,7 +1173,7 @@ class Analytics:
             df_dates.to_csv('date_range.csv', index=False)
         return df_dates
 
-    def getDateRange(self,dateRangeID:str=None)->dict:
+    def getDateRange(self, dateRangeID: str = None) -> dict:
         """
         Get a specific Data Range based on the ID
         Arguments:
@@ -1173,8 +1183,8 @@ class Analytics:
             raise ValueError("No date range ID has been passed")
         if self.loggingEnabled:
             self.logger.debug(f"starting getDateRange with ID: {dateRangeID}")
-        params ={
-            "expansion":"definition,ownerFullName,modified,tags"
+        params = {
+            "expansion": "definition,ownerFullName,modified,tags"
         }
         dr = self.connector.getData(
             self.endpoint_company + f"{self._getDateRanges}/{dateRangeID}",
@@ -1200,7 +1210,7 @@ class Analytics:
             headers=self.header
         )
         return dr
-    
+
     def deleteDateRange(self, dateRangeID: str = None) -> object:
         """
         Method that deletes a specific date Range based on the id passed.
@@ -1319,7 +1329,7 @@ class Analytics:
         Create a new tag and applies that new tag to the passed components.
         Arguments:
             data : REQUIRED : list of the tag to be created with their component relation.
-        
+
         Example of data :
         [
             {
@@ -1428,13 +1438,14 @@ class Analytics:
         path = "/componentmetadata/tags/tagitems"
         res = self.connector.putData(self.endpoint_company + path, data=data, headers=self.header)
         return res
-    
-    def getScheduledJobs(self, includeType: str = "all", full: bool = True,limit:int=1000,format:str="df",verbose: bool = False) -> JsonListOrDataFrameType:
+
+    def getScheduledJobs(self, includeType: str = "all", full: bool = True, limit: int = 1000, format: str = "df",
+                         verbose: bool = False) -> JsonListOrDataFrameType:
         """
         Get Scheduled Projects. You can retrieve the projectID out of the tasks column to see for which workspace a schedule
         Arguments:
             includeType : OPTIONAL : By default gets all non-expired or deleted projects. (default "all")
-                You can specify e.g. "all,shared,expired,deleted" to get more. 
+                You can specify e.g. "all,shared,expired,deleted" to get more.
                 Active schedules always get exported,so you need to use the `rsLocalExpirationTime` parameter in the `schedule` column to e.g. see which schedules are expired
             full : OPTIONAL : By default True. It returns the following additional information "ownerFullName,groups,tags,sharesFullName,modified,favorite,approved,scheduledItemName,scheduledUsersFullNames,deletedReason"
             limit : OPTIONAL : Number of element retrieved by request (default max 1000)
@@ -1450,7 +1461,8 @@ class Analytics:
                   "limit": limit
                   }
         if full is True:
-            params["expansion"] = "ownerFullName,groups,tags,sharesFullName,modified,favorite,approved,scheduledItemName,scheduledUsersFullNames,deletedReason"
+            params[
+                "expansion"] = "ownerFullName,groups,tags,sharesFullName,modified,favorite,approved,scheduledItemName,scheduledUsersFullNames,deletedReason"
         path = "/scheduler/scheduler/scheduledjobs/"
         if verbose:
             print(f"Getting Scheduled Jobs with Parameters {params}")
@@ -1459,7 +1471,7 @@ class Analytics:
             raise Exception(f"Scheduled Job had no content in response. Parameters were: {params}")
         # get Scheduled Jobs data into Data Frame
         data = res.get("content")
-        last_page = res.get("lastPage",True)
+        last_page = res.get("lastPage", True)
         total_el = res.get("totalElements")
         number_el = res.get("numberOfElements")
         if verbose:
@@ -1471,13 +1483,13 @@ class Analytics:
             params["page"] += 1
             res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
             data += res.get("content")
-            last_page = res.get("lastPage",True)
+            last_page = res.get("lastPage", True)
         if format == "df":
             df = pd.DataFrame(data)
             return df
         return data
-    
-    def getScheduledJob(self,scheduleId:str=None)->dict:
+
+    def getScheduledJob(self, scheduleId: str = None) -> dict:
         """
         Return a scheduled project definition.
         Arguments:
@@ -1492,8 +1504,9 @@ class Analytics:
             'expansion': 'modified,favorite,approved,tags,shares,sharesFullName,reportSuiteName,schedule,triggerObject,tasks,deliverySetting'}
         res = self.connector.getData(self.endpoint_company + path, params=params)
         return res
-    
-    def createScheduledJob(self,projectId:str=None,type:str="pdf",schedule:dict=None,loginIds:list=None,emails:list=None,groupIds:list=None,width:int=None)->dict:
+
+    def createScheduledJob(self, projectId: str = None, type: str = "pdf", schedule: dict = None, loginIds: list = None,
+                           emails: list = None, groupIds: list = None, width: int = None) -> dict:
         """
         Creates a schedule job based on the information provided as arguments.
         Expiration will be in one year by default.
@@ -1501,7 +1514,7 @@ class Analytics:
             projectId : REQUIRED : The workspace project ID to send.
             type : REQUIRED : how to send the project, default "pdf"
             schedule : REQUIRED : object to specify the schedule used.
-                example: {  
+                example: {
                             "hour": 10,
                             "minute": 45,
                             "second": 25,
@@ -1533,10 +1546,10 @@ class Analytics:
             self.logger.debug(f"starting createScheduleJob")
         path = f"/scheduler/scheduler/scheduledjobs/"
         dateNow = datetime.datetime.now()
-        nowDateTime = datetime.datetime.isoformat(dateNow,timespec='seconds')
-        futureDate = datetime.datetime.isoformat(dateNow.replace(dateNow.year + 1),timespec='seconds')
-        deliveryId_res = self.createDeliverySetting(loginIds=loginIds, emails=emails,groupIds=groupIds)
-        deliveryId = deliveryId_res.get('id','')
+        nowDateTime = datetime.datetime.isoformat(dateNow, timespec='seconds')
+        futureDate = datetime.datetime.isoformat(dateNow.replace(dateNow.year + 1), timespec='seconds')
+        deliveryId_res = self.createDeliverySetting(loginIds=loginIds, emails=emails, groupIds=groupIds)
+        deliveryId = deliveryId_res.get('id', '')
         if deliveryId == "":
             if self.loggingEnabled:
                 self.logger.error(f"erro creating the delivery ID")
@@ -1545,52 +1558,52 @@ class Analytics:
         me = self.getUserMe()
         projectDetail = self.getProject(projectId)
         data = {
-            "approved" : False,
-            "complexity":{},
-            "curatedItem":False,
-            "description" : "",
-            "favorite" : False,
-            "hidden":False,
-            "internal":False,
-            "intrinsicIdentity" : False,
-            "isDeleted":False,
-            "isDisabled":False,
-            "locale":"en_US",
-            "noAccess":False,
-            "template":False,
-            "version":"1.0.1", 
-            "rsid":projectDetail.get('rsid',''),
-            "schedule":{
-                "rsLocalStartTime":nowDateTime,
-                "rsLocalExpirationTime":futureDate,
-                "triggerObject":schedule
+            "approved": False,
+            "complexity": {},
+            "curatedItem": False,
+            "description": "",
+            "favorite": False,
+            "hidden": False,
+            "internal": False,
+            "intrinsicIdentity": False,
+            "isDeleted": False,
+            "isDisabled": False,
+            "locale": "en_US",
+            "noAccess": False,
+            "template": False,
+            "version": "1.0.1",
+            "rsid": projectDetail.get('rsid', ''),
+            "schedule": {
+                "rsLocalStartTime": nowDateTime,
+                "rsLocalExpirationTime": futureDate,
+                "triggerObject": schedule
             },
-            "tasks":[
-                {  
-                    "tasktype":"generate",
-                    "tasksubtype":"analysisworkspace",
-                    "requestParams":{
-                        "artifacts":[type],
+            "tasks": [
+                {
+                    "tasktype": "generate",
+                    "tasksubtype": "analysisworkspace",
+                    "requestParams": {
+                        "artifacts": [type],
                         "imsOrgId": self.connector.config['org_id'],
-                        "imsUserId": me.get('imsUserId',''),
-                        "imsUserName":"API",
-                        "projectId" : projectDetail.get('id'),
-                        "projectName" : projectDetail.get('name')
+                        "imsUserId": me.get('imsUserId', ''),
+                        "imsUserName": "API",
+                        "projectId": projectDetail.get('id'),
+                        "projectName": projectDetail.get('name')
                     }
                 },
                 {
-                    "tasktype":"deliver",
-                    "artifactType":type,
+                    "tasktype": "deliver",
+                    "artifactType": type,
                     "deliverySettingId": deliveryId,
                 }
             ]
         }
         if width is not None and width >= 800:
             data['tasks'][0]['requestParams']['width'] = width
-        res = self.connector.postData(self.endpoint_company+path,data=data)
+        res = self.connector.postData(self.endpoint_company + path, data=data)
         return res
 
-    def updateScheduledJob(self,scheduleId:str=None,scheduleObj:dict=None)->dict:
+    def updateScheduledJob(self, scheduleId: str = None, scheduleObj: dict = None) -> dict:
         """
         Update a schedule Job based on its id and the definition attached to it.
         Arguments:
@@ -1604,11 +1617,10 @@ class Analytics:
         if self.loggingEnabled:
             self.logger.debug(f"starting updateScheduleJob with ID: {scheduleId}")
         path = f"/scheduler/scheduler/scheduledjobs/{scheduleId}"
-        res = self.connector.putData(self.endpoint_company+path,data=scheduleObj)
+        res = self.connector.putData(self.endpoint_company + path, data=scheduleObj)
         return res
 
-
-    def deleteScheduledJob(self,scheduleId:str=None)->dict:
+    def deleteScheduledJob(self, scheduleId: str = None) -> dict:
         """
         Delete a schedule project based on its ID.
         Arguments:
@@ -1622,27 +1634,27 @@ class Analytics:
         res = self.connector.deleteData(self.endpoint_company + path)
         return res
 
-    def getDeliverySettings(self)->list:
+    def getDeliverySettings(self) -> list:
         """
         Return a list of delivery settings.
         """
         path = f"/scheduler/scheduler/deliverysettings/"
-        params = {'expansion': 'definition',"limit" : 2000}
+        params = {'expansion': 'definition', "limit": 2000}
         lastPage = False
         page_nb = 0
         data = []
         while lastPage != True:
             params['page'] = page_nb
             res = self.connector.getData(self.endpoint_company + path, params=params)
-            data += res.get('content',[])
-            if len(res.get('content',[]))==params["limit"]:
+            data += res.get('content', [])
+            if len(res.get('content', [])) == params["limit"]:
                 lastPage = False
             else:
                 lastPage = True
             page_nb += 1
         return data
 
-    def getDeliverySetting(self,deliverySettingId:str=None)->dict:
+    def getDeliverySetting(self, deliverySettingId: str = None) -> dict:
         """
         Retrieve the delivery setting from a scheduled project.
         Argument:
@@ -1652,14 +1664,14 @@ class Analytics:
         params = {'expansion': 'definition'}
         res = self.connector.getData(self.endpoint_company + path, params=params)
         return res
-    
-    def createDeliverySetting(self,loginIds:list=None,emails:list=None,groupIds:list=None)->dict:
+
+    def createDeliverySetting(self, loginIds: list = None, emails: list = None, groupIds: list = None) -> dict:
         """
         Create a delivery setting for a specific scheduled project.
         Automatically used when using `createScheduleJob`.
         Arguments:
             loginIds : REQUIRED : List of login ID to send the scheduled project to. Can be retrieved by the getUsers method.
-            emails : OPTIONAL : In case the recipient are not in the analytics interface. 
+            emails : OPTIONAL : In case the recipient are not in the analytics interface.
             groupIds : OPTIONAL : List of group ID to send the scheduled project to.
         """
         path = f"/scheduler/scheduler/deliverysettings/"
@@ -1670,26 +1682,27 @@ class Analytics:
         if groupIds is None:
             groupIds = []
         data = {
-            "definition" : {
-                "allAdmins" : False,
-                "emailAddresses" : emails,
-                "groupIds" : groupIds,
+            "definition": {
+                "allAdmins": False,
+                "emailAddresses": emails,
+                "groupIds": groupIds,
                 "loginIds": loginIds,
-                "type": "email" 
+                "type": "email"
             },
-            "name" : "email-aanalytics2"
+            "name": "email-aanalytics2"
         }
         res = self.connector.postData(self.endpoint_company + path, data=data)
         return res
 
-    def updateDeliverySetting(self,deliveryId:str=None,loginIds:list=None,emails:list=None,groupIds:list=None)->dict:
+    def updateDeliverySetting(self, deliveryId: str = None, loginIds: list = None, emails: list = None,
+                              groupIds: list = None) -> dict:
         """
         Create a delivery setting for a specific scheduled project.
         Automatically created for email setting.
         Arguments:
             deliveryId : REQUIRED : the delivery setting ID to be updated
             loginIds : REQUIRED : List of login ID to send the scheduled project to. Can be retrieved by the getUsers method.
-            emails : OPTIONAL : In case the recipient are not in the analytics interface. 
+            emails : OPTIONAL : In case the recipient are not in the analytics interface.
             groupIds : OPTIONAL : List of group ID to send the scheduled project to.
         """
         if deliveryId is None:
@@ -1702,19 +1715,19 @@ class Analytics:
         if groupIds is None:
             groupIds = []
         data = {
-            "definition" : {
-                "allAdmins" : False,
-                "emailAddresses" : emails,
-                "groupIds" : groupIds,
+            "definition": {
+                "allAdmins": False,
+                "emailAddresses": emails,
+                "groupIds": groupIds,
                 "loginIds": loginIds,
-                "type": "email" 
+                "type": "email"
             },
-            "name" : "email-aanalytics2"
+            "name": "email-aanalytics2"
         }
         res = self.connector.putData(self.endpoint_company + path, data=data)
         return res
-    
-    def deleteDeliverySetting(self,deliveryId:str=None)->dict:
+
+    def deleteDeliverySetting(self, deliveryId: str = None) -> dict:
         """
         Delete a delivery setting based on the ID passed.
         Arguments:
@@ -1725,13 +1738,14 @@ class Analytics:
         path = f"/scheduler/scheduler/deliverysettings/{deliveryId}"
         res = self.connector.deleteData(self.endpoint_company + path)
         return res
-    
+
     def getProjects(self, includeType: str = 'all', full: bool = False, limit: int = None, includeShared: bool = False,
-                    includeTemplate: bool = False, format: str = 'df', cache:bool=False, save: bool = False) -> JsonListOrDataFrameType:
+                    includeTemplate: bool = False, format: str = 'df', cache: bool = False,
+                    save: bool = False) -> JsonListOrDataFrameType:
         """
         Returns the list of projects through either a dataframe or a list.
         Arguments:
-            includeType : OPTIONAL : type of projects to be retrieved.(str) Possible values: 
+            includeType : OPTIONAL : type of projects to be retrieved.(str) Possible values:
                 - all : Default value (all projects possibles)
                 - shared : shared projects
             full : OPTIONAL : if set to True, returns all information about projects.
@@ -1775,7 +1789,8 @@ class Analytics:
             df.to_csv(f'projects_{int(time.time())}.csv', index=False)
         return df
 
-    def getProject(self, projectId: str = None, projectClass: bool = False, rsidSuffix: bool = False, retry: int = 0, cache:bool=False, verbose: bool = False) -> Union[dict,Project]:
+    def getProject(self, projectId: str = None, projectClass: bool = False, rsidSuffix: bool = False, retry: int = 0,
+                   cache: bool = False, verbose: bool = False) -> Union[dict, Project]:
         """
         Return the dictionary of the project information and its definition.
         It will return a dictionary or a Project class.
@@ -1795,11 +1810,12 @@ class Analytics:
         path = f"/projects/{projectId}"
         if self.loggingEnabled:
             self.logger.debug(f"starting getProject for {projectId}")
-        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header,retry=retry, verbose=verbose)
+        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header, retry=retry,
+                                     verbose=verbose)
         if projectClass:
             if self.loggingEnabled:
                 self.logger.info(f"building an instance of Project class")
-            myProject = Project(res,rsidSuffix=rsidSuffix)
+            myProject = Project(res, rsidSuffix=rsidSuffix)
             return myProject
         if cache:
             if self.loggingEnabled:
@@ -1812,8 +1828,10 @@ class Analytics:
                 if self.loggingEnabled:
                     self.logger.warning(f"Cannot convert Project to Project class")
         return res
-    
-    def getAllProjectDetails(self, projects:JsonListOrDataFrameType=None, filterNameProject:str=None, filterNameOwner:str=None, useAttribute:bool=True, cache:bool=False, rsidSuffix:bool=False, output:str="dict", verbose:bool=False)->dict:
+
+    def getAllProjectDetails(self, projects: JsonListOrDataFrameType = None, filterNameProject: str = None,
+                             filterNameOwner: str = None, useAttribute: bool = True, cache: bool = False,
+                             rsidSuffix: bool = False, output: str = "dict", verbose: bool = False) -> dict:
         """
         Retrieve all projects details. You can either pass the list of dataframe returned from the getProjects methods and some filters.
         Returns a dict of ProjectId and the value is the Project class for analysis.
@@ -1837,17 +1855,17 @@ class Analytics:
         if projects is None:
             if self.loggingEnabled:
                 self.logger.debug(f"No projects passed")
-            if len(self.listProjectIds)>0 and useAttribute:
+            if len(self.listProjectIds) > 0 and useAttribute:
                 fullProjectIds = self.listProjectIds
             else:
-                fullProjectIds = self.getProjects(format='raw',cache=cache)
+                fullProjectIds = self.getProjects(format='raw', cache=cache)
         ## if project data is passed
         elif projects is not None:
             if self.loggingEnabled:
                 self.logger.debug(f"projects passed")
-            if isinstance(projects,pd.DataFrame):
+            if isinstance(projects, pd.DataFrame):
                 fullProjectIds = projects.to_dict(orient='records')
-            elif isinstance(projects,list):
+            elif isinstance(projects, list):
                 fullProjectIds = (proj['id'] for proj in projects)
         if filterNameProject is not None:
             if self.loggingEnabled:
@@ -1856,14 +1874,16 @@ class Analytics:
         if filterNameOwner is not None:
             if self.loggingEnabled:
                 self.logger.debug(f"filterNameOwner passed")
-            fullProjectIds = [project for project in fullProjectIds if filterNameOwner in project['owner'].get('name','')]
+            fullProjectIds = [project for project in fullProjectIds if
+                              filterNameOwner in project['owner'].get('name', '')]
         if verbose:
             print(f'{len(fullProjectIds)} project details to retrieve')
-            print(f"estimated time required : {int(len(fullProjectIds)/60)} minutes")
+            print(f"estimated time required : {int(len(fullProjectIds) / 60)} minutes")
         if self.loggingEnabled:
             self.logger.debug(f'{len(fullProjectIds)} project details to retrieve')
         projectIds = (project['id'] for project in fullProjectIds)
-        projectsDetails = {projectId:self.getProject(projectId,projectClass=True,rsidSuffix=rsidSuffix) for projectId in projectIds}
+        projectsDetails = {projectId: self.getProject(projectId, projectClass=True, rsidSuffix=rsidSuffix) for projectId
+                           in projectIds}
         if filterNameProject is None and filterNameOwner is None:
             self.projectsDetails = projectsDetails
         if output == "list":
@@ -1884,8 +1904,8 @@ class Analytics:
         path = f"/projects/{projectId}"
         res = self.connector.deleteData(self.endpoint_company + path, headers=self.header)
         return res
-    
-    def validateProject(self,projectObj:dict = None)->dict:
+
+    def validateProject(self, projectObj: dict = None) -> dict:
         """
         Validate a project definition based on the definition passed.
         Arguments:
@@ -1894,20 +1914,19 @@ class Analytics:
         """
         if self.loggingEnabled:
             self.logger.debug(f"starting validateProject")
-        if projectObj is None and type(projectObj) != dict :
+        if projectObj is None and type(projectObj) != dict:
             raise Exception("Requires a projectObj data to be sent to the server.")
         if 'project' in projectObj.keys():
-            rsid = projectObj['project'].get('rsid',None)
+            rsid = projectObj['project'].get('rsid', None)
         else:
-            rsid = projectObj.get('rsid',None)
-            projectObj = {'project':projectObj}
+            rsid = projectObj.get('rsid', None)
+            projectObj = {'project': projectObj}
         if rsid is None:
             raise Exception("Could not find a rsid parameter in your project definition")
         path = "/projects/validate"
-        params = {'rsid':rsid}
-        res = self.connector.postData(self.endpoint_company + path, data=projectObj, headers=self.header,params=params)
+        params = {'rsid': rsid}
+        res = self.connector.postData(self.endpoint_company + path, data=projectObj, headers=self.header, params=params)
         return res
-
 
     def updateProject(self, projectId: str = None, projectObj: dict = None) -> dict:
         """
@@ -1941,7 +1960,6 @@ class Analytics:
         res = self.connector.putData(self.endpoint_company + path, data=projectObj, headers=self.header)
         return res
 
-
     def createProject(self, projectObj: dict = None) -> dict:
         """
         Create a project based on the definition you have set.
@@ -1970,17 +1988,17 @@ class Analytics:
             raise ValueError("Requires definition key to be a dictionary")
         res = self.connector.postData(self.endpoint_company + path, data=projectObj, headers=self.header)
         return res
-    
-    def findComponentsUsage(self,components:list=None,
-                            projectDetails:list=None,
-                            segments:Union[list,pd.DataFrame]=None,
-                            calculatedMetrics:Union[list,pd.DataFrame]=None,
-                            recursive:bool=False,
-                            regexUsed:bool=False,
-                            verbose:bool=False,
-                            resetProjectDetails:bool=False,
-                            rsidSuffix:bool=False,
-                            )->dict:
+
+    def findComponentsUsage(self, components: list = None,
+                            projectDetails: list = None,
+                            segments: Union[list, pd.DataFrame] = None,
+                            calculatedMetrics: Union[list, pd.DataFrame] = None,
+                            recursive: bool = False,
+                            regexUsed: bool = False,
+                            verbose: bool = False,
+                            resetProjectDetails: bool = False,
+                            rsidSuffix: bool = False,
+                            ) -> dict:
         """
         Find the usage of components in the different part of Adobe Analytics setup.
         Projects, Segment, Calculated metrics.
@@ -2005,12 +2023,13 @@ class Analytics:
         listComponentEvent = [comp for comp in components if 'event' in comp]
         listComponentSegs = [comp for comp in components if comp.startswith('s')]
         listComponentCalcs = [comp for comp in components if comp.startswith('cm')]
-        restComponents = set(components) - set(listComponentProp+listComponentVar+listComponentEvent+listComponentSegs+listComponentCalcs)
+        restComponents = set(components) - set(
+            listComponentProp + listComponentVar + listComponentEvent + listComponentSegs + listComponentCalcs)
         listDefaultElements = [comp for comp in restComponents]
         listRecusion = []
         ## adding unregular ones
-        regPartSeg = "('|\.)" ## ensure to not catch evar100 for evar10
-        regPartProj = "($|\.|\::)" ## ensure to not catch evar100 for evar10
+        regPartSeg = "('|\.)"  ## ensure to not catch evar100 for evar10
+        regPartProj = "($|\.|\::)"  ## ensure to not catch evar100 for evar10
         if regexUsed:
             if self.loggingEnabled:
                 self.logger.debug(f"regex is used")
@@ -2054,116 +2073,117 @@ class Analytics:
         if (len(self.projectsDetails) == 0 and projectDetails is None) or resetProjectDetails:
             if self.loggingEnabled:
                 self.logger.debug(f"retrieving projects details")
-            self.projectDetails = self.getAllProjectDetails(verbose=verbose,rsidSuffix=rsidSuffix)
+            self.projectDetails = self.getAllProjectDetails(verbose=verbose, rsidSuffix=rsidSuffix)
             myProjectDetails = (self.projectsDetails[key].to_dict() for key in self.projectsDetails)
-        elif len(self.projectsDetails) > 0 and projectDetails is None and resetProjectDetails==False:
+        elif len(self.projectsDetails) > 0 and projectDetails is None and resetProjectDetails == False:
             if self.loggingEnabled:
                 self.logger.debug(f"transforming projects details")
             myProjectDetails = (self.projectsDetails[key].to_dict() for key in self.projectsDetails)
         elif projectDetails is not None:
             if self.loggingEnabled:
                 self.logger.debug(f"setting the project details")
-            if isinstance(projectDetails[0],Project):
+            if isinstance(projectDetails[0], Project):
                 myProjectDetails = (item.to_dict() for item in projectDetails)
-            elif isinstance(projectDetails[0],dict):
+            elif isinstance(projectDetails[0], dict):
                 myProjectDetails = (Project(item).to_dict() for item in projectDetails)
         else:
             raise Exception("Project details were not able to be processed")
-        teeProjects:tuple = tee(myProjectDetails) ## duplicating the project generator for recursive pass (low memory - intensive computation)
-        returnObj = {element : {'segments':[],'calculatedMetrics':[],'projects':[]} for element in components}
+        teeProjects: tuple = tee(
+            myProjectDetails)  ## duplicating the project generator for recursive pass (low memory - intensive computation)
+        returnObj = {element: {'segments': [], 'calculatedMetrics': [], 'projects': []} for element in components}
         recurseObj = defaultdict(list)
         if verbose:
             print('search started')
             print(f'recursive option : {recursive}')
             print('start looking into segments')
         if self.loggingEnabled:
-                self.logger.debug(f"Analyzing segments")
-        for _,seg in mySegments.iterrows():
+            self.logger.debug(f"Analyzing segments")
+        for _, seg in mySegments.iterrows():
             for prop in listComponentProp:
-                if re.search(f"{prop+regPartSeg}",str(seg['definition'])):
-                    returnObj[prop]['segments'].append({seg['name']:seg['id']})
+                if re.search(f"{prop + regPartSeg}", str(seg['definition'])):
+                    returnObj[prop]['segments'].append({seg['name']: seg['id']})
                     if recursive:
                         listRecusion.append(seg['id'])
             for var in listComponentVar:
-                if re.search(f"{var+regPartSeg}",str(seg['definition'])):
-                    returnObj[var]['segments'].append({seg['name']:seg['id']})
+                if re.search(f"{var + regPartSeg}", str(seg['definition'])):
+                    returnObj[var]['segments'].append({seg['name']: seg['id']})
                     if recursive:
                         listRecusion.append(seg['id'])
             for event in listComponentEvent:
-                if re.search(f"{event}'",str(seg['definition'])):
-                    returnObj[event]['segments'].append({seg['name']:seg['id']})
+                if re.search(f"{event}'", str(seg['definition'])):
+                    returnObj[event]['segments'].append({seg['name']: seg['id']})
                     if recursive:
                         listRecusion.append(seg['id'])
             for element in listDefaultElements:
-                if re.search(f"{element}",str(seg['definition'])):
-                    returnObj[element]['segments'].append({seg['name']:seg['id']})
+                if re.search(f"{element}", str(seg['definition'])):
+                    returnObj[element]['segments'].append({seg['name']: seg['id']})
                     if recursive:
                         listRecusion.append(seg['id'])
         if self.loggingEnabled:
-                self.logger.debug(f"Analyzing calculated metrics")
+            self.logger.debug(f"Analyzing calculated metrics")
         if verbose:
             print('start looking into calculated metrics')
-        for _,met in myMetrics.iterrows():
+        for _, met in myMetrics.iterrows():
             for prop in listComponentProp:
-                if re.search(f"{prop+regPartSeg}",str(met['definition'])):
-                    returnObj[prop]['calculatedMetrics'].append({met['name']:met['id']})
+                if re.search(f"{prop + regPartSeg}", str(met['definition'])):
+                    returnObj[prop]['calculatedMetrics'].append({met['name']: met['id']})
                     if recursive:
                         listRecusion.append(met['id'])
             for var in listComponentVar:
-                if re.search(f"{var+regPartSeg}",str(met['definition'])):
-                    returnObj[var]['calculatedMetrics'].append({met['name']:met['id']})
+                if re.search(f"{var + regPartSeg}", str(met['definition'])):
+                    returnObj[var]['calculatedMetrics'].append({met['name']: met['id']})
                     if recursive:
                         listRecusion.append(met['id'])
             for event in listComponentEvent:
-                if re.search(f"{event}'",str(met['definition'])):
-                    returnObj[event]['calculatedMetrics'].append({met['name']:met['id']})
+                if re.search(f"{event}'", str(met['definition'])):
+                    returnObj[event]['calculatedMetrics'].append({met['name']: met['id']})
                     if recursive:
                         listRecusion.append(met['id'])
             for element in listDefaultElements:
-                if re.search(f"{element}'",str(met['definition'])):
-                    returnObj[element]['calculatedMetrics'].append({met['name']:met['id']})
+                if re.search(f"{element}'", str(met['definition'])):
+                    returnObj[element]['calculatedMetrics'].append({met['name']: met['id']})
                     if recursive:
                         listRecusion.append(met['id'])
         if verbose:
             print('start looking into projects')
         if self.loggingEnabled:
-                self.logger.debug(f"Analyzing projects")
+            self.logger.debug(f"Analyzing projects")
         for proj in teeProjects[0]:
             ## mobile reports don't have dimensions.
             if proj['reportType'] == "desktop":
                 for prop in listComponentProp:
                     for element in proj['dimensions']:
-                        if re.search(f"{prop+regPartProj}",element):
-                            returnObj[prop]['projects'].append({proj['name']:proj['id']})
+                        if re.search(f"{prop + regPartProj}", element):
+                            returnObj[prop]['projects'].append({proj['name']: proj['id']})
                 for var in listComponentVar:
                     for element in proj['dimensions']:
-                        if re.search(f"{var+regPartProj}",element):
-                            returnObj[var]['projects'].append({proj['name']:proj['id']})
+                        if re.search(f"{var + regPartProj}", element):
+                            returnObj[var]['projects'].append({proj['name']: proj['id']})
                 for event in listComponentEvent:
                     for element in proj['metrics']:
-                        if re.search(f"{event}",element):
-                            returnObj[event]['projects'].append({proj['name']:proj['id']})
+                        if re.search(f"{event}", element):
+                            returnObj[event]['projects'].append({proj['name']: proj['id']})
                 for seg in listComponentSegs:
-                    for element in proj.get('segments',[]):
-                        if re.search(f"{seg}",element):
-                            returnObj[seg]['projects'].append({proj['name']:proj['id']})
+                    for element in proj.get('segments', []):
+                        if re.search(f"{seg}", element):
+                            returnObj[seg]['projects'].append({proj['name']: proj['id']})
                 for met in listComponentCalcs:
-                    for element in proj.get('calculatedMetrics',[]):
-                        if re.search(f"{met}",element):
-                            returnObj[met]['projects'].append({proj['name']:proj['id']})
+                    for element in proj.get('calculatedMetrics', []):
+                        if re.search(f"{met}", element):
+                            returnObj[met]['projects'].append({proj['name']: proj['id']})
                 for element in listDefaultElements:
                     for met in proj['calculatedMetrics']:
-                        if re.search(f"{element}",met):
-                            returnObj[element]['projects'].append({proj['name']:proj['id']})
+                        if re.search(f"{element}", met):
+                            returnObj[element]['projects'].append({proj['name']: proj['id']})
                     for dim in proj['dimensions']:
-                        if re.search(f"{element}",dim):
-                            returnObj[element]['projects'].append({proj['name']:proj['id']})
+                        if re.search(f"{element}", dim):
+                            returnObj[element]['projects'].append({proj['name']: proj['id']})
                     for rsid in proj['rsids']:
-                        if re.search(f"{element}",rsid):
-                            returnObj[element]['projects'].append({proj['name']:proj['id']})
+                        if re.search(f"{element}", rsid):
+                            returnObj[element]['projects'].append({proj['name']: proj['id']})
                     for event in proj['metrics']:
-                        if re.search(f"{element}",event):
-                            returnObj[element]['projects'].append({proj['name']:proj['id']})
+                        if re.search(f"{element}", event):
+                            returnObj[element]['projects'].append({proj['name']: proj['id']})
         if recursive:
             if verbose:
                 print('start looking into recursive elements')
@@ -2171,44 +2191,44 @@ class Analytics:
                 self.logger.debug(f"recursive option checked")
             for proj in teeProjects[1]:
                 for rec in listRecusion:
-                    for element in proj.get('segments',[]):
-                        if re.search(f"{rec}",element):
-                            recurseObj[rec].append({proj['name']:proj['id']})
-                    for element in proj.get('calculatedMetrics',[]):
-                        if re.search(f"{rec}",element):
-                            recurseObj[rec].append({proj['name']:proj['id']})
+                    for element in proj.get('segments', []):
+                        if re.search(f"{rec}", element):
+                            recurseObj[rec].append({proj['name']: proj['id']})
+                    for element in proj.get('calculatedMetrics', []):
+                        if re.search(f"{rec}", element):
+                            recurseObj[rec].append({proj['name']: proj['id']})
         if recursive:
             returnObj['recursion'] = recurseObj
         if verbose:
             print('done')
         return returnObj
-    
+
     def getUsageLogs(self,
-        startDate:str=None,
-        endDate:str=None,
-        eventType:str=None,
-        event:str=None,
-        rsid:str=None,
-        login:str=None,
-        ip:str=None,
-        limit:int=100,
-        max_result:int=None,
-        format:str="df",
-        verbose:bool=False,
-        **kwargs)->dict:
+                     startDate: str = None,
+                     endDate: str = None,
+                     eventType: str = None,
+                     event: str = None,
+                     rsid: str = None,
+                     login: str = None,
+                     ip: str = None,
+                     limit: int = 100,
+                     max_result: int = None,
+                     format: str = "df",
+                     verbose: bool = False,
+                     **kwargs) -> dict:
         """
         Returns the Audit Usage Logs from your company analytics setup.
         Arguments:
-            startDate : REQUIRED : Start date, format : 2020-12-01T00:00:00-07.(default 60 days prior today)	
+            startDate : REQUIRED : Start date, format : 2020-12-01T00:00:00-07.(default 60 days prior today)
             endDate : REQUIRED : End date, format : 2020-12-15T14:32:33-07. (default today)
                 Should be a maximum of a 3 month period between startDate and endDate.
-            eventType : OPTIONAL : The numeric id for the event type you want to filter logs by. 
+            eventType : OPTIONAL : The numeric id for the event type you want to filter logs by.
                 Please reference the lookup table in the LOGS_EVENT_TYPE
-            event : OPTIONAL : The event description you want to filter logs by. 
+            event : OPTIONAL : The event description you want to filter logs by.
                 No wildcards are permitted, but this filter is case insensitive and supports partial matches.
             rsid : OPTIONAL : ReportSuite ID to filter on.
-            login : OPTIONAL : The login value of the user you want to filter logs by. This filter functions as an exact match.	
-            ip : OPTIONAL : The IP address you want to filter logs by. This filter supports a partial match.	
+            login : OPTIONAL : The login value of the user you want to filter logs by. This filter functions as an exact match.
+            ip : OPTIONAL : The IP address you want to filter logs by. This filter supports a partial match.
             limit : OPTIONAL : Number of results per page.
             max_result : OPTIONAL : Number of maximum amount of results if you want. If you want to cap the process. Ex : max_result=1000
             format : OPTIONAL : If you wish to have a DataFrame ("df" - default) or list("raw") as output.
@@ -2219,13 +2239,13 @@ class Analytics:
         if self.loggingEnabled:
             self.logger.debug(f"starting getUsageLogs")
         import datetime
-        now =  datetime.datetime.now()
+        now = datetime.datetime.now()
         if startDate is None:
             startDate = datetime.datetime.isoformat(now - datetime.timedelta(days=60)).split('.')[0]
         if endDate is None:
             endDate = datetime.datetime.isoformat(now).split('.')[0]
         path = "/auditlogs/usage"
-        params = {"page":kwargs.get('page',0),"limit":limit,"startDate":startDate,"endDate":endDate}
+        params = {"page": kwargs.get('page', 0), "limit": limit, "startDate": startDate, "endDate": endDate}
         if eventType is not None:
             params['eventType'] = eventType
         if event is not None:
@@ -2238,12 +2258,12 @@ class Analytics:
             params['ip'] = ip
         if self.loggingEnabled:
             self.logger.debug(f"params: {params}")
-        res = self.connector.getData(self.endpoint_company + path, params=params,verbose=verbose)
+        res = self.connector.getData(self.endpoint_company + path, params=params, verbose=verbose)
         data = res['content']
         lastPage = res['lastPage']
         while lastPage == False:
             params["page"] += 1
-            res = self.connector.getData(self.endpoint_company + path, params=params,verbose=verbose)
+            res = self.connector.getData(self.endpoint_company + path, params=params, verbose=verbose)
             data += res['content']
             lastPage = res['lastPage']
             if max_result is not None:
@@ -2254,8 +2274,8 @@ class Analytics:
             return df
         return data
 
-
-    def getTopItems(self,rsid:str=None,dimension:str=None,dateRange:str=None,searchClause:str=None,lookupNoneValues:bool = True,limit:int=10,verbose:bool=False,**kwargs)->object:
+    def getTopItems(self, rsid: str = None, dimension: str = None, dateRange: str = None, searchClause: str = None,
+                    lookupNoneValues: bool = True, limit: int = 10, verbose: bool = False, **kwargs) -> object:
         """
         Returns the top items of a request.
         Arguments:
@@ -2275,29 +2295,30 @@ class Analytics:
         if self.loggingEnabled:
             self.logger.debug(f"starting getTopItems")
         path = "/reports/topItems"
-        page = kwargs.get("page",0)
+        page = kwargs.get("page", 0)
         if rsid is None:
             raise ValueError("Require a reportSuite ID")
         if dimension is None:
             raise ValueError("Require a dimension")
-        params = {"rsid" : rsid, "dimension":dimension,"lookupNoneValues":lookupNoneValues,"limit":limit,"page":page}
+        params = {"rsid": rsid, "dimension": dimension, "lookupNoneValues": lookupNoneValues, "limit": limit,
+                  "page": page}
         if searchClause is not None:
             params["search-clause"] = searchClause
         if dateRange is not None and '/' in dateRange:
             params["dateRange"] = dateRange
-        if kwargs.get('page',None) is not None:
+        if kwargs.get('page', None) is not None:
             params["page"] = kwargs.get('page')
-        if kwargs.get("startDate",None) is not None:
+        if kwargs.get("startDate", None) is not None:
             params["startDate"] = kwargs.get("startDate")
-        if kwargs.get("endDate",None) is not None:
+        if kwargs.get("endDate", None) is not None:
             params["endDate"] = kwargs.get("endDate")
         if kwargs.get("searchAnd", None) is not None:
             params["searchAnd"] = kwargs.get("searchAnd")
-        if kwargs.get("searchOr",None) is not None:
+        if kwargs.get("searchOr", None) is not None:
             params["searchOr"] = kwargs.get("searchOr")
-        if kwargs.get("searchNot",None) is not None:
+        if kwargs.get("searchNot", None) is not None:
             params["searchNot"] = kwargs.get("searchNot")
-        if kwargs.get("searchPhrase",None) is not None:
+        if kwargs.get("searchPhrase", None) is not None:
             params["searchPhrase"] = kwargs.get("searchPhrase")
         last_page = False
         if verbose:
@@ -2306,37 +2327,38 @@ class Analytics:
         while not last_page:
             if verbose:
                 print(f'request page : {page}')
-            res = self.connector.getData(self.endpoint_company+path,params=params)
-            last_page = res.get("lastPage",True)
+            res = self.connector.getData(self.endpoint_company + path, params=params)
+            last_page = res.get("lastPage", True)
             data += res["rows"]
             page += 1
             params["page"] = page
         df = pd.DataFrame(data)
         return df
-    
-    def getAnnotations(self,full:bool=True,includeType:str='all',limit:int=1000,page:int=0)->list:
+
+    def getAnnotations(self, full: bool = True, includeType: str = 'all', limit: int = 1000, page: int = 0) -> list:
         """
-        Returns a list of the available annotations 
+        Returns a list of the available annotations
         Arguments:
             full : OPTIONAL : If set to True (default), returned all available information of the annotation.
             includeType : OPTIONAL : use to return only "shared" or "all"(default) annotation available.
             limit : OPTIONAL : number of result per page (default 1000)
             page : OPTIONAL : page used for pagination
         """
-        params = {"includeType":includeType,"page":page}
+        params = {"includeType": includeType, "page": page}
         if full:
-            params['expansion'] = "name,description,dateRange,color,applyToAllReports,scope,createdDate,modifiedDate,modifiedById,tags,shares,approved,favorite,owner,usageSummary,companyId,reportSuiteName,rsid"
+            params[
+                'expansion'] = "name,description,dateRange,color,applyToAllReports,scope,createdDate,modifiedDate,modifiedById,tags,shares,approved,favorite,owner,usageSummary,companyId,reportSuiteName,rsid"
         path = f"/annotations"
         lastPage = False
         data = []
         while lastPage == False:
-            res = self.connector.getData(self.endpoint_company + path,params=params)
-            data += res.get('content',[])
-            lastPage = res.get('lastPage',True)
+            res = self.connector.getData(self.endpoint_company + path, params=params)
+            data += res.get('content', [])
+            lastPage = res.get('lastPage', True)
             params['page'] += 1
         return data
-    
-    def getAnnotation(self,annotationId:str=None)->dict:
+
+    def getAnnotation(self, annotationId: str = None) -> dict:
         """
         Return a specific annotation definition.
         Arguments:
@@ -2345,13 +2367,13 @@ class Analytics:
         if annotationId is None:
             raise ValueError("Require an annotation ID")
         path = f"/annotations/{annotationId}"
-        params ={
-            "expansion" : "name,description,dateRange,color,applyToAllReports,scope,createdDate,modifiedDate,modifiedById,tags,shares,approved,favorite,owner,usageSummary,companyId,reportSuiteName,rsid"
+        params = {
+            "expansion": "name,description,dateRange,color,applyToAllReports,scope,createdDate,modifiedDate,modifiedById,tags,shares,approved,favorite,owner,usageSummary,companyId,reportSuiteName,rsid"
         }
-        res = self.connector.getData(self.endpoint_company + path,params=params)
+        res = self.connector.getData(self.endpoint_company + path, params=params)
         return res
-    
-    def deleteAnnotation(self,annotationId:str=None)->dict:
+
+    def deleteAnnotation(self, annotationId: str = None) -> dict:
         """
         Delete a specific annotation definition.
         Arguments:
@@ -2364,23 +2386,23 @@ class Analytics:
         return res
 
     def createAnnotation(self,
-                        name:str=None,
-                        dateRange:str=None,
-                        rsid:str=None,
-                        metricIds:list=None,
-                        dimensionObj:list=None,
-                        description:str=None,
-                        filterIds:list=None,
-                        applyToAllReports:bool=False,
-                        **kwargs)->dict:
+                         name: str = None,
+                         dateRange: str = None,
+                         rsid: str = None,
+                         metricIds: list = None,
+                         dimensionObj: list = None,
+                         description: str = None,
+                         filterIds: list = None,
+                         applyToAllReports: bool = False,
+                         **kwargs) -> dict:
 
         """
         Create an Annotation.
         Arguments:
             name : REQUIRED : Name of the annotation
-            dateRange : REQUIRED : Date range of the annotation to be used. 
+            dateRange : REQUIRED : Date range of the annotation to be used.
                 Example: 2022-04-19T00:00:00/2022-04-19T23:59:59
-            rsid : REQUIRED : ReportSuite ID 
+            rsid : REQUIRED : ReportSuite ID
             metricIds : OPTIONAL : List of metrics ID to be annotated
             filterIds : OPTIONAL : List of Segments ID to apply for annotation for context.
             dimensionObj : OPTIONAL : List of dimensions object specification:
@@ -2412,50 +2434,50 @@ class Analytics:
             "name": name,
             "description": description,
             "dateRange": dateRange,
-            "color": kwargs.get('colors',"STANDARD1"),
+            "color": kwargs.get('colors', "STANDARD1"),
             "applyToAllReports": applyToAllReports,
             "scope": {
-                "metrics":[],
-                "filters":[]
+                "metrics": [],
+                "filters": []
             },
             "tags": [],
-            "approved": kwargs.get('approved',False),
-            "favorite": kwargs.get('favorite',False),
+            "approved": kwargs.get('approved', False),
+            "favorite": kwargs.get('favorite', False),
             "rsid": rsid
         }
         if metricIds is not None and type(metricIds) == list:
             for metric in metricIds:
                 data['scopes']['metrics'].append({
-                    "id" : metric,
-                    "componentType":"metric"
+                    "id": metric,
+                    "componentType": "metric"
                 })
         if filterIds is None and type(filterIds) == list:
             for filter in filterIds:
                 data['scopes']['filters'].append({
-                    "id" : filter,
-                    "componentType":"segment"
+                    "id": filter,
+                    "componentType": "segment"
                 })
         if dimensionObj is not None and type(dimensionObj) == list:
             for obj in dimensionObj:
                 data['scopes']['filters'].append(obj)
-        if kwargs.get("shares",None) is not None:
+        if kwargs.get("shares", None) is not None:
             data['shares'] = []
-            for user in kwargs.get("shares",[]):
+            for user in kwargs.get("shares", []):
                 data['shares'].append({
-                    "shareToId" : user,
-                    "shareToType":"user"
+                    "shareToId": user,
+                    "shareToType": "user"
                 })
-        if kwargs.get('tags',None) is not None:
+        if kwargs.get('tags', None) is not None:
             for tag in kwargs.get('tags'):
                 res = self.getTag(tag)
                 data['tags'].append({
-                    "id":tag,
-                    "name":res['name']
+                    "id": tag,
+                    "name": res['name']
                 })
-        res = self.connector.postData(self.endpoint_company + path,data=data)
-        return res       
+        res = self.connector.postData(self.endpoint_company + path, data=data)
+        return res
 
-    def updateAnnotation(self,annotationId:str=None,annotationObj:dict=None)->dict:
+    def updateAnnotation(self, annotationId: str = None, annotationObj: dict = None) -> dict:
         """
         Update an annotation based on its ID. PUT method.
         Arguments:
@@ -2467,16 +2489,16 @@ class Analytics:
         if annotationId is None:
             raise ValueError('Require the annotation ID')
         path = f"/annotations/{annotationId}"
-        res = self.connector.putData(self.endpoint_company+path,data=annotationObj)
+        res = self.connector.putData(self.endpoint_company + path, data=annotationObj)
         return res
-    
+
     def getDataWarehouseReports(self,
-                                scheduledRequestUUID:str=None,
-                                status:str=None,
-                                createdAfter:str=None,
-                                createdBefore:str=None,
-                                updatedAfter:str=None,
-                                limit:int=1000)-> dict:
+                                scheduledRequestUUID: str = None,
+                                status: str = None,
+                                createdAfter: str = None,
+                                createdBefore: str = None,
+                                updatedAfter: str = None,
+                                limit: int = 1000) -> dict:
         """
         Get all DW reports that matched filter parameters.
         Arguments:
@@ -2490,9 +2512,10 @@ class Analytics:
         if scheduledRequestUUID is None:
             raise ValueError("Required a scheduled request UUID")
         path = '/data_warehouse/report'
-        params = {"limit":limit}
+        params = {"limit": limit}
         params['scheduledRequestUUID'] = scheduledRequestUUID
-        if status is not None and status in ["Completed", "Canceled", "Processing", "Pending", "Created", "Error - Failure To Send", "Error - Processing"]:
+        if status is not None and status in ["Completed", "Canceled", "Processing", "Pending", "Created",
+                                             "Error - Failure To Send", "Error - Processing"]:
             params["status"] = status
         if createdAfter is not None:
             params["createdAfter"] = createdAfter
@@ -2500,44 +2523,44 @@ class Analytics:
             params['createdBefore'] = createdBefore
         if updatedAfter is not None:
             params["updatedAfter"] = updatedAfter
-        res = self.connector.getData(self.endpoint_company + path,params=params)
+        res = self.connector.getData(self.endpoint_company + path, params=params)
         return res
-    
-    def getDataWarehouseReport(self,reportUUID:str=None)-> dict:
+
+    def getDataWarehouseReport(self, reportUUID: str = None) -> dict:
         """
         Return a single report information out of the report UUID.
         Arguments:
-            reportUUID : REQUIRED : the report UUID 
+            reportUUID : REQUIRED : the report UUID
         """
         if reportUUID is None:
             raise ValueError("Require a report UUID")
         path = f'/data_warehouse/report/{reportUUID}'
         res = self.connector.getData(self.endpoint_company + path)
         return res
-    
-    def resendDataWarehouseReport(self,reportUUID:str=None,)->dict:
+
+    def resendDataWarehouseReport(self, reportUUID: str = None, ) -> dict:
         """
         Resend the data warehouse already completed.
         Argument:
-            reportUUID : REQUIRED : the report UUID 
+            reportUUID : REQUIRED : the report UUID
         """
         if reportUUID is None:
             raise ValueError("Require a report UUID")
         path = f'/data_warehouse/report/{reportUUID}'
         data = {
-            "metadata":{
-                "status":"resend"
+            "metadata": {
+                "status": "resend"
             }
         }
-        res = self.connector.putData(self.endpoint_company + path,data=data)
+        res = self.connector.putData(self.endpoint_company + path, data=data)
         return res
 
     def getDataWarehouseScheduledRequests(self,
-                                          rsid:str=None,
-                                          limit:int=1000,
-                                          createdAfter:str=None,
-                                          createdBefore:str=None,
-                                          updatedAfter:str=None,)-> dict:
+                                          rsid: str = None,
+                                          limit: int = 1000,
+                                          createdAfter: str = None,
+                                          createdBefore: str = None,
+                                          updatedAfter: str = None, ) -> dict:
         """
         Get all DW scheduled requests that matched filter parameters.
         Arguments:
@@ -2551,28 +2574,28 @@ class Analytics:
         if rsid is None:
             raise ValueError("Required a reportSuite ID")
         path = '/data_warehouse/scheduled'
-        params = {"limit":limit,"rsid":rsid}
+        params = {"limit": limit, "rsid": rsid}
         if createdAfter is not None:
             params["createdAfter"] = createdAfter
         if createdBefore is not None:
             params['createdBefore'] = createdBefore
         if updatedAfter is not None:
             params["updatedAfter"] = updatedAfter
-        res = self.connector.getData(self.endpoint_company+ path,params=params)
+        res = self.connector.getData(self.endpoint_company + path, params=params)
         return res
-    
-    def getDataWarehouseScheduledRequest(self,scheduleUUID:str=None)-> dict:
+
+    def getDataWarehouseScheduledRequest(self, scheduleUUID: str = None) -> dict:
         """
         Return a single request information out of the schedule UUID.
         Arguments:
-            scheduleUUID : REQUIRED : the scheduled Request UUID 
+            scheduleUUID : REQUIRED : the scheduled Request UUID
         """
         if scheduleUUID is None:
             raise ValueError("Require a report UUID")
         path = f'/data_warehouse/scheduled/{scheduleUUID}'
         res = self.connector.getData(self.endpoint_company + path)
         return res
-    
+
     # def createDataWarehouseRequest(self,
     #                 requestDict:dict=None,
     #                 reportName:str=None,
@@ -2583,16 +2606,16 @@ class Analytics:
     #     """
     #     Create a Data Warehouse request based on either the dictionary provided or the parameters filled.
     #     Arguments:
-    #         requestDict : OPTIONAL : The complete dictionary definition for a datawarehouse export. 
+    #         requestDict : OPTIONAL : The complete dictionary definition for a datawarehouse export.
     #             If not provided, require the other parameters to be used.
     #         reportName : OPTIONAL : The name of the report
-    #         startDateTime : OPTIONAL : The date time to use for start "2020-01-01T00:00:00.000" 
+    #         startDateTime : OPTIONAL : The date time to use for start "2020-01-01T00:00:00.000"
     #         endDateTime : OPTIONAL : The date time  to use for end "2020-02-01T00:00:00.000"
     #         dimensionsList : OPTIONAL : List of dimensions to use, example : [{"id":"prop1"]
     #         metricList : OPTIONAL : List of metrics to use, example : ["id": "metrics/visitors"]
     #         segmentList : OPTIONAL : List of segments to use, example : ['seg1','seg2']
-    #         dateGranularity : OPTIONAL : 
-    #         reportPeriod : OPTIONAL : 
+    #         dateGranularity : OPTIONAL :
+    #         reportPeriod : OPTIONAL :
     #         emailNote : OPTIONAL : Note for the email
 
     #     Example of requestDict:
@@ -2628,25 +2651,25 @@ class Analytics:
     #         }
     #     """
     #     f'/data_warehouse/scheduled/'
-        
 
-    def getDataWarehouseDeliveryAccounts(self)->dict:
+    def getDataWarehouseDeliveryAccounts(self) -> dict:
         """
         Get All delivery Account used by a company.
         """
         path = f'/data_warehouse/delivery/account'
-        res = self.connector.getData(self.endpoint_company+path)
+        res = self.connector.getData(self.endpoint_company + path)
         return res
-    
-    def getDataWarehouseDeliveryProfile(self)->dict:
+
+    def getDataWarehouseDeliveryProfile(self) -> dict:
         """
         Get all Delivery Profile for a given global company id
         """
         path = f'/data_warehouse/delivery/profile'
-        res = self.connector.getData('https://analytics.adobe.io'+path)
+        res = self.connector.getData('https://analytics.adobe.io' + path)
         return res
 
-    def compareReportSuites(self,listRsids:list=None,element:str='dimensions',comparison:str="full",save: bool=False)->pd.DataFrame:
+    def compareReportSuites(self, listRsids: list = None, element: str = 'dimensions', comparison: str = "full",
+                            save: bool = False) -> pd.DataFrame:
         """
         Compare reportSuite on dimensions (default) or metrics based on the comparison selected.
         Returns a dataframe with multi-index and a column telling which elements are differents
@@ -2664,26 +2687,26 @@ class Analytics:
             self.logger.debug(f"starting compareReportSuites")
         if listRsids is None or type(listRsids) != list:
             raise ValueError("Require a list of rsids")
-        if element=="dimensions":
+        if element == "dimensions":
             if self.loggingEnabled:
                 self.logger.debug(f"dimensions selected")
-            listDFs = [self.getDimensions(rsid,full=True) for rsid in listRsids]
+            listDFs = [self.getDimensions(rsid, full=True) for rsid in listRsids]
         elif element == "metrics":
-            listDFs = [self.getMetrics(rsid,full=True) for rsid in listRsids]
+            listDFs = [self.getMetrics(rsid, full=True) for rsid in listRsids]
             if self.loggingEnabled:
                 self.logger.debug(f"metrics selected")
-        for df,rsid in zip(listDFs, listRsids):
-            df['rsid']=rsid
-            df.set_index('id',inplace=True)
-            df.set_index('rsid',append=True,inplace=True)
+        for df, rsid in zip(listDFs, listRsids):
+            df['rsid'] = rsid
+            df.set_index('id', inplace=True)
+            df.set_index('rsid', append=True, inplace=True)
         df = pd.concat(listDFs)
         df = df.unstack()
-        if comparison=='name':
+        if comparison == 'name':
             df_name = df['name'].copy()
             ## transforming to a new df with boolean value comparison to col 0
             temp_df = df_name.eq(df_name.iloc[:, 0], axis=0)
             ## now doing a complete comparison of all boolean with all
-            df_name['different'] = ~temp_df.eq(temp_df.iloc[:,0],axis=0).all(1)
+            df_name['different'] = ~temp_df.eq(temp_df.iloc[:, 0], axis=0).all(1)
             if save:
                 df_name.to_csv(f'comparison_name_{int(time.time())}.csv')
                 if self.loggingEnabled:
@@ -2694,31 +2717,31 @@ class Analytics:
         dict_temp = {}
         for index in mainIndex:
             temp_df = df[index].copy()
-            temp_df.fillna('',inplace=True)
+            temp_df.fillna('', inplace=True)
             ## transforming to a new df with boolean value comparison to col 0
             temp_df.eq(temp_df.iloc[:, 0], axis=0)
             ## now doing a complete comparison of all boolean with all
-            dict_temp[index] = list(temp_df.eq(temp_df.iloc[:,0],axis=0).all(1))
+            dict_temp[index] = list(temp_df.eq(temp_df.iloc[:, 0], axis=0).all(1))
         df_bool = pd.DataFrame(dict_temp)
-        df['different'] = list(~df_bool.eq(df_bool.iloc[:,0],axis=0).all(1))
+        df['different'] = list(~df_bool.eq(df_bool.iloc[:, 0], axis=0).all(1))
         if save:
             df.to_csv(f'comparison_full_{element}_{int(time.time())}.csv')
             if self.loggingEnabled:
                 self.logger.debug(f'Full comparison, file : comparison_full_{element}_{int(time.time())}.csv')
         return df
-        
+
     def shareComponent(self, componentId: str = None, componentType: str = None, shareToId: int = None,
                        shareToImsId: int = None, shareToType: str = None, shareToLogin: str = None,
                        accessLevel: str = None, shareFromImsId: str = None) -> dict:
         """
         Shares a component with an individual or a group (product profile ID) a dictionary on the calculated metrics requested.
-        Returns the JSON response from the API. 
+        Returns the JSON response from the API.
         Arguments:
             componentId : REQUIRED : The component ID to share.
             componentType : REQUIRED : The component Type ("calculatedMetric", "segment", "project", "dateRange")
             shareToId: ID of the user or the group to share to
             shareToImsId: IMS ID of the user to share to (alternative to ID)
-            shareToLogin: Login of the user to share to (alternative to ID)                
+            shareToLogin: Login of the user to share to (alternative to ID)
             shareToType: "group" => share to a group (product profile), "user" => share to a user, "all" => share to all users (in this case, no shareToId or shareToImsId is needed)
         """
 
@@ -2736,8 +2759,8 @@ class Analytics:
         }
         res = self.connector.postData(self.endpoint_company + path, data=data)
         return res
-        
-    def getClassificationDatasets(self,rsid:str=None)->dict:
+
+    def getClassificationDatasets(self, rsid: str = None) -> dict:
         """
         Retrieve all the datasets associated with a specific reportSuites
         Arguments:
@@ -2746,10 +2769,10 @@ class Analytics:
         if rsid is None:
             raise ValueError("Require a reportSuite ID")
         path = f"/classifications/datasets/compatibilityMetrics/{rsid}"
-        res = self.connector.getData(self.endpoint_company+path)
+        res = self.connector.getData(self.endpoint_company + path)
         return res
 
-    def getClassificationDataset(self,datasetId:str=None)->dict:
+    def getClassificationDataset(self, datasetId: str = None) -> dict:
         """
         Get a classification dataset by its id.
         Argumnents:
@@ -2758,10 +2781,10 @@ class Analytics:
         if datasetId is None:
             raise ValueError("DataSet ID")
         path = f"/datasets/{datasetId}"
-        res = self.connector.getData(self._endpoint_classification+path)
+        res = self.connector.getData(self._endpoint_classification + path)
         return res
-    
-    def getClassificationTemplate(self,datasetId:str=None)->dict:
+
+    def getClassificationTemplate(self, datasetId: str = None) -> dict:
         """
         Return the template to be filled by classification file for a specific dataset.
         Arguments:
@@ -2770,10 +2793,10 @@ class Analytics:
         if datasetId is None:
             raise ValueError("datasetId is required")
         path = f"/classifications/datasets/template/{datasetId}"
-        res = self.connector.getData(self.endpoint_company+path)
+        res = self.connector.getData(self.endpoint_company + path)
         return res
 
-    def getClassificationJobs(self,datasetId:str=None,n_results:int=20)->list:
+    def getClassificationJobs(self, datasetId: str = None, n_results: int = 20) -> list:
         """
         Returns a list of jobs done for classification of a specific dataset. This
         Arguments:
@@ -2783,21 +2806,21 @@ class Analytics:
         if datasetId is None:
             raise ValueError("A datasetId is required")
         path = f"/classifications/job/byDataset/{datasetId}"
-        params = {"page":0,"size":10}
-        res = self.connector.get(self.endpoint_company+path, params=params)
+        params = {"page": 0, "size": 10}
+        res = self.connector.get(self.endpoint_company + path, params=params)
         data = res.get('content')
-        last = res.get('last',False)
+        last = res.get('last', False)
         if last == False:
-            params['page'] +=1
-            res = self.connector.get(self.endpoint_company+path, params=params)
-            data += res.get('content',[])
-            last = res.get('last',False)
+            params['page'] += 1
+            res = self.connector.get(self.endpoint_company + path, params=params)
+            data += res.get('content', [])
+            last = res.get('last', False)
             if last != True:
                 if len(data) >= n_results:
                     last = True
         return data
-    
-    def getClassificationJob(self,jobId:str=None)->dict:
+
+    def getClassificationJob(self, jobId: str = None) -> dict:
         """
         Get a specific classification job information
         Arguments:
@@ -2806,10 +2829,10 @@ class Analytics:
         if jobId is None:
             raise ValueError('Required a Job ID')
         path = f"/classifications/job/{jobId}"
-        res = self.connector.getData(self.endpoint_company+path)
+        res = self.connector.getData(self.endpoint_company + path)
         return res
-    
-    def deleteClassification(self,datasetId:str=None)->dict:
+
+    def deleteClassification(self, datasetId: str = None) -> dict:
         """
         Delete a specific dataset for classification.
         Argument:
@@ -2818,10 +2841,11 @@ class Analytics:
         if datasetId is None:
             raise ValueError("Require a Dataset Id")
         path = f"/classifications/datasets/{datasetId}"
-        res = self.connector.deleteData(self.endpoint_company+path)
+        res = self.connector.deleteData(self.endpoint_company + path)
         return res
-    
-    def importClassification(self,datasetId:str=None,jobName:str="aanalytics2 upload",data:list=None,emailNotification:Union[str,list]=None)->dict:
+
+    def importClassification(self, datasetId: str = None, jobName: str = "aanalytics2 upload", data: list = None,
+                             emailNotification: Union[str, list] = None) -> dict:
         """
         Import data in a JSON/dictionary format when less than 50Mb of data.
         Arguments:
@@ -2850,38 +2874,38 @@ class Analytics:
         path = f"/classifications/job/import/json/{datasetId}"
         classData = {
             "dataFormat": "json",
-          "encoding": "UTF8",
-          "jobName": jobName,
-          "notifications": [
-            {
-              "method": "email",
-              "state": "completed",
-              "recipients": emailNotification
-            }
-          ],
-          "listDelimiter": ",",
-          "source": "Direct API Upload",
-          "keyOptions": {
-            "byte_length": 0,
-            "type": "string"
-          },
-          "data": data
+            "encoding": "UTF8",
+            "jobName": jobName,
+            "notifications": [
+                {
+                    "method": "email",
+                    "state": "completed",
+                    "recipients": emailNotification
+                }
+            ],
+            "listDelimiter": ",",
+            "source": "Direct API Upload",
+            "keyOptions": {
+                "byte_length": 0,
+                "type": "string"
+            },
+            "data": data
         }
-        res = self.connector.postData(self.endpoint_company+path,data=data)
+        res = self.connector.postData(self.endpoint_company + path, data=data)
         return res
-    
+
     def createExportClassification(self,
-                                   datasetId:str=None,
-                                   jobName:str= "aanalytics2 export",
-                                   rowLimit:int=50000,
-                                   dataFormat:str="json",
-                                   offset:int=0,
-                                   columns:list=None,
-                                   keys:list=None,
-                                   stateNotification:str = None,
-                                   emailNotification:Union[str,list]=None,
-                                   dateFilterStart:str=None,
-                                   dateFilterEnd:str=None)->dict:
+                                   datasetId: str = None,
+                                   jobName: str = "aanalytics2 export",
+                                   rowLimit: int = 50000,
+                                   dataFormat: str = "json",
+                                   offset: int = 0,
+                                   columns: list = None,
+                                   keys: list = None,
+                                   stateNotification: str = None,
+                                   emailNotification: Union[str, list] = None,
+                                   dateFilterStart: str = None,
+                                   dateFilterEnd: str = None) -> dict:
         """
         Create an export classification file. The job ID returned can be used with the method: exportClassificationFile.
         Arguments:
@@ -2901,16 +2925,16 @@ class Analytics:
             raise ValueError("A datasetId is required")
         path = f"/classifications/job/export/{datasetId}"
         data = {
-          "dataFormat": dataFormat,
-          "encoding": "UTF8",
-          "jobName": jobName,
-          "listDelimiter": ",",
-          "source": "Direct API Upload",
-          "rowLimit": rowLimit,
-          "offset": offset,
-          "dateFilterStart": "YYYY-12-07T22:29:07.446Z",
-          "dateFilterEnd": "YYYY-12-07T22:29:07.446Z"
-        }      
+            "dataFormat": dataFormat,
+            "encoding": "UTF8",
+            "jobName": jobName,
+            "listDelimiter": ",",
+            "source": "Direct API Upload",
+            "rowLimit": rowLimit,
+            "offset": offset,
+            "dateFilterStart": "YYYY-12-07T22:29:07.446Z",
+            "dateFilterEnd": "YYYY-12-07T22:29:07.446Z"
+        }
         if stateNotification is not None and emailNotification is not None:
             notificationData = [{
                 "method": "email",
@@ -2930,21 +2954,20 @@ class Analytics:
             data["dateFilterStart"] = dateFilterStart
         if dateFilterEnd is not None:
             data["dateFilterEnd"] = dateFilterEnd
-        res = self.connector.postData(self.endpoint_company+path,data=data)
+        res = self.connector.postData(self.endpoint_company + path, data=data)
         return res
-    
-    def getExportClassificationFile(self,jobId:str=None)->dict:
+
+    def getExportClassificationFile(self, jobId: str = None) -> dict:
         """
         Retrieve the file based on the job ID created.
         Arguments:
-            jobId : REQUIRED : The job ID 
+            jobId : REQUIRED : The job ID
         """
         if jobId is None:
             raise ValueError("Job ID is required")
         path = f"/classifications/job/export/file/{jobId}"
-        res = self.connector.getData(self.endpoint_company+path)
+        res = self.connector.getData(self.endpoint_company + path)
         return res
-
 
     def _dataDescriptor(self, json_request: dict):
         """
@@ -2954,7 +2977,7 @@ class Analytics:
         if self.loggingEnabled:
             self.logger.debug(f"starting _dataDescriptor")
         obj = {}
-        if json_request.get('dimension',None) is not None:
+        if json_request.get('dimension', None) is not None:
             obj['dimension'] = json_request.get('dimension')
         obj['filters'] = {'globalFilters': [], 'metricsFilters': {}}
         obj['rsid'] = json_request['rsid']
@@ -2990,10 +3013,10 @@ class Analytics:
             item_id: bool = False
     ) -> pd.DataFrame:
         """
-        read the data from the requests and returns a dataframe. 
+        read the data from the requests and returns a dataframe.
         Parameters:
             data_rows : REQUIRED : Rows that have been returned by the request.
-            anomaly : OPTIONAL : Boolean to tell if the anomaly detection has been used. 
+            anomaly : OPTIONAL : Boolean to tell if the anomaly detection has been used.
             cols : OPTIONAL : list of columns names
         """
         if self.loggingEnabled:
@@ -3028,7 +3051,7 @@ class Analytics:
 
     def getReport(
             self,
-            json_request: Union[dict, str, IO,RequestCreator],
+            json_request: Union[dict, str, IO, RequestCreator],
             limit: int = 1000,
             n_results: Union[int, str] = 1000,
             save: bool = False,
@@ -3039,29 +3062,29 @@ class Analytics:
             **kwargs,
     ) -> object:
         """
-        Retrieve data from a JSON request.Returns an object containing meta info and dataframe. 
+        Retrieve data from a JSON request.Returns an object containing meta info and dataframe.
         Arguments:
             json_request: REQUIRED : JSON statement that contains your request for Analytics API 2.0.
-                The argument can be : 
+                The argument can be :
                 - a dictionary : It will be used as it is.
                 - a string that is a dictionary : It will be transformed to a dictionary / JSON.
-                - a path to a JSON file that contains the statement (must end with ".json"). 
+                - a path to a JSON file that contains the statement (must end with ".json").
                 - an instance of the RequestCreator class
             limit : OPTIONAL : number of result per request (defaut 1000)
             n_results : OPTIONAL : Number of result that you would like to retrieve. (default 1000)
                 if you want to have all possible data, use "inf".
             item_id : OPTIONAL : Boolean to define if you want to return the item id for sub requests (default False)
-            unsafe : OPTIONAL : If set to True, it will not check "lastPage" parameter and assume first request is complete. 
+            unsafe : OPTIONAL : If set to True, it will not check "lastPage" parameter and assume first request is complete.
                 This may break the script or return incomplete data. (default False).
             save : OPTIONAL : If you would like to save the data within a CSV file. (default False)
             verbose : OPTIONAL : If you want to have comments displayed (default False)
-            
+
         """
         if unsafe and verbose:
             print('---- running the getReport in "unsafe" mode ----')
         obj = {}
-        
-        if isinstance(json_request,RequestCreator):
+
+        if isinstance(json_request, RequestCreator):
             request = json_request.to_dict()
         elif type(json_request) == dict:
             request = json_request
@@ -3087,7 +3110,7 @@ class Analytics:
         columns = [data_info['dimension']] + data_info['metrics']
         # preparing for the loop
         # in case "inf" has been used. Turn it to a number
-        n_results = kwargs.get('n_result',n_results)
+        n_results = kwargs.get('n_result', n_results)
         n_results = float(n_results)
         if n_results != float('inf') and n_results < request['settings']['limit']:
             # making sure we don't call more than set in wrapper
@@ -3105,7 +3128,7 @@ class Analytics:
             if verbose:
                 print('Data received.')
             # Recursion to take care of throttling limit
-            while report.get('status_code', 200) == 429 or report.get('error_code',None) == "429050":
+            while report.get('status_code', 200) == 429 or report.get('error_code', None) == "429050":
                 if verbose:
                     print('reaching the limit : pause for 50 s and entering recursion.')
                 if debug:
@@ -3113,7 +3136,7 @@ class Analytics:
                         f.write(json.dumps(report, indent=4))
                 time.sleep(50)
                 report = self.connector.postData(self.endpoint_company +
-                                             self._getReport, data=request, headers=self.header)
+                                                 self._getReport, data=request, headers=self.header)
             if 'lastPage' not in report and unsafe == False:  # checking error when no lastPage key in report
                 if verbose:
                     print(json.dumps(report, indent=2))
@@ -3177,11 +3200,11 @@ class Analytics:
             print(
                 f'Report contains {(count_elements / total_elements) * 100} % of the available dimensions')
         return obj
-    
+
     def _prepareData(
-        self,
-        dataRows: list = None,
-        reportType: str = "normal",
+            self,
+            dataRows: list = None,
+            reportType: str = "normal",
     ) -> dict:
         """
         Read the data returned by the getReport and returns a dictionary used by the Workspace class.
@@ -3202,21 +3225,22 @@ class Analytics:
         return expanded_rows
 
     def _decrypteStaticData(
-        self, dataRequest: dict = None, response: dict = None,resolveColumns:bool=False
+            self, dataRequest: dict = None, response: dict = None, resolveColumns: bool = False
     ) -> dict:
         """
         From the request dictionary and the response, decrypte the data to standardise the reading.
         """
         dataRows = []
         ## retrieve StaticRow ID and segmentID
-        if len([metric for metric in dataRequest['metricContainer'].get('metricFilters',[]) if metric.get('id','').startswith("STATIC_ROW_COMPONENT")])>0:
-            if  "dateRange" in list(dataRequest['metricContainer'].get('metricFilters',[])[0].keys()):
+        if len([metric for metric in dataRequest['metricContainer'].get('metricFilters', []) if
+                metric.get('id', '').startswith("STATIC_ROW_COMPONENT")]) > 0:
+            if "dateRange" in list(dataRequest['metricContainer'].get('metricFilters', [])[0].keys()):
                 tableSegmentsRows = {
                     obj["id"]: obj["dateRange"]
                     for obj in dataRequest["metricContainer"]["metricFilters"]
                     if obj["id"].startswith("STATIC_ROW_COMPONENT")
                 }
-            elif "segmentId" in list(dataRequest['metricContainer'].get('metricFilters',[])[0].keys()):
+            elif "segmentId" in list(dataRequest['metricContainer'].get('metricFilters', [])[0].keys()):
                 tableSegmentsRows = {
                     obj["id"]: obj["segmentId"]
                     for obj in dataRequest["metricContainer"]["metricFilters"]
@@ -3263,7 +3287,7 @@ class Analytics:
                 staticRowsNames.append(row)
         if resolveColumns:
             staticRowDict = {
-                row: self.getSegment(rowName).get('name',rowName) for row, rowName in zip(staticRows, staticRowsNames)
+                row: self.getSegment(rowName).get('name', rowName) for row, rowName in zip(staticRows, staticRowsNames)
             }
         else:
             staticRowDict = {
@@ -3273,7 +3297,7 @@ class Analytics:
         dataRows = defaultdict(list)
         for row in staticRowDict:  ## iter on the different static rows
             for column, data in zip(
-                response["columns"]["columnIds"], response["summaryData"]["totals"]
+                    response["columns"]["columnIds"], response["summaryData"]["totals"]
             ):
                 if tableSegmentsRows[tableColumnIds[column]] == row:
                     ## check translation of metricId with Static Row ID
@@ -3284,22 +3308,22 @@ class Analytics:
         return nb_columns, tableColumnIds, segmentApplied, filterRelations, dataRows
 
     def getReport2(
-        self,
-        request: Union[dict, IO,RequestCreator] = None,
-        limit: int = 20000,
-        n_results: Union[int, str] = "inf",
-        allowRemoteLoad: str = "default",
-        useCache: bool = True,
-        useResultsCache: bool = False,
-        includeOberonXml: bool = False,
-        includePredictiveObjects: bool = False,
-        returnsNone: bool = None,
-        countRepeatInstances: bool = None,
-        ignoreZeroes: bool = None,
-        rsid: str = None,
-        resolveColumns: bool = True,
-        save: bool = False,
-        returnClass: bool = True,
+            self,
+            request: Union[dict, IO, RequestCreator] = None,
+            limit: int = 20000,
+            n_results: Union[int, str] = "inf",
+            allowRemoteLoad: str = "default",
+            useCache: bool = True,
+            useResultsCache: bool = False,
+            includeOberonXml: bool = False,
+            includePredictiveObjects: bool = False,
+            returnsNone: bool = None,
+            countRepeatInstances: bool = None,
+            ignoreZeroes: bool = None,
+            rsid: str = None,
+            resolveColumns: bool = True,
+            save: bool = False,
+            returnClass: bool = True,
     ) -> Union[Workspace, dict]:
         """
         Return an instance of Workspace that contains the data requested.
@@ -3332,7 +3356,7 @@ class Analytics:
         }
         if type(request) == dict:
             dataRequest = request
-        elif isinstance(request,RequestCreator):
+        elif isinstance(request, RequestCreator):
             dataRequest = request.to_dict()
         elif ".json" in request:
             with open(request, "r") as f:
@@ -3345,24 +3369,24 @@ class Analytics:
         dataRequest["settings"]["limit"] = limit
         if returnsNone:
             dataRequest["settings"]["nonesBehavior"] = "return-nones"
-        elif dataRequest['settings'].get('nonesBehavior',False) != False:
-            pass ## keeping current settings
+        elif dataRequest['settings'].get('nonesBehavior', False) != False:
+            pass  ## keeping current settings
         else:
             dataRequest["settings"]["nonesBehavior"] = "exclude-nones"
         if countRepeatInstances:
             dataRequest["settings"]["countRepeatInstances"] = True
-        elif dataRequest["settings"].get("countRepeatInstances",False) != False:
-            pass ## keeping current settings
+        elif dataRequest["settings"].get("countRepeatInstances", False) != False:
+            pass  ## keeping current settings
         else:
             dataRequest["settings"]["countRepeatInstances"] = False
         if rsid is not None:
             dataRequest["rsid"] = rsid
         if ignoreZeroes:
-            dataRequest.get("statistics",{'ignoreZeroes':True})["ignoreZeroes"] = True
+            dataRequest.get("statistics", {'ignoreZeroes': True})["ignoreZeroes"] = True
         deepCopyRequest = deepcopy(dataRequest)
         ### Request data
         if self.loggingEnabled:
-            self.logger.debug(f"getReport request: {json.dumps(dataRequest,indent=4)}")
+            self.logger.debug(f"getReport request: {json.dumps(dataRequest, indent=4)}")
         res = self.connector.postData(
             self.endpoint_company + path, data=dataRequest, params=params
         )
@@ -3438,7 +3462,7 @@ class Analytics:
                 segmentApplied,
                 filterRelations,
                 dataRows,
-            ) = self._decrypteStaticData(dataRequest=dataRequest, response=res,resolveColumns=resolveColumns)
+            ) = self._decrypteStaticData(dataRequest=dataRequest, response=res, resolveColumns=resolveColumns)
             ### Findings metrics
             metricFilters = {}
             metricColumns = []
@@ -3453,7 +3477,7 @@ class Analytics:
                 if correspondingStatic in list(filterRelations.keys()):
                     ## finding segment applied to metrics
                     for element in filterRelations[correspondingStatic]:
-                        segId:str = segmentApplied[element]
+                        segId: str = segmentApplied[element]
                         metricName += f":::{segId}"
                         metricFilters[segId] = segId
                         if segId.startswith("s") and "@AdobeOrg" in segId:
@@ -3484,8 +3508,7 @@ class Analytics:
                 data.to_csv()
             return data
 
-
-    def getAlerts(self, definition: bool=False, format: str="df") -> JsonListOrDataFrameType:
+    def getAlerts(self, definition: bool = False, format: str = "df") -> JsonListOrDataFrameType:
         """
         Get Alerts.
         Arguments:
@@ -3509,7 +3532,7 @@ class Analytics:
             raise Exception(f"Get Alerts Job had no content in response. Parameters were: {params}")
         # get Alerts into Data Frame
         data = res.get("content")
-        last_page = res.get("lastPage",True)
+        last_page = res.get("lastPage", True)
         total_el = res.get("totalElements")
         number_el = res.get("numberOfElements")
         # iterate through pages if not on last page yet
@@ -3519,8 +3542,63 @@ class Analytics:
             params["page"] += 1
             res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
             data += res.get("content")
-            last_page = res.get("lastPage",True)
+            last_page = res.get("lastPage", True)
         if format == "df":
             df = pd.DataFrame(data)
             return df
         return data
+
+    def getAlert(self, alertId: str) -> dict:
+        """
+        gets an individual Alert as a dictionary
+        @param alertId: Alert ID
+        """
+        path = f"{self._getAlerts}/{alertId}"
+        res = self.connector.getData(self.endpoint_company + path, headers=self.header)
+        return res
+
+    def updateAlert(self, alertId: str, data: dict) -> dict:
+        """
+        Wrapper for all methods to update an Alert.
+        Arguments:
+            alertId : REQUIRED : Alert ID to change
+            data : REQUIRED : Parameters to change
+        """
+        path = f"{self._getAlerts}/{alertId}"
+        return self.connector.putData(self.endpoint_company + path, data=data, headers=self.header)
+
+    def disableAlert(self, alertId: str) -> dict:
+        """
+        Disable an Alert.
+        Arguments:
+            alertId : REQUIRED : Alert ID to disable
+        """
+
+        return self.updateAlert(alertId=alertId, data={"isDisabled": True})
+
+    def enableAlert(self, alertId: str) -> dict:
+        """
+        Enable an Alert.
+        Arguments:
+            alertId : REQUIRED : Alert ID to enable
+        """
+
+        return self.updateAlert(alertId=alertId, data={"isDisabled": False})
+
+    def deleteAlert(self, alertId: str) -> int:
+        """
+        Delete an Alert. Returns 200 if successful.
+        Arguments:
+            alertId : REQUIRED : ID of Alert to delete
+        """
+        path = f"{self._getAlerts}/{alertId}"
+        return self.connector.deleteData(self.endpoint_company + path, headers=self.header)
+
+    def renewAlerts(self, alertIds: list) -> list:  # todo
+        """
+        Renew a list of Alerts. Returns a list of dictionaries with the status per Alert ID.
+        Arguments:
+            alertId : REQUIRED : IDs of Alerts to renew
+        """
+        path = f"{self._getAlerts}/reenable"
+        return self.connector.putData(self.endpoint_company + path, data=alertIds, headers=self.header)
