@@ -1739,16 +1739,17 @@ class Analytics:
         res = self.connector.deleteData(self.endpoint_company + path)
         return res
 
-    def getProjects(self, includeType: str = 'all', full: bool = False, limit: int = None, includeShared: bool = False,
-                    includeTemplate: bool = False, format: str = 'df', cache: bool = False,
+    def getProjects(self, includeType: str = 'all', full: bool = False, expansion: str = None, limit: int = None,
+                    includeShared: bool = False, includeTemplate: bool = False, format: str = 'df', cache: bool = False,
                     save: bool = False) -> JsonListOrDataFrameType:
         """
         Returns the list of projects through either a dataframe or a list.
         Arguments:
-            includeType : OPTIONAL : type of projects to be retrieved.(str) Possible values:
+            includeType : OPTIONAL : type of projects to be retrieved.(str) Possible values: 
                 - all : Default value (all projects possibles)
                 - shared : shared projects
             full : OPTIONAL : if set to True, returns all information about projects.
+            expansion : OPTIONAL : if set, limits the request to the listed expansion parameters
             limit : OPTIONAL : Limit the number of result returned.
             includeShared : OPTIONAL : If full is set to False, you can retrieve only information about sharing.
             includeTemplate: OPTIONAL : If full is set to False, you can add information about template here.
@@ -1769,6 +1770,9 @@ class Analytics:
                 params["expansion"] += ',shares,sharesFullName'
             if includeTemplate:
                 params["expansion"] += ',companyTemplate'
+        if expansion is not None:
+            # override the default expansion values in case an explicit expansion parameter is present
+            params["expansion"] = expansion
         if limit is not None:
             params['limit'] = limit
         if self.loggingEnabled:
