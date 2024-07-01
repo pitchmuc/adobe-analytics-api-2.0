@@ -21,7 +21,11 @@ The changes have been tracked starting version 0.1.0
   * getDataWarehouseReport
   * resendDataWarehouseReport
   * getDataWarehouseScheduledRequests
-  * getDataWarehouseScheduledRequest
+  * getDataWarehouseScheduledRequest\
+Patch :
+* fixing issue on getClassificationDatasets method
+* adding more methods to classication
+* improving standard for `retry` parameters. 
 
 ## version 0.4.1
 

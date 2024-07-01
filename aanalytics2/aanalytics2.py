@@ -2798,7 +2798,7 @@ class Analytics:
 
     def getClassificationJobs(self, datasetId: str = None, n_results: int = 20) -> list:
         """
-        Returns a list of jobs done for classification of a specific dataset. This
+        Returns a list of jobs done for classification of a specific dataset.
         Arguments:
             datasetId : REQUIRED : The datasetId to be looked for
             n_results : OPTIONAL : Total amount of result to be returned
