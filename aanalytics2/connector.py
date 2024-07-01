@@ -142,8 +142,9 @@ class AdobeRequest:
                     print('Retry parameter activated')
                     print(f'{internRetry} retry left')
                 if 'error' in res_json.keys():
-                    time.sleep(30)
-                    res_json = self.getData(endpoint, params=params, data=data, headers=headers, retry=internRetry-1, **kwargs)
+                    time.sleep(self.restTime)
+                    kwargs["retry"] = internRetry - 1
+                    res_json = self.getData(endpoint, params=params, data=data, headers=headers, **kwargs)
                     return res_json
         return res_json
 
