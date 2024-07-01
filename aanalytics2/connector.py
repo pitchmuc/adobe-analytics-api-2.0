@@ -4,7 +4,7 @@ from copy import deepcopy
 
 # Non standard libraries
 import requests
-
+import io
 from aanalytics2 import config, token_provider
 
 
@@ -112,11 +112,19 @@ class AdobeRequest:
                 res = requests.get(endpoint, headers=headers, params=params, data=data)
             res_json = res.json()
         except:
-            ## handling 1.4
+            ## handling 1.4 and classification
             if self.loggingEnabled:
                 self.logger.warning(f"handling exception as res.json() cannot be managed")
                 self.logger.warning(f"status code: {res.status_code}")
-            if kwargs.get('legacy',False):
+            if kwargs.get('classFile'): ## reading classification files
+                text = res.text
+                textIO = io.StringIO(text)
+                list_lines = list(textIO.readlines())
+                data = []
+                for line in list_lines:
+                    data.append(json.loads(line.strip()))
+                return data
+            elif kwargs.get('legacy',False): ## handling 1.4
                 try:
                     return json.loads(res.text)
                 except:
@@ -170,19 +178,21 @@ class AdobeRequest:
             res_json = {'error': res.get('status_code','Request Error')}
         return res_json
 
-    def patchData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
+    def patchData(self, endpoint: str, params: dict = None, data:dict = None, headers: dict = None, files : dict = None,  *args, **kwargs):
         """
         Abstraction for patching data
         """
         self._checkingDate()
         if headers is None:
             headers = self.header
-        if params is not None and data is None:
+        if params is not None and data is None and files is None:
             res = requests.patch(endpoint, headers=headers, params=params)
-        elif params is None and data is not None:
+        elif params is None and data is not None and files is None:
             res = requests.patch(endpoint, headers=headers, data=json.dumps(data))
-        elif params is not None and data is not None:
+        elif params is not None and data is not None and files is None:
             res = requests.patch(endpoint, headers=headers, params=params, data=json.dumps(data))
+        elif files is not None:
+            res = requests.patch(endpoint, headers=headers, params=params, files=files)
         try:
             while str(res.status_code) == "429":
                 if kwargs.get("verbose", False):
@@ -196,19 +206,21 @@ class AdobeRequest:
             res_json = {'error': res.get('status_code','Request Error')}
         return res_json
 
-    def putData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
+    def putData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, files:dict=None,*args, **kwargs):
         """
         Abstraction for putting data
         """
         self._checkingDate()
         if headers is None:
             headers = self.header
-        if params is not None and data is None:
+        if params is not None and data is None and files is None:
             res = requests.put(endpoint, headers=headers, params=params)
-        elif params is None and data is not None:
+        elif params is None and data is not None and files is None:
             res = requests.put(endpoint, headers=headers, data=json.dumps(data))
-        elif params is not None and data is not None:
+        elif params is not None and data is not None and files is None:
             res = requests.put(endpoint, headers=headers, params=params, data=json.dumps(data=data))
+        elif files is not None:
+            res = requests.put(endpoint, headers=headers, params=params, files=files)
         try:
             status_code = res.json()
         except:

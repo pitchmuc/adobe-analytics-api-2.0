@@ -2780,8 +2780,8 @@ class Analytics:
         """
         if datasetId is None:
             raise ValueError("DataSet ID")
-        path = f"/datasets/{datasetId}"
-        res = self.connector.getData(self._endpoint_classification + path)
+        path = f"/classifications/datasets/{datasetId}"
+        res = self.connector.getData(self.endpoint_company + path)
         return res
 
     def getClassificationTemplate(self, datasetId: str = None) -> dict:
@@ -2807,12 +2807,12 @@ class Analytics:
             raise ValueError("A datasetId is required")
         path = f"/classifications/job/byDataset/{datasetId}"
         params = {"page": 0, "size": 10}
-        res = self.connector.get(self.endpoint_company + path, params=params)
+        res = self.connector.getData(self.endpoint_company + path, params=params)
         data = res.get('content')
         last = res.get('last', False)
         if last == False:
             params['page'] += 1
-            res = self.connector.get(self.endpoint_company + path, params=params)
+            res = self.connector.getData(self.endpoint_company + path, params=params)
             data += res.get('content', [])
             last = res.get('last', False)
             if last != True:
@@ -2844,7 +2844,48 @@ class Analytics:
         res = self.connector.deleteData(self.endpoint_company + path)
         return res
 
-    def importClassification(self, datasetId: str = None, jobName: str = "aanalytics2 upload", data: list = None,
+    def createImportClassificationJob(self,datasetId:str=None,dataFormat:str='json',jobName:str='aanalytics2',delimiter:str=",",encoding:str="UTF8")->dict:
+        """
+        Create API import job entity on classification dataset, need to upload file after this API call
+        Arguments:
+            datasetId : REQUIRED : The datasetId to be used
+            dataFormat : OPTIONAL : If you want to specify another type of file to import (default "json",possible "tab" or "tsv")
+            jobName : OPTIONAL : Job Name to be given
+            delimiter : OPTIONAL : The delimiter of lists
+            encoding : OPTIONAL : Encoding to be used (default UTF8)
+        """
+        if datasetId is None:
+            raise ValueError("Require a datasetId")
+        path = f"/classifications/job/import/createApiJob/{datasetId}"
+        data = {
+            "dataFormat": dataFormat,
+            "encoding": encoding,
+            "jobName": jobName,
+            "listDelimiter": delimiter,
+            "source": "aanalytics2 API Upload",
+            "keyOptions": {
+                "byte_length": 0,
+                "type": "string",
+                "overwrite": True
+            }
+            }
+        res = self.connector.postData(self.endpoint_company+path,data=data)
+        return res
+
+    def commitImportClassificationJob(self,jobId:str=None)->dict:
+        """
+        Commit the API classification job uploaded. 
+        Arguments:
+            jobId : REQUIRED : The job ID to commit
+        """
+        if jobId is None:
+            raise ValueError("Require the Job ID to be provided")
+        path = f"/classifications/job/import/commitApiJob/{jobId}"
+        res = self.connector.postData(self.endpoint_company+path)
+        return res
+
+
+    def importClassificationJSON(self, datasetId: str = None, jobName: str = "aanalytics2 upload", data: list = None,
                              emailNotification: Union[str, list] = None) -> dict:
         """
         Import data in a JSON/dictionary format when less than 50Mb of data.
@@ -2891,8 +2932,31 @@ class Analytics:
             },
             "data": data
         }
-        res = self.connector.postData(self.endpoint_company + path, data=data)
+        res = self.connector.postData(self.endpoint_company + path, data=classData)
         return res
+
+    def importClassificationFile(self,jobId:str=None,filepath:str=None,filename:str="classification_import")->dict:
+        """
+        Import the file to the classification dataset.
+        Arguments:
+            jobId : REQUIRED : The job ID to upload the file to
+            filepath : REQUIRED : The path to your file such as "test_classification.tsv"
+            filename : OPTIONAL : The file name that is to be sent
+        """
+        if filepath is None:
+            raise ValueError("Require a file path")
+        if jobId is None:
+            raise ValueError("Require a job ID")
+        path = f"/classifications/job/import/uploadFile/{jobId}"
+        with open(filepath,'rb') as f:
+            files = {
+                filename : f.read(),
+            }
+        privateHeader = deepcopy(self.header)
+        privateHeader["Content-Type"] = "multipart/form-data"
+        res = self.connector.putData(self.endpoint_company+path, files=files,headers=privateHeader)
+        return res
+
 
     def createExportClassification(self,
                                    datasetId: str = None,
@@ -2932,8 +2996,6 @@ class Analytics:
             "source": "Direct API Upload",
             "rowLimit": rowLimit,
             "offset": offset,
-            "dateFilterStart": "YYYY-12-07T22:29:07.446Z",
-            "dateFilterEnd": "YYYY-12-07T22:29:07.446Z"
         }
         if stateNotification is not None and emailNotification is not None:
             notificationData = [{
@@ -2957,17 +3019,134 @@ class Analytics:
         res = self.connector.postData(self.endpoint_company + path, data=data)
         return res
 
-    def getExportClassificationFile(self, jobId: str = None) -> dict:
+    def getExportClassificationFile(self, jobId: str = None,fileName: str = None,listFile:bool=False) -> dict:
         """
-        Retrieve the file based on the job ID created.
+        Retrieve the file based on the job ID created and possibly the filename.
         Arguments:
             jobId : REQUIRED : The job ID
+            fileName : OPTIONAL : If the filename is provided.
+            listFile : OPTIONAL : Boolean if you want to retrieve a list of export file
         """
+        classFile=True
         if jobId is None:
             raise ValueError("Job ID is required")
         path = f"/classifications/job/export/file/{jobId}"
-        res = self.connector.getData(self.endpoint_company + path)
+        if fileName is not None:
+            path = f"{path}/{fileName}"
+        elif listFile:
+            path = f"{path}/list"
+            classFile = False
+        res = self.connector.getData(self.endpoint_company + path,classFile=classFile)
         return res
+    
+    def getAlerts(self, definition: bool = False, format: str = "df") -> JsonListOrDataFrameType:
+        """
+        Get Alerts.
+        Arguments:
+            includeType : OPTIONAL : By default gets all Alerts. (default "all")
+                You can specify e.g. "shared" to get only the ones shared to you.
+            definition : OPTIONAL : Gets the full definition per Alert with used segments, metrics, and operators
+            format : OPTIONAL : Define the format you want to output the result. Default "df" for dataframe, other option "raw"
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getAlerts")
+        params = {"includeType": "all",
+                  "pagination": True,
+                  "locale": "en_US",
+                  "page": 0,
+                  "limit": 1000,
+                  }
+        if definition:
+            params["expansion"] = "definition"
+        path = self._getAlerts
+        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
+        if res.get("content") is None:
+            raise Exception(f"Get Alerts Job had no content in response. Parameters were: {params}")
+        # get Alerts into Data Frame
+        data = res.get("content")
+        last_page = res.get("lastPage", True)
+        # iterate through pages if not on last page yet
+        while last_page == False:
+            if self.loggingEnabled:
+                self.logger.debug(f"last_page is {last_page}, next round")
+            params["page"] += 1
+            res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
+            data += res.get("content")
+            last_page = res.get("lastPage", True)
+        if format == "df":
+            df = pd.DataFrame(data)
+            return df
+        return data
+
+    def getAlert(self, alertId: str) -> dict:
+        """
+        gets an individual Alert as a dictionary
+        Arguments:
+            alertId : REQUIRED : Alert ID to be retrieved
+        """
+        if alertId is None:
+            raise ValueError("alertId is required")
+        path = f"{self._getAlerts}/{alertId}"
+        res = self.connector.getData(self.endpoint_company + path, headers=self.header)
+        return res
+
+    def updateAlert(self, alertId: str = None, data: dict = None) -> dict:
+        """
+        Wrapper for all methods to update an Alert.
+        Arguments:
+            alertId : REQUIRED : Alert ID to change
+            data : REQUIRED : Parameters to change
+        """
+        if alertId is None:
+            raise ValueError("Require an alert ID")
+        if data is None:
+            raise ValueError("Require the data to be passed for update")
+        path = f"{self._getAlerts}/{alertId}"
+        return self.connector.putData(self.endpoint_company + path, data=data, headers=self.header)
+
+    def disableAlert(self, alertId: str = None) -> dict:
+        """
+        Disable an Alert.
+        Arguments:
+            alertId : REQUIRED : Alert ID to disable
+        """
+        if alertId is None:
+            raise ValueError("Alert ID is required")
+        return self.updateAlert(alertId=alertId, data={"isDisabled": True})
+
+    def enableAlert(self, alertId: str = None) -> dict:
+        """
+        Enable an Alert.
+        Arguments:
+            alertId : REQUIRED : Alert ID to enable
+        """
+        if alertId is None:
+            raise ValueError("Require an alert ID")
+        return self.updateAlert(alertId=alertId, data={"isDisabled": False})
+
+    def deleteAlert(self, alertId: str=None) -> int:
+        """
+        Delete an Alert. Returns 200 if successful.
+        Arguments:
+            alertId : REQUIRED : ID of Alert to delete
+        """
+        if alertId is None:
+            raise ValueError("Alert ID should be provided")
+        path = f"{self._getAlerts}/{alertId}"
+        return self.connector.deleteData(self.endpoint_company + path, headers=self.header)
+
+    def renewAlerts(self, alertIds: list=None) -> list:  # todo
+        """
+        Renew a list of Alerts. Returns a list of dictionaries with the status per Alert ID.
+        Arguments:
+            alertId : REQUIRED : IDs of Alerts to renew
+        """
+        if alertIds is None:
+            raise ValueError("Require alertIds list to be passed")
+        if type(alertIds) != list:
+            raise TypeError("alertIds must be a list")
+        path = f"{self._getAlerts}/reenable"
+        return self.connector.putData(self.endpoint_company + path, data=alertIds, headers=self.header)
 
     def _dataDescriptor(self, json_request: dict):
         """
@@ -3507,112 +3686,3 @@ class Analytics:
             if save:
                 data.to_csv()
             return data
-
-    def getAlerts(self, definition: bool = False, format: str = "df") -> JsonListOrDataFrameType:
-        """
-        Get Alerts.
-        Arguments:
-            includeType : OPTIONAL : By default gets all Alerts. (default "all")
-                You can specify e.g. "shared" to get only the ones shared to you.
-            definition : OPTIONAL : Gets the full definition per Alert with used segments, metrics, and operators
-            format : OPTIONAL : Define the format you want to output the result. Default "df" for dataframe, other option "raw"
-        """
-        if self.loggingEnabled:
-            self.logger.debug(f"Starting getAlerts")
-        params = {"includeType": "all",
-                  "pagination": True,
-                  "locale": "en_US",
-                  "page": 0,
-                  "limit": 1000,
-                  }
-        if definition:
-            params["expansion"] = "definition"
-        path = self._getAlerts
-        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
-        if res.get("content") is None:
-            raise Exception(f"Get Alerts Job had no content in response. Parameters were: {params}")
-        # get Alerts into Data Frame
-        data = res.get("content")
-        last_page = res.get("lastPage", True)
-        # iterate through pages if not on last page yet
-        while last_page == False:
-            if self.loggingEnabled:
-                self.logger.debug(f"last_page is {last_page}, next round")
-            params["page"] += 1
-            res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
-            data += res.get("content")
-            last_page = res.get("lastPage", True)
-        if format == "df":
-            df = pd.DataFrame(data)
-            return df
-        return data
-
-    def getAlert(self, alertId: str) -> dict:
-        """
-        gets an individual Alert as a dictionary
-        Arguments:
-            alertId : REQUIRED : Alert ID to be retrieved
-        """
-        if alertId is None:
-            raise ValueError("alertId is required")
-        path = f"{self._getAlerts}/{alertId}"
-        res = self.connector.getData(self.endpoint_company + path, headers=self.header)
-        return res
-
-    def updateAlert(self, alertId: str = None, data: dict = None) -> dict:
-        """
-        Wrapper for all methods to update an Alert.
-        Arguments:
-            alertId : REQUIRED : Alert ID to change
-            data : REQUIRED : Parameters to change
-        """
-        if alertId is None:
-            raise ValueError("Require an alert ID")
-        if data is None:
-            raise ValueError("Require the data to be passed for update")
-        path = f"{self._getAlerts}/{alertId}"
-        return self.connector.putData(self.endpoint_company + path, data=data, headers=self.header)
-
-    def disableAlert(self, alertId: str = None) -> dict:
-        """
-        Disable an Alert.
-        Arguments:
-            alertId : REQUIRED : Alert ID to disable
-        """
-        if alertId is None:
-            raise ValueError("Alert ID is required")
-        return self.updateAlert(alertId=alertId, data={"isDisabled": True})
-
-    def enableAlert(self, alertId: str = None) -> dict:
-        """
-        Enable an Alert.
-        Arguments:
-            alertId : REQUIRED : Alert ID to enable
-        """
-        if alertId is None:
-            raise ValueError("Require an alert ID")
-        return self.updateAlert(alertId=alertId, data={"isDisabled": False})
-
-    def deleteAlert(self, alertId: str=None) -> int:
-        """
-        Delete an Alert. Returns 200 if successful.
-        Arguments:
-            alertId : REQUIRED : ID of Alert to delete
-        """
-        if alertId is None:
-            raise ValueError("Alert ID should be provided")
-        path = f"{self._getAlerts}/{alertId}"
-        return self.connector.deleteData(self.endpoint_company + path, headers=self.header)
-
-    def renewAlerts(self, alertIds: list=None) -> list:  # todo
-        """
-        Renew a list of Alerts. Returns a list of dictionaries with the status per Alert ID.
-        Arguments:
-            alertId : REQUIRED : IDs of Alerts to renew
-        """
-        if alertIds is None:
-            raise ValueError("Require alertIds list to be passed")
-        if type(alertIds) != list:
-            raise TypeError("alertIds must be a list")
-        path = f"{self._getAlerts}/reenable"
-        return self.connector.putData(self.endpoint_company + path, data=alertIds, headers=self.header)
