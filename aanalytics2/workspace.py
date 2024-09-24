@@ -194,6 +194,7 @@ class Workspace:
             dimension : REQUIRED : dimension to report.
             n_results : OPTIONAL : number of results you want to have on your breakdown. Default 10, can use "inf"
         """
+        n_results = float(n_results) ## transforming n_result in float
         if index is None or dimension is None:
             raise ValueError(
                 "Require a value to use as breakdown and dimension to request"
