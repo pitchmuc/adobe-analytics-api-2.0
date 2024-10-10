@@ -2600,61 +2600,138 @@ class Analytics:
         res = self.connector.getData(self.endpoint_company + path)
         return res
 
-    # def createDataWarehouseRequest(self,
-    #                 requestDict:dict=None,
-    #                 reportName:str=None,
-    #                 login:str=None,
-    #                 emails:list=None,
-    #                 emailNote:str=None,
-    #                 )->dict:
-    #     """
-    #     Create a Data Warehouse request based on either the dictionary provided or the parameters filled.
-    #     Arguments:
-    #         requestDict : OPTIONAL : The complete dictionary definition for a datawarehouse export.
-    #             If not provided, require the other parameters to be used.
-    #         reportName : OPTIONAL : The name of the report
-    #         startDateTime : OPTIONAL : The date time to use for start "2020-01-01T00:00:00.000"
-    #         endDateTime : OPTIONAL : The date time  to use for end "2020-02-01T00:00:00.000"
-    #         dimensionsList : OPTIONAL : List of dimensions to use, example : [{"id":"prop1"]
-    #         metricList : OPTIONAL : List of metrics to use, example : ["id": "metrics/visitors"]
-    #         segmentList : OPTIONAL : List of segments to use, example : ['seg1','seg2']
-    #         dateGranularity : OPTIONAL :
-    #         reportPeriod : OPTIONAL :
-    #         emailNote : OPTIONAL : Note for the email
+    def createDataWarehouseScheduledRequest(self,
+                    requestDict:dict=None,
+                    frequency:str="runOnceSetPeriod",
+                    periodSettings:dict=None,
+                    scheduleAt:str=None,
+                    reportName:str=None,
+                    preset:str=None,
+                    startDateTime:str=None,
+                    endDateTime:str=None,
+                    dimensionsList:list=None,
+                    metricList:list=None,
+                    rsid:str=None,
+                    segmentList:list=None,
+                    exportLocationUUID:str=None,
+                    cancelSettings:dict=None
+                    )->dict:
+        """
+        Create a Data Warehouse request based on either the dictionary provided or the parameters filled.
+        Arguments:
+            requestDict : OPTIONAL : The complete dictionary definition for a datawarehouse export.
+                If not provided, require the other parameters to be used.
+            reportName : OPTIONAL : The name of the report
+            frequency : OPTIONAL : By default send once (possible value : daily,monthly,hourly)
+            periodSettings : OPTIONAL : The full Period Setting object to override.
+                    Example: 
+                    {
+                        "frequency": "string",
+                        "every": 0,
+                        "dayOfMonth": 0,
+                        "dayOfWeek": "string",
+                        "month": "string",
+                        "weekOfMonth": "string"
+                    }
+            scheduleAt : OPTIONAL : If you want to send the request at a specific time (2023-01-01T00:00:00)
+            preset : OPTIONAL : If a preset time range is defined (otherwise startDate or )
+            startDateTime : OPTIONAL : The date time to use for start "2023-01-01T00:00:00Z"
+            endDateTime : OPTIONAL : The date time  to use for end "2023-01-01T00:00:00Z"
+            dimensionsList : OPTIONAL : List of dimensions to use, example : [{"id":"variables/prop1"}]
+            metricList : OPTIONAL : List of metrics to use, example : ["id": "metrics/visitors"]
+            rsid : OPTIONAL : Which reportSuite to use.
+            segmentList : OPTIONAL : List of segments to use, example : ['seg1','seg2']
+            dateGranularity : OPTIONAL : if you wish to have granularity. value (dayly,monthly,)
+            exportLocationUUID : OPTIONAL : The export Location to be used.
+            cancelSettings : OPTIONAL : cancel method for scheduled that run more than once.
+                            Example:
+                            {
+                                "cancelMethod": "afterOccurrences",
+                                "endAfterNumOccurrences": 10
+                            }
 
-    #     Example of requestDict:
-    #     {
-    #         "schedule": {
-    #             "periodSettings": {
-    #             "frequency": "daily"
-    #             }, "cancelSettings": {
-    #             "cancelMethod": "afterOccurrences",
-    #             "endAfterNumOccurrences": 10
-    #             }
-    #         },
-    #         "request": {
-    #             "name": "Run Daily Example",
-    #             "reportParameters": {
-    #                 "reportRange": {
-    #                     "preset": "Yesterday"
-    #                 },
-    #                 "dimensionList": [
-    #                 ],
-    #                 "metricList": [
-    #                     {
-    #                         "id": "metrics/visitors"
-    #                     }
-    #                 ]
-    #             },
-    #             "rsid": "examplersid"
-    #         },
-    #         "delivery": {
-    #             "exportLocationUUID": "000fxf00-12d1-1234-a6aa-00000000000a"
-    #             }
-    #         }
-    #         }
-    #     """
-    #     f'/data_warehouse/scheduled/'
+
+
+        Example of requestDict:
+        {
+            "schedule": {
+                "periodSettings": {
+                    "frequency": "daily"
+                }, "cancelSettings": {
+                    "cancelMethod": "afterOccurrences",
+                    "endAfterNumOccurrences": 10
+                }
+            },
+            "request": {
+                "name": "Run Daily Example",
+                "reportParameters": {
+                    "reportRange": {
+                        "preset": "Yesterday"
+                    },
+                    "dimensionList": [
+                        {"id":"variables/evar1"}
+                    ],
+                    "metricList": [
+                        {
+                            "id": "metrics/visitors"
+                        }
+                    ]
+                },
+                "rsid": "examplersid"
+            },
+            "delivery": {
+                "exportLocationUUID": "000fxf00-12d1-1234-a6aa-00000000000a"
+                }
+            }
+            }
+        """
+        path = f'/data_warehouse/scheduled/'
+        if requestDict is not None and type(requestDict) == dict:
+            res = self.connector.postData(self.endpoint_company+path,data=requestDict)
+        else:
+            if metricList is None or dimensionsList is None or rsid is None:
+                raise Exception("You need to define dimensions and metrics and rsid")
+            data = {
+                "schedule": {
+                    "periodSettings": {
+                        "frequency": frequency
+                    }
+                },
+                "request": {
+                    "name": reportName,
+                    "reportParameters": {
+                        "reportRange": {
+                            "preset": "Yesterday"
+                        },
+                        "dimensionList": dimensionsList,
+                        "metricList": metricList
+                    },
+                    "rsid": rsid
+                },
+                "delivery": {
+                    "exportLocationUUID": exportLocationUUID
+                    }
+                }
+            if periodSettings is not None and type(periodSettings) == dict:
+                data["schedule"]["periodSettings"] = periodSettings
+            if cancelSettings is not None and type(cancelSettings) == dict:
+                data["schedule"]["cancelSettings"] = cancelSettings
+            if preset is not None and (startDateTime is None and endDateTime is None):
+                data['request']["reportRange"]['preset'] = preset
+            if startDateTime is not None and endDateTime is not None:
+                data['request']["reportRange"] = {
+                    "startDateTime": startDateTime,
+                    "endDateTime":endDateTime
+                }
+            if segmentList is not None and type(segmentList)==list:
+                if type(segmentList[0]) == str:
+                    segmentList = [{'namespace':'Segment Service','id':seg} for seg in segmentList]
+                data['request']["segmentList"] = segmentList
+            if scheduleAt is not None:
+                data['schedule']["scheduleAt"] = scheduleAt
+            res = self.connector.postData(self.endpoint_company+path,data=data)
+        return res
+
 
     def getDataWarehouseDeliveryAccounts(self) -> dict:
         """

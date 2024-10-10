@@ -25,7 +25,10 @@ The changes have been tracked starting version 0.1.0
 Patch :
 * fixing issue on getClassificationDatasets method
 * adding more methods to classication
-* improving standard for `retry` parameters. 
+* improving standard for `retry` parameters.
+* adding capability for reading reports (`summary`, `trended` and `ranked`) out of the 1.4 Reporting API
+* adding the `createDataWarehouseScheduledRequest` method
+
 
 ## version 0.4.1
 
