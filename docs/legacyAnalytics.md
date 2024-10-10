@@ -99,3 +99,42 @@ Available methods example:\
 * `myCompany.connector.putData`
 * `myCompany.connector.patchData`
 * `myCompany.connector.deleteData`
+
+### Report Creation
+
+When using the old Reporting API, with the following methods:
+
+* `Report.Queue`
+* `Report.Get`
+* `Report.GetQueue`
+
+You can return data that are already broke down by different dimensions and with metrics.\
+In order to simplify the creation of reports based on these 1.4 report setup, I have built a new method: 
+
+`transformReportToDataFrame``
+
+Its name is pretty self-explanatory.\
+It will return a dataframe based on the result returned from a `Report.Get` for the following type of reports:
+
+* `summary`
+* `trended`
+* `ranked`
+
+
+example: 
+
+```py
+import aanalytics2
+
+org = aanalytics2.LegacyAnalytics("companyName")
+
+myReport = {}## report definition
+res = org.postData(method="Report.Queue",data=myReport)
+
+### res is  {'reportID': XXXXXX}
+
+mydata = org.postData(method="Report.Get",data=res)
+
+mydf = ags.transformReportToDataFrame(mydata)
+
+```
