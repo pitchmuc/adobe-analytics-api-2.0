@@ -234,6 +234,36 @@ Argument:
 * elementId : REQUIRED : The element ID to be used
 * kwargs : OPTIONAL : any additional attribute you want to add
 
+#### addSegment
+Require you to pass the segment object definition to add it on the request.
+Arguments
+    segment : REQUIRED : A dictionary that provides some information on the segment depending the type.
+
+Example: 
+  ```py
+  segment = {
+      "id" : "segmentID"
+  }
+  ```
+  or
+  ```py
+  segment = {
+      "element": "page",
+      "selected": ["Home Page", "Shopping Cart"]
+  }
+  ```
+  or 
+  ```py
+  segment = {
+      "element": "eVar1",
+      "classification": "Group Name",
+      "search": { "type": "OR", "keywords": ["Administrator", "Manager", "Director"]
+    }
+  }
+  ```
+
+#### removeSegment
+Remove the segment from the report
 
 #### setEncoding
 Supported values include utf8 or base64.\

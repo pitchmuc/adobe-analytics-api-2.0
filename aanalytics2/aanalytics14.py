@@ -323,4 +323,35 @@ class ReportBuilder14:
         """
         self.report['reportDescription']['elementDataEncoding'] = encoding
 
-    
+    def addSegment(self,segment:dict=None):
+        """
+        Require you to pass the segment object definition to add it on the request.
+        Arguments
+            segment : REQUIRED : A dictionary that provides some information on the segment depending the type.
+        
+        Example: 
+            segment = {
+                "id" : "segmentID"
+            }
+            or 
+            segment = {
+                "element": "page",
+                "selected": ["Home Page", "Shopping Cart"]
+            }
+            or 
+            segment = {
+                "element": "eVar1",
+                "classification": "Group Name",
+                "search": { "type": "OR", "keywords": ["Administrator", "Manager", "Director"]
+            }
+        """
+        if 'segments' not in self.report['reportDescription'].keys():
+            self.report['reportDescription']['segments'] = []
+        self.report['reportDescription']['segments'].append(segment)
+
+    def removeSegment(self):
+        """
+        Remove the segment from the report request.
+        """
+        if 'segments' in self.report['reportDescription'].keys():
+           del self.report['reportDescription']['segments']
