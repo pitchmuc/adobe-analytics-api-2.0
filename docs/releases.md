@@ -26,9 +26,9 @@ Patch :
 * fixing issue on getClassificationDatasets method
 * adding more methods to classication
 * improving standard for `retry` parameters.
-* adding capability for reading reports (`summary`, `trended` and `ranked`) out of the 1.4 Reporting API
+* adding capability for reading reports (`summary`, `trended` and `ranked`) out of the 1.4 Reporting API via `transformReportToDataFrame` (see [LegacyAnalytics](./legacyAnalytics.md))
 * adding the `createDataWarehouseScheduledRequest` method
-
+* adding the `ReportBuilder14` class for building query on legacy API (see [LegacyAnalytics](./legacyAnalytics.md))
 
 ## version 0.4.1
 
