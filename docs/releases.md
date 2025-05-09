@@ -29,6 +29,8 @@ Patch :
 * adding capability for reading reports (`summary`, `trended` and `ranked`) out of the 1.4 Reporting API via `transformReportToDataFrame` (see [LegacyAnalytics](./legacyAnalytics.md))
 * adding the `createDataWarehouseScheduledRequest` method
 * adding the `ReportBuilder14` class for building query on legacy API (see [LegacyAnalytics](./legacyAnalytics.md))
+* adding `publishingStatus` in the getSegments `extendedInfo` capability
+* adding `complexity` and `lastRecordedAccess` in `extendInfo` in `getProjects`
 
 ## version 0.4.1
 

@@ -732,7 +732,7 @@ class Analytics:
             rsid_list : OPTIONAL : Filter list to only include segments tied to specified RSID list (list)
             sidFilter : OPTIONAL : Filter list to only include segments in the specified list (list)
             extended_info : OPTIONAL : additional segment metadata fields to include on response (bool : default False)
-                if set to true, returns reportSuiteName, ownerFullName, modified, tags, compatibility, definition
+                if set to true, returns reportSuiteName, ownerFullName, modified, tags, compatibility, definition, publishingStatus
             format : OPTIONAL : defined the format returned by the query. (Default df)
                 possibe values :
                     "df" : default value that return a dataframe
@@ -751,7 +751,7 @@ class Analytics:
         params = {'includeType': 'all', 'limit': limit}
         if extended_info:
             params.update(
-                {'expansion': 'reportSuiteName,ownerFullName,created,modified,tags,compatibility,definition,shares'})
+                {'expansion': 'reportSuiteName,ownerFullName,created,modified,tags,compatibility,definition,shares,publishingStatus'})
         if name is not None:
             params.update({'name': str(name)})
         if tagNames is not None:
@@ -1763,7 +1763,7 @@ class Analytics:
         params = {"includeType": includeType}
         if full:
             params[
-                "expansion"] = 'reportSuiteName,ownerFullName,tags,shares,sharesFullName,modified,favorite,approved,companyTemplate,externalReferences,accessLevel'
+                "expansion"] = 'reportSuiteName,ownerFullName,tags,shares,sharesFullName,modified,lastRecordedAccess,favorite,approved,companyTemplate,externalReferences,accessLevel,usageSummary,complexity'
         else:
             params["expansion"] = "ownerFullName,modified"
             if includeShared:
@@ -1789,6 +1789,9 @@ class Analytics:
         if df.empty == False:
             df['created'] = pd.to_datetime(df['created'], format='%Y-%m-%dT%H:%M:%SZ')
             df['modified'] = pd.to_datetime(df['modified'], format='%Y-%m-%dT%H:%M:%SZ')
+            if 'complexity' in df.columns:
+                df['longestDateRangeDays'] = df['complexity'].apply(lambda x : x.get('longestDateRangeDays') if type(x)==dict else None)
+                df['estimatedQueryCount'] = df['complexity'].apply(lambda x : x.get('estimatedQueryCount') if type(x)==dict else None)
         if save:
             df.to_csv(f'projects_{int(time.time())}.csv', index=False)
         return df
@@ -2032,8 +2035,8 @@ class Analytics:
         listDefaultElements = [comp for comp in restComponents]
         listRecusion = []
         ## adding unregular ones
-        regPartSeg = "('|\.)"  ## ensure to not catch evar100 for evar10
-        regPartProj = "($|\.|\::)"  ## ensure to not catch evar100 for evar10
+        regPartSeg = r"('|\.)"  ## ensure to not catch evar100 for evar10
+        regPartProj = r"($|\.|\::)"  ## ensure to not catch evar100 for evar10
         if regexUsed:
             if self.loggingEnabled:
                 self.logger.debug(f"regex is used")
