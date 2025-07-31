@@ -41,13 +41,12 @@ api2.createConfigFile()
 
 As you can see, it takes no argument and the output of the file will look like this :
 
-```javaScript
+```JSON
 {
-    'org_id': '<orgID>',
-    'api_key': "<APIkey>",
-    'tech_id': "<something>@techacct.adobe.com",
-    'secret': "<YourSecret>",
-    'pathToKey': '<path/to/your/privatekey.key>',
+    "org_id": "<orgID>",
+    "client_id": "<APIkey>",
+    "secret": "<YourSecret>",
+    "scopes": "<scopes>"
 }
 ```
 
@@ -69,38 +68,6 @@ or
 import aanalytics2 as api2
 myfilePath = './myCredential/config.json'
 api2.importConfigFile(myfilePath)
-```
-
-### retrieveToken (OPTIONAL)
-
-This method is not mandatory because each of your requests will be taken care by a wrapping function that will generate a token if you don't have one.
-However, at some point, you may want to generate a token for a reason X or Y, so this function is available for that use-case.
-This function takes no argument as long as you have imported the config file.
-It returns the token.
-
-```python
-import aanalytics2 as api2
-api2.importConfigFile('config.json')
-
-token = api2.retrieveToken()
-```
-
-This method also caches the time limit of the token usage in the config_object in config module.
-It can be accessed like this:
-
-```python
-aanalytics2.config.config_object
-## your token
-aanalytics2.config.config_object['token']
-```
-
-You can review when this token expire through the time module:
-
-```python
-import time
-time.ctime(aanalytics2.config.config_object['date_limit'])
-
-## returns something like : 'Mon May 17 18:08:42 2023'
 ```
 
 ## Login class
@@ -141,10 +108,10 @@ login.COMPANY_IDS
 After selecting your `globalCompanyId`, you can generate your connection to the Login company by calling the **__createAnalyticsConnection__**.
 
 ```python
-mycompany1 = loggin.createAnalyticsConnection('comp1')
+mycompany1 = login.createAnalyticsConnection('comp1')
 ```
 
-We will see later that you can also directly use the `Analytics` class.
+**Note 1**: This step is not necessary. We will see later that you can also directly use the `Analytics` class with the `globalCompanyId`.
 
 **Note**: you can enable logging capability for the class by passing an object in the `loggingObject` parameter. More information [here](./logging.md)
 
@@ -159,13 +126,20 @@ Several reason an error can occur:
 * inconsistent behavior from Adobe Analytics API
 
 The retry parameter is going to be attached to every GET method available in your `Analytics` class.\
-**Note**
-The `getReport` is in fact a POST method. \
+**Note 1**
+The `getReport` and `getReport2` are in fact a POST method. \
 From my point of view, you want to get data so I called it that way. \
 From Adobe API you are generating a report, therefore it requires a POST method with data attached (your report config).\
-Consequently, the `getReport` method doesn't support the **retry** parameter at the moment.\
+Consequently, the `getReport` and `getReport2` method doesn't support the **retry** parameter at the moment.\
 This is also a design decision because it is based on data you are providing. If the data is corrupted or non-conformed, I do not realize a check but I expect Adobe Analytics API to return an error.\
 Following this error, I do not want to __retry__ sending that data again.
+
+**Note**
+I would encourage you to shift to use the `getReport2` instead of the `getReport` as this method provide better decoupling and code infrastructure. It will most likely be the one maintained in the future.
+It also provide with more options as you get a object back that you can interact with: 
+- realize a breakdown
+- get more contextual information (startDate, endDate, segment applied)
+
 
 You can instantiate the `Analytics` class and the `Login` class with the **retry** parameter.\
 The parameter takes the number of time you would like to retry in case of error.\
@@ -903,6 +877,8 @@ It also has several parameters that would allow for extensive comparison (with a
 
 ## GetReport
 
+**Try to use the getReport2 method instead (see below), getReport will be deprecated**
+
 The get report from Adobe Analytics, I will recommend you to watch the [video](https://youtu.be/j1kI3peSXhY) that explains how you can generate the JSON file for requesting the report through API.
 This getReport methods is a bit special because it is mostly what users would have liked to have from this API, so it is a separate part.
 
@@ -993,9 +969,9 @@ Before going with examples, I will explain the method and its arguments:
   * countRepeatInstance : OPTIONAL: Overwritte the request setting to count repeatInstances values.
   * ignoreZeroes : OPTIONAL : Ignore zeros in the results
   * rsid : OPTIONAL : Overwrite the reportSuite ID used for report. Only works if the same components are presents.
-  * resolveColumns: OPTIONAL : automatically resolve columns from ID to name for calculated metrics & segments. Default True. (works on returnClass only)
+  * resolveColumns: OPTIONAL : automatically resolve columns from ID to name for calculated metrics & segments. Default `True`. (works on returnClass only)
   * save : OPTIONAL : If you want to save the data (in JSON or CSV, depending the class is used or not)
-  * returnClass : OPTIONAL : return the class building dataframe and better comprehension of data. (default yes)
+  * returnClass : OPTIONAL : return the class building dataframe and better comprehension of data. (default `True`)
 
 I am recommending to try using the `getReport2` instead of the `getReport` method, with returning the `Workspace` class as often as possible (default method).
 This will provide the more intelligible report for you.

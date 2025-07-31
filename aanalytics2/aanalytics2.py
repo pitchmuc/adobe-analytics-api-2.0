@@ -751,7 +751,7 @@ class Analytics:
         params = {'includeType': 'all', 'limit': limit}
         if extended_info:
             params.update(
-                {'expansion': 'reportSuiteName,ownerFullName,created,modified,tags,compatibility,definition,shares,publishingStatus'})
+                {'expansion': 'reportSuiteName,ownerFullName,created,modified,tags,compatibility,definition,shares,publishingStatus,lastRecordedAccess'})
         if name is not None:
             params.update({'name': str(name)})
         if tagNames is not None:
@@ -981,7 +981,7 @@ class Analytics:
             params.update({'rsids': rsids_list})
         if extended_info:
             params.update(
-                {'expansion': 'reportSuiteName,definition,ownerFullName,modified,tags,categories,compatibility,shares'})
+                {'expansion': 'reportSuiteName,definition,ownerFullName,modified,tags,categories,compatibility,shares,lastRecordedAccess'})
         metrics = self.connector.getData(self.endpoint_company +
                                          self._getCalcMetrics, params=params)
         data = metrics['content']
