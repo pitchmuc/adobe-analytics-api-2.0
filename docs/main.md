@@ -17,12 +17,12 @@ The different section will quickly explain the methods available in the differen
   - [The create methods](#create)
   - [The update methods](#update-methods)
   - [The delete methods](#delete-methods)
+  - [The Project class](#project-class)
   - [The scan method](#the-scan-methods)
   - [Decoding Adobe Analytics requests](#decode-aa-requests)
   - [Comparing Report Suite](#compare-reportsuite)
 - [The getReport](#getreport)
 - [The getReport2](#getreport2)
-- [The Project Class](#the-project-class)
 
 
 ## Core components
@@ -169,12 +169,13 @@ At any point in time, you can use the docstring that have been set in this modul
 ```python
 help(mycompany.getSegments)
 ## returns:
-##getSegments(name: str = None, tagNames: str = None, inclType: str = 'all', rsids_list: list = None, sidFilter: list = None, extended_info: bool = False, format: str = 'df', save: bool = False, verbose: bool = False, **kwargs) -> object method of aanalytics2.Analytics instance
-#    Retrieve the list of segments. Returns a data frame.
-#    Arguments:
-#        name : OPTIONAL : Filter to only include segments that contains the name (str)
-#        tagNames : OPTIONAL : Filter list to only include segments that contains one of the tags (string delimited with comma, can be list as well)
-#...
+"""
+getSegments(name: str = None, tagNames: str = None, inclType: str = 'all', rsids_list: list = None, sidFilter: list = None, extended_info: bool = False, format: str = 'df', save: bool = False, verbose: bool = False, **kwargs) -> object method of aanalytics2.Analytics instance
+    Retrieve the list of segments. Returns a data frame.
+    Arguments:
+        name : OPTIONAL : Filter to only include segments that contains the name (str)
+        tagNames : OPTIONAL : Filter list to only include segments that contains one of the tags (string delimited with comma, can be list as well)
+"""
 ```
 
 One of the specific functionality for this class, is that you can update the token with a new one by using the _refreshToken_ method.
@@ -228,589 +229,661 @@ A method "to_dict()" also exists on this instance so you can flatten these infor
 
 There are several get methods.
 
-* getReportSuites : Get the list of reportSuites.Returns a data frame.
-  Arguments:
-  * txt : OPTIONAL : returns the reportSuites that matches a speific text field
-  * rsid_list : OPTIONAL : returns the reportSuites that matches the list of rsids set
-  * limit : OPTIONAL : How many reportSuite retrieves per serverCall
-  * save : OPTIONAL : if set to True, it will save the list in a file. (Default False)
+#### getReportSuites
+Get the list of reportSuites.Returns a data frame.\
+Arguments:
+* txt : OPTIONAL : returns the reportSuites that matches a speific text field
+* rsid_list : OPTIONAL : returns the reportSuites that matches the list of rsids set
+* limit : OPTIONAL : How many reportSuite retrieves per serverCall
+* save : OPTIONAL : if set to True, it will save the list in a file. (Default False)
 
-* getVirtualReportSuites : Retrieve all the Virtual reportSuite for a login company.
-  Arguments:
-  * extended_info : OPTIONAL : boolean to retrieve the maximum of information.
-  * limit : OPTIONAL : How many reportSuite retrieves per serverCall
-  * filterIds : OPTIONAL : comma delimited list of virtual reportSuite ID  to be retrieved.
-  * idContains : OPTIONAL : element that should be contained in the Virtual ReportSuite Id
-  * segmentIds : OPTIONAL : comma delimited list of segmentId contained in the VRSID
-  * save : OPTIONAL : if set to True, it will save the list in a file. (Default False)
+#### getVirtualReportSuites
+Retrieve all the Virtual reportSuite for a login company.\
+Arguments:
+* extended_info : OPTIONAL : boolean to retrieve the maximum of information.
+* limit : OPTIONAL : How many reportSuite retrieves per serverCall
+* filterIds : OPTIONAL : comma delimited list of virtual reportSuite ID  to be retrieved.
+* idContains : OPTIONAL : element that should be contained in the Virtual ReportSuite Id
+* segmentIds : OPTIONAL : comma delimited list of segmentId contained in the VRSID
+* save : OPTIONAL : if set to True, it will save the list in a file. (Default False)
 
-* getVirtualReportSuite : Get a specific reportSuite based on the id.
-  Arguments:
-  * vrsid : REQUIRED : The virtual reportSuite to be retrieved
-  * extended_info : OPTIONAL : boolean to add more information
-  * format : OPTIONAL : format of the output. 2 values "df" for dataframe and "raw" for raw json.
+#### getVirtualReportSuite
+Get a specific reportSuite based on the id.\
+Arguments:
+* vrsid : REQUIRED : The virtual reportSuite to be retrieved
+* extended_info : OPTIONAL : boolean to add more information
+* format : OPTIONAL : format of the output. 2 values "df" for dataframe and "raw" for raw json.
 
-* getVirtualReportSuiteComponents: Get the curated components for a VRS (needs Curation enabled in this VRS) and returns them as a DataFrame
-  Arguments:
-  * vrsid: Virtual Report Suite ID
-  * nan_value: how to treat missing values. Default: ""
+#### getVirtualReportSuiteComponents
+Get the curated components for a VRS (needs Curation enabled in this VRS) and returns them as a DataFrame\
+Arguments:
+* vrsid: Virtual Report Suite ID
+* nan_value: how to treat missing values. Default: ""
 
-* getSegments: Retrieve the list of segments. Returns a data frame.
-    Arguments:
-  * name : OPTIONAL : Filter to only include segments that contains the name (str)
-  * tagNames : OPTIONAL : Filter list to only include segments that contains one of the tags (string delimited with comma, can be list as well)
-  inclType : OPTIONAL : type of segments to be retrieved.(str) Possible values:
-    * all : Default value (all segments possibles)
-    * shared : shared segments
-    * template : template segments
-    * deleted : deleted segments
-    * internal : internal segments
-    * curatedItem : curated segments
-  * rsid_list : OPTIONAL : Filter list to only include segments tied to specified RSID list (list)
-  * sidFilter : OPTIONAL : Filter list to only include segments in the specified list (list)
-  * extended_info : OPTIONAL : additional segment metadata fields to include on response (bool : default False)
-  if set to true, returns reportSuiteName, ownerFullName, modified, tags, compatibility, definition
-  * format : OPTIONAL : defined the format returned by the query. (Default df)
-    possibe values :
-    * "df" : default value that return a dataframe
-    * "raw": return a list of value. More or less what is return from server.
-  * save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
-  * verbose : OPTIONAL : If set to True, print some information
-  Possible kwargs:
-  * limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.
+#### getSegments
 
-* getDimensions: Retrieve the list of dimensions from a specific reportSuite.Shrink columns to simplify output. Returns the data frame of available dimensions.
-  Arguments:
-  * rsid : REQUIRED : Report Suite ID from which you want the dimensions
-  * tags : OPTIONAL : If you would like to have additional information, such as tags. (bool : default False)
-  * description : OPTIONAL : Trying to add the description column. It may break the method.
-  * save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
-  Possible kwargs:
-  * full : Boolean : Doesn't shrink the number of columns if set to true
-  example : getDimensions(rsid,full=True)
-
-* getMetrics: Retrieve the list of metrics from a specific reportSuite. Shrink columns to simplify output. Returns the data frame of available metrics.
-  Arguments:
-  * rsid : REQUIRED : Report Suite ID from which you want the dimensions
-  * tags : OPTIONAL : If you would like to have additional information, such as tags. (bool : default False)
-  * dataGroup : OPTIONAL : Adding dataGroups to the column exported. Default False.
-                May break the report.
-  * save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
-  Possible kwargs:
-  * full : Boolean : Doesn't shrink the number of columns if set to true
-  example : getMetrics(rsid,full=True)
-
-* getUsers: Retrieve the list of users for a login company.Returns a data frame.
-  Arguments:
-  * save : OPTIONAL : Save the data in a file (bool : default False).
-  Possible kwargs:
-  * limit : OPTIONAL : Nummber of results per requests. Default 100.
-
-* getDateRanges: Get the list of date ranges available for the user.
-  Arguments:
-  * extended_info : OPTIONAL : additional segment metadata fields to include on response
-        additional infos: reportSuiteName, ownerFullName, modified, tags, compatibility, definition
-  * save : OPTIONAL : If set to True, it will save the info in a csv file (Default False)
-  Possible kwargs:
-  * limit : number of segments retrieved by request. default 500: Limited to 1000 by the Analytics API.
-  * full : Boolean : Doesn't shrink the number of columns if set to true
-
-* getDateRange
-  Get a specific Data Range based on the ID
-  Arguments:
-  * dateRangeID : REQUIRED : the date range ID to be retrieved.
-
-* getCalculatedMetrics : Return the calculated metrics of your login company (dataframe by default).
-  Arguments:
-  * name : OPTIONAL : Filter to only include calculated metrics that contains the name (str)
-  * tagNames : OPTIONAL : Filter list to only include calculated metrics that contains one of the tags (string delimited with comma, can be list as well)
-  * inclType : OPTIONAL : type of calculated Metrics to be retrieved. (str) Possible values:
-    * all : Default value (all calculated metrics possibles)
-    * shared : shared calculated metrics
-    * template : template calculated metrics
-  * rsid_list : OPTIONAL : Filter list to only include segments tied to specified RSID list (list)
-  * extended_info : OPTIONAL : additional segment metadata fields to include on response (list)
-      additional infos: reportSuiteName,definition, ownerFullName, modified, tags, compatibility
-  * save : OPTIONAL : If set to True, it will save the info in a csv file (Default False)
-  * format : OPTIONAL : format of the output. 2 values "df" for dataframe and "raw" for raw json.
+Retrieve the list of segments. Returns a data frame.\
+Arguments:
+* name : OPTIONAL : Filter to only include segments that contains the name (str)
+* tagNames : OPTIONAL : Filter list to only include segments that contains one of the tags (string delimited with comma, can be list as well)
+inclType : OPTIONAL : type of segments to be retrieved.(str) Possible values:
+  * all : Default value (all segments possibles)
+  * shared : shared segments
+  * template : template segments
+  * deleted : deleted segments
+  * internal : internal segments
+  * curatedItem : curated segments
+* rsid_list : OPTIONAL : Filter list to only include segments tied to specified RSID list (list)
+* sidFilter : OPTIONAL : Filter list to only include segments in the specified list (list)
+* extended_info : OPTIONAL : additional segment metadata fields to include on response (bool : default False)
+if set to true, returns reportSuiteName, ownerFullName, modified, tags, compatibility, definition
+* format : OPTIONAL : defined the format returned by the query. (Default df)
+  possibe values :
+  * "df" : default value that return a dataframe
+  * "raw": return a list of value. More or less what is return from server.
+* save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
+* verbose : OPTIONAL : If set to True, print some information
 Possible kwargs:
-  limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.(int)
+* limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.
 
-* getSegment : retrieve a specific segment by its ID.
-  Arguments:
-  * segment_id : REQUIRED : the segment id to retrieve.
-  * full : OPTIONAL : Add all possible information. bool, default False
+#### getDimensions
+Retrieve the list of dimensions from a specific reportSuite.Shrink columns to simplify output. Returns the data frame of available dimensions.\
+Arguments:
+* rsid : REQUIRED : Report Suite ID from which you want the dimensions
+* tags : OPTIONAL : If you would like to have additional information, such as tags. (bool : default False)
+* description : OPTIONAL : Trying to add the description column. It may break the method.
+* save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)\
+Possible kwargs:
+* full : Boolean : Doesn't shrink the number of columns if set to true
+example : getDimensions(rsid,full=True)
 
-* getCalculatedMetric : Return a dictionary on the calculated metrics requested.
-  Arguments:
-  * calculatedMetricId : REQUIRED : The calculated metric ID to be retrieved.
-  * full : OPTIONAL : additional segment metadata fields to include on response (list)
-      additional infos: reportSuiteName,definition, ownerFullName, modified, tags, compatibility
+#### getMetrics
+Retrieve the list of metrics from a specific reportSuite. Shrink columns to simplify output. Returns the data frame of available metrics.\
+Arguments:
+* rsid : REQUIRED : Report Suite ID from which you want the dimensions
+* tags : OPTIONAL : If you would like to have additional information, such as tags. (bool : default False)
+* dataGroup : OPTIONAL : Adding dataGroups to the column exported. Default False.
+              May break the report.
+* save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)\
+Possible kwargs:
+* full : Boolean : Doesn't shrink the number of columns if set to true
+example : getMetrics(rsid,full=True)
 
-* getTags : Retrieve the list of Tags used on the company Login.
-  Arguments:
-  * limit : OPTIONAL : Amount of tag to be returned by request. Default 100
+#### getUsers
+Retrieve the list of users for a login company.Returns a data frame.\
+Arguments:
+* save : OPTIONAL : Save the data in a file (bool : default False).\
+Possible kwargs:
+* limit : OPTIONAL : Nummber of results per requests. Default 100.
 
-* getScheduledJobs: Retrieve the list of scheduled Jobs for your login company.
-  Arguments:
-  * includeType : OPTIONAL : By default gets all non-expired or deleted projects. (default "all")
-      You can specify e.g. "all,shared,expired,deleted" to get more. 
-      Active schedules always get exported,so you need to use the `rsLocalExpirationTime` parameter in the `schedule` column to e.g. see which schedules are expired
-  * full : OPTIONAL : By default True. It returns the following additional information "ownerFullName,groups,tags,sharesFullName,modified,favorite,approved,scheduledItemName,scheduledUsersFullNames,deletedReason"
-  * limit : OPTIONAL : Number of element retrieved by request (default max 1000)
-  * format : OPTIONAL : Define the format you want to output the result. Default "df" for dataframe, other option "raw"
-  * verbose: OPTIONAL : set to True for debug output
+#### getDateRanges
+Get the list of date ranges available for the user.\
+Arguments:
+* extended_info : OPTIONAL : additional segment metadata fields to include on response
+      additional infos: reportSuiteName, ownerFullName, modified, tags, compatibility, definition
+* save : OPTIONAL : If set to True, it will save the info in a csv file (Default False)\
+Possible kwargs:
+* limit : number of segments retrieved by request. default 500: Limited to 1000 by the Analytics API.
+* full : Boolean : Doesn't shrink the number of columns if set to true
 
-* getComponentTagName : Given a comma separated list of tag names, return component ids associated with them
-  Arguments:
-  * tagNames : REQUIRED : Comma separated list of tag names.
-  * componentType : REQUIRED : The component type to operate on.\
-      Available values : segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
+#### getDateRange
+Get a specific Data Range based on the ID\
+Arguments:
+* dateRangeID : REQUIRED : the date range ID to be retrieved.
 
-* getComponentTags : Given a componentId, return all tags associated with that component.
-  Arguments:
-  * componentId : REQUIRED : The componentId to operate on. Currently this is just the segmentId.
-  * componentType : REQUIRED : The component type to operate on.
+#### getCalculatedMetrics
+Return the calculated metrics of your login company (dataframe by default).\
+Arguments:
+* name : OPTIONAL : Filter to only include calculated metrics that contains the name (str)
+* tagNames : OPTIONAL : Filter list to only include calculated metrics that contains one of the tags (string delimited with comma, can be list as well)
+* inclType : OPTIONAL : type of calculated Metrics to be retrieved. (str) Possible values:
+  * all : Default value (all calculated metrics possibles)
+  * shared : shared calculated metrics
+  * template : template calculated metrics
+* rsid_list : OPTIONAL : Filter list to only include segments tied to specified RSID list (list)
+* extended_info : OPTIONAL : additional segment metadata fields to include on response (list)
+    additional infos: reportSuiteName,definition, ownerFullName, modified, tags, compatibility
+* save : OPTIONAL : If set to True, it will save the info in a csv file (Default False)
+* format : OPTIONAL : format of the output. 2 values "df" for dataframe and "raw" for raw json.\
+Possible kwargs:
+limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.(int)
 
-* getUsageLogs : Retrieve the usage logs from the users of a login company:
-  Arguments:
-  * startDate : REQUIRED : Start date, format : 2020-12-01T00:00:00-07.(default 3 month prior today)
-  * endDate : REQUIRED : End date, format : 2020-12-15T14:32:33-07. (default today)
-      Should be a maximum of a 3 month period between startDate and endDate.
-  * eventType : OPTIONAL : The numeric id for the event type you want to filter logs by.
-      Please reference the lookup table in the LOGS_EVENT_TYPE
-  * event : OPTIONAL : The event description you want to filter logs by.
-      No wildcards are permitted, but this filter is case insensitive and supports partial matches.
-  * rsid : OPTIONAL : ReportSuite ID to filter on.
-  * login : OPTIONAL : The login value of the user you want to filter logs by. This filter functions as an exact match.
-  * ip : OPTIONAL : The IP address you want to filter logs by. This filter supports a partial match.
-  * limit : OPTIONAL : Number of results per page.
-  * max_result : OPTIONAL : Number of maximum amount of results if you want. If you want to cap the process. Ex : max_result=1000
-  * format : OPTIONAL : If you wish to have a DataFrame ("df" - default) or list("raw") as output.
-  * verbose : OPTIONAL : Set it to True if you want to have console info.
+#### getSegment
+retrieve a specific segment by its ID.\
+Arguments:
+* segment_id : REQUIRED : the segment id to retrieve.
+* full : OPTIONAL : Add all possible information. bool, default False
+
+#### getCalculatedMetric
+Return a dictionary on the calculated metrics requested.\
+Arguments:
+* calculatedMetricId : REQUIRED : The calculated metric ID to be retrieved.
+* full : OPTIONAL : additional segment metadata fields to include on response (list)
+    additional infos: reportSuiteName,definition, ownerFullName, modified, tags, compatibility
+
+#### getTags
+Retrieve the list of Tags used on the company Login.\
+Arguments:
+* limit : OPTIONAL : Amount of tag to be returned by request. Default 100
+
+#### getScheduledJobs
+Retrieve the list of scheduled Jobs for your login company.\
+Arguments:
+* includeType : OPTIONAL : By default gets all non-expired or deleted projects. (default "all")
+    You can specify e.g. "all,shared,expired,deleted" to get more. 
+    Active schedules always get exported,so you need to use the `rsLocalExpirationTime` parameter in the `schedule` column to e.g. see which schedules are expired
+* full : OPTIONAL : By default True. It returns the following additional information "ownerFullName,groups,tags,sharesFullName,modified,favorite,approved,scheduledItemName,scheduledUsersFullNames,deletedReason"
+* limit : OPTIONAL : Number of element retrieved by request (default max 1000)
+* format : OPTIONAL : Define the format you want to output the result. Default "df" for dataframe, other option "raw"
+* verbose: OPTIONAL : set to True for debug output
+
+#### getComponentTagName
+Given a comma separated list of tag names, return component ids associated with them\
+Arguments:
+* tagNames : REQUIRED : Comma separated list of tag names.
+* componentType : REQUIRED : The component type to operate on.\
+    Available values : segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
+
+#### getComponentTags
+Given a componentId, return all tags associated with that component.\
+Arguments:
+* componentId : REQUIRED : The componentId to operate on. Currently this is just the segmentId.
+* componentType : REQUIRED : The component type to operate on.
+
+#### getUsageLogs
+Retrieve the usage logs from the users of a login company\
+Arguments:
+* startDate : REQUIRED : Start date, format : 2020-12-01T00:00:00-07.(default 3 month prior today)
+* endDate : REQUIRED : End date, format : 2020-12-15T14:32:33-07. (default today)
+    Should be a maximum of a 3 month period between startDate and endDate.
+* eventType : OPTIONAL : The numeric id for the event type you want to filter logs by.
+    Please reference the lookup table in the LOGS_EVENT_TYPE
+* event : OPTIONAL : The event description you want to filter logs by.
+    No wildcards are permitted, but this filter is case insensitive and supports partial matches.
+* rsid : OPTIONAL : ReportSuite ID to filter on.
+* login : OPTIONAL : The login value of the user you want to filter logs by. This filter functions as an exact match.
+* ip : OPTIONAL : The IP address you want to filter logs by. This filter supports a partial match.
+* limit : OPTIONAL : Number of results per page.
+* max_result : OPTIONAL : Number of maximum amount of results if you want. If you want to cap the process. Ex : max_result=1000
+* format : OPTIONAL : If you wish to have a DataFrame ("df" - default) or list("raw") as output.
+* verbose : OPTIONAL : Set it to True if you want to have console info.
 possible kwargs:
-  * page : page number (default 0)
+* page : page number (default 0)
 
 
-* getScheduledJob: Return a scheduled project definition.
-  Arguments:
-  * scheduleId : REQUIRED : Schedule project ID
+#### getScheduledJob
+Return a scheduled project definition.\
+Arguments:
+* scheduleId : REQUIRED : Schedule project ID
 
 
-* getDeliverySettings: Retrieve the delivery setting from a scheduled project.
-  Argument
-  * deliverySettingId : REQUIRED : The delivery setting ID of the scheduled project.
+#### getDeliverySettings
+Retrieve the delivery setting from a scheduled project.\
+Argument
+* deliverySettingId : REQUIRED : The delivery setting ID of the scheduled project.
 
-* getAnnotations: Returns a list of the available annotations 
-  Arguments:
-  * full : OPTIONAL : If set to True (default), returned all available information of the annotation.
-  * includeType : OPTIONAL : use to return only "shared" or "all"(default) annotation available.
-  * limit : OPTIONAL : number of result per page (default 1000)
-  * page : OPTIONAL : page used for pagination
+#### getAnnotations
+Returns a list of the available annotations\
+Arguments:
+* full : OPTIONAL : If set to True (default), returned all available information of the annotation.
+* includeType : OPTIONAL : use to return only "shared" or "all"(default) annotation available.
+* limit : OPTIONAL : number of result per page (default 1000)
+* page : OPTIONAL : page used for pagination
 
-* getAnnotation: Return a specific annotation definition.
-  Arguments:
-  * annotationId : REQUIRED : The annotation ID
+#### getAnnotation
+Return a specific annotation definition.\
+Arguments:
+* annotationId : REQUIRED : The annotation ID
 
 Example of getSegments usage:
 
-```python
+```py
 mysegments = mycompany.getSegments(extended_info=True,save=True)
 ```
 
 Example of getDimensions usage:
 
-```python
+```py
 mydims = mycompany.getDimensions('rsid')
 ```
 
-* getClassificationDatasets : Retrieve all the datasets associated with a specific reportSuites\
+#### getClassificationDatasets
+Retrieve all the datasets associated with a specific reportSuites\
 Arguments:
-  * rsid : REQUIRED : Report Suite ID
+* rsid : REQUIRED : Report Suite ID
 
 
-* getClassificationDataset : Get a classification dataset by its id.\
+#### getClassificationDataset
+Get a classification dataset by its id.\
 Argumnents:
-  * datasetId : REQUIRED : Classification Dataset ID
+* datasetId : REQUIRED : Classification Dataset ID
 
 
-* getClassificationTemplate : Return the template to be filled by classification file for a specific dataset.\
+#### getClassificationTemplate
+Return the template to be filled by classification file for a specific dataset.\
 Arguments:
-  * datasetId : REQUIRED : Dataset ID
+* datasetId : REQUIRED : Dataset ID
 
-* getClassificationJobs : Returns a list of jobs done for classification of a specific dataset.\
+#### getClassificationJobs
+Returns a list of jobs done for classification of a specific dataset.\
 Arguments:
-  * datasetId : REQUIRED : The datasetId to be looked for
-  * n_results : OPTIONAL : Total amount of result to be returned
+* datasetId : REQUIRED : The datasetId to be looked for
+* n_results : OPTIONAL : Total amount of result to be returned
 
-* getClassificationJob : Get a specific classification job information\
+#### getClassificationJob
+Get a specific classification job information\
 Arguments:
-  * jobId : REQUIRED : The job ID to be retrieved
+* jobId : REQUIRED : The job ID to be retrieved
 
-* getAlerts : Get Alerts.\
+#### getAlerts
+Get the alerts that have been set.\
 Arguments:
-  * includeType : OPTIONAL : By default gets all Alerts. (default "all")\
-      You can specify e.g. "shared" to get only the ones shared to you.
-  * definition : OPTIONAL : Gets the full definition per Alert with used segments, metrics, and operators
-  * format : OPTIONAL : Define the format you want to output the result. Default "df" for dataframe, other option "raw"
+* includeType : OPTIONAL : By default gets all Alerts. (default "all")\
+    You can specify e.g. "shared" to get only the ones shared to you.
+* definition : OPTIONAL : Gets the full definition per Alert with used segments, metrics, and operators
+* format : OPTIONAL : Define the format you want to output the result. Default "df" for dataframe, other option "raw"
 
-* getAlert : gets an individual Alert as a dictionary\
+#### getAlert
+gets an individual Alert as a dictionary based on its ID\
 Arguments:
-  * alertId : REQUIRED : Alert ID to be retrieved
+* alertId : REQUIRED : Alert ID to be retrieved
 
-* getDataWarehouseReports : Get all DW reports that matched filter parameters.\
+#### getDataWarehouseReports
+Get all DW reports that matched filter parameters.\
 Arguments:
-  * scheduledRequestUUID : OPTIONAL : THe schedule report UUID generated by this report
-  * status : OPTIONAL : Status of the report Generation, can be any of ["Completed", "Canceled", "Processing", "Pending", "Created", "Error - Failure To Send", "Error - Processing"]
-  * createdAfter : OPTIONAL : Filters for reports created on or after the specified datetime
-  * createdBefore : OPTIONAL : Filters for reports created on or before the specified datetime
-  * updatedAfter : OPTIONAL : Filters for reports updated on or after the specified datetime
-  * limit : OPTIONAL : Maximum amount of data returned
+* scheduledRequestUUID : OPTIONAL : THe schedule report UUID generated by this report
+* status : OPTIONAL : Status of the report Generation, can be any of ["Completed", "Canceled", "Processing", "Pending", "Created", "Error - Failure To Send", "Error - Processing"]
+* createdAfter : OPTIONAL : Filters for reports created on or after the specified datetime
+* createdBefore : OPTIONAL : Filters for reports created on or before the specified datetime
+* updatedAfter : OPTIONAL : Filters for reports updated on or after the specified datetime
+* limit : OPTIONAL : Maximum amount of data returned
 
-* getDataWarehouseReport : Return a single report information out of the report UUID.\
+#### getDataWarehouseReport 
+Return a single report information out of the report UUID.\
 Arguments:
-  * reportUUID : REQUIRED : the report UUID
+* reportUUID : REQUIRED : the report UUID
 
-* getDataWarehouseScheduledRequests : Get all DW scheduled requests that matched filter parameters.\
+#### getDataWarehouseScheduledRequests
+Get all DW scheduled requests that matched filter parameters.\
 Arguments:
-  * rsid : OPTIONAL : The reportSuite ID
-  * status : OPTIONAL : Status of the report Generation, can be any of [COMPLETED, CANCELED, ERROR_DELIVERY, ERROR_PROCESSING, CREATED, PROCESSING, PENDING]
-  * limit : OPTIONAL : Maximum amount of data returned (default 1000)
-  * createdAfter : OPTIONAL : Filters for reports created on or after the specified datetime
-  * createdBefore : OPTIONAL : Filters for reports created on or before the specified datetime
-  * updatedAfter : OPTIONAL : Filters for reports updated on or after the specified datetime
+* rsid : OPTIONAL : The reportSuite ID
+* status : OPTIONAL : Status of the report Generation, can be any of [COMPLETED, CANCELED, ERROR_DELIVERY, ERROR_PROCESSING, CREATED, PROCESSING, PENDING]
+* limit : OPTIONAL : Maximum amount of data returned (default 1000)
+* createdAfter : OPTIONAL : Filters for reports created on or after the specified datetime
+* createdBefore : OPTIONAL : Filters for reports created on or before the specified datetime
+* updatedAfter : OPTIONAL : Filters for reports updated on or after the specified datetime
 
-* getDataWarehouseScheduledRequest: Return a single request information out of the schedule UUID.\
+#### getDataWarehouseScheduledRequest
+Return a single request information out of the schedule UUID.\
 Arguments:
-  * scheduleUUID : REQUIRED : the scheduled Request UUID
+* scheduleUUID : REQUIRED : the scheduled Request UUID
 
-#### Project Methods
-
-I have implemented a `getProjects`, `getProject`, `updateProject` and `createProject` methods.
-
-From these methods, I have created other supported methods that are explained in the [Project documentation](./projects.md).
-
-### Create
+### Create methods
 
 The Adobe Analytics API 2.0 provides some endpoint to create elements in your Analytics setup.
 Here is the list of the possible create options.
 
-* createVirtualReportSuite: Create a new virtual report suite based on the information provided.
-  Arguments:
-  * name : REQUIRED : name of the virtual reportSuite
-  * parentRsid : REQUIRED : Parent reportSuite ID for the VRS
-  * segmentLists : REQUIRED : list of segment id to be applied on the ReportSuite.
-  * dataSchema : REQUIRED : Type of schema used for the VRSID. (default : "Cache")
-  * data_dict : OPTIONAL : you can pass directly the dictionary.
-  In this case, you dictionary should looks like this:
-
-  ```python
-  data_dict = {
-    'name' : 'xxxx',
-    'parentRsid':'',
-    'segmentLists':'',
-    'dataSchema':'Cache',
-  }
-  ```
-
-* createSegment: This method create segment based on the information provided in the dictionary passed as parameter.
-  Arguments:
-  * segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment.
-  The segmentJSON is referenced on this [Swagger reference](https://adobedocs.github.io/analytics-2.0-apis/#/segments/segments_createSegment)
-
-* createCalculatedMetrics: This method create a calculated metrics within your Login Company with the provided dictionary.
-  Arguments:
-  * metricJSON : REQUIRED : Calculated Metrics information to create. Required :  name, definition, rsid
-    more information can be found on the [Swagger refrence](https://adobedocs.github.io/analytics-2.0-apis/#/calculatedmetrics/calculatedmetrics_createCalculatedMetric)
-  
-* createCalculatedMetricValidate: Validate a calculated metrics definition or object passed.
-  Arguments:
-  * metricJSON : REQUIRED : Calculated Metrics information to create. (Required: name, definition, rsid)
-      More information can be found at this address https://adobedocs.github.io/analytics-2.0-apis/#/calculatedmetrics/calculatedmetrics_createCalculatedMetric
-
-* createTags : This method creates a tag and associate it with a component.
-  Arguments:
-  * data : REQUIRED : The list of the tag to be created with their component relation.
-  It looks like the following:
-
-  ```JSON
-  [
-    {
-        "id": 0,
-        "name": "string",
-        "description": "string",
-        "components": [
-        {
-            "componentType": "string",
-            "componentId": "string",
-            "tags": [
-            "Unknown Type: Tag"
-            ]
-        }
-        ]
-    }
-  ]
-  ```
-
-* createScheduledJob : 
-  Creates a schedule job based on the information provided as arguments.
-  Expiration will be in one year by default.
-  Arguments:
-    * projectId : REQUIRED : The workspace project ID to send.
-    * type : REQUIRED : how to send the project, default "pdf"
-    * schedule : REQUIRED : object to specify the schedule used.
-        example: 
-        ```python
-        {  
-                  "hour": 10,
-                  "minute": 45,
-                  "second": 25,
-                  "interval": 1,
-                  "type": "daily"
-                }
-                {
-                  'type': 'weekly',
-                  'second': 53,
-                  'minute': 0,
-                  'hour': 8,
-                  'daysOfWeek': [2],
-                  'interval': 1
-                }
-                {
-                  'type': 'monthly',
-                  'second': 53,
-                  'minute': 30,
-                  'hour': 16,
-                  'dayOfMonth': 21,
-                  'interval': 1
-                }
-        ```
-    * loginIds : REQUIRED : A list of login ID of the users that are recipient of the report. It can be retrieved by the getUsers method.
-    * emails : OPTIONAL : If users are not registered in AA, you can specify a list of email addresses.
-    * groupIds : OPTIONAL : Group Id to send the report to.
-
-* createDeliverySetting : Create a delivery setting for a specific scheduled project. Automatically used when using `createScheduleJob`.
-  Arguments:
-  * loginIds : REQUIRED : List of login ID to send the scheduled project to.   Can be retrieved by the getUsers method.
-  * emails : OPTIONAL : In case the recipient are not in the analytics interface. 
-  * groupIds : OPTIONAL : List of group ID to send the scheduled project to.
-
-* createAnnotation : Create an Annotation.
-  Arguments:
-  * name : REQUIRED : Name of the annotation
-  * dateRange : REQUIRED : Date range of the annotation to be used. 
-      Example: 2022-04-19T00:00:00/2022-04-19T23:59:59
-  * rsid : REQUIRED : ReportSuite ID 
-  * metricIds : OPTIONAL : List of metrics ID to be annotated
-  * filterIds : OPTIONAL : List of Segments ID to apply for annotation for context.
-  * dimensionObj : OPTIONAL : List of dimensions object specification:
-      {
-          componentType: "dimension"
-          dimensionType: "string"
-          id: "variables/product"
-          operator: "streq"
-          terms: ["unknown"]
-      }
-  * applyToAllReports : OPTIONAL : If the annotation apply to all ReportSuites.
-  * possible kwargs:
-  * colors: Color to be used, examples: "STANDARD1"
-  * shares: List of userId for sharing the annotation
-  * tags: List of tagIds to be applied
-  * favorite: boolean to set the annotation as favorite (false by default)
-  * approved: boolean to set the annotation as approved (false by default)
-
-* createImportClassificationJob : Create API import job entity on classification dataset, need to upload file after this API call\
+#### createVirtualReportSuite
+Create a new virtual report suite based on the information provided.\
 Arguments:
-  * datasetId : REQUIRED : The datasetId to be used
-  * dataFormat : OPTIONAL : If you want to specify another type of file to import (default "json",possible "tab" or "tsv")
-  * jobName : OPTIONAL : Job Name to be given
-  * delimiter : OPTIONAL : The delimiter of lists
-  * encoding : OPTIONAL : Encoding to be used (default UTF8)
+* name : REQUIRED : name of the virtual reportSuite
+* parentRsid : REQUIRED : Parent reportSuite ID for the VRS
+* segmentLists : REQUIRED : list of segment id to be applied on the ReportSuite.
+* dataSchema : REQUIRED : Type of schema used for the VRSID. (default : "Cache")
+* data_dict : OPTIONAL : you can pass directly the dictionary.\
+In this case, you dictionary should looks like this:
 
-* commitImportClassificationJob: Note a create per say but commit your upload job. Commit the API classification job uploaded. 
+```python
+data_dict = {
+  'name' : 'xxxx',
+  'parentRsid':'',
+  'segmentLists':'',
+  'dataSchema':'Cache',
+}
+```
+
+#### createSegment
+This method create segment based on the information provided in the dictionary passed as parameter.\
 Arguments:
-  * jobId : REQUIRED : The job ID to commit
+* segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment.
+The segmentJSON is referenced on this [API reference](https://developer.adobe.com/analytics-apis/docs/2.0/guides/endpoints/segments/definition/)
 
-* importClassificationJSON : Import data in a JSON/dictionary format when less than 50Mb of data.\
+#### createCalculatedMetrics
+This method create a calculated metrics within your Login Company with the provided dictionary.\
 Arguments:
-  * datasetId : REQUIRED : The dataset ID to upload the data to
-  * jobName : OPTIONAL : if you want to name your upload
-  * data : REQUIRED : the data to be uploaded in the following format:
-  ```python
-  [
-      {
-      "key": "KeyYYYY0730-json1",
-      "data": {
-          "Column1": "value",
-          "Colume2": "value",
-          "Column3": "value",
-          }
-      }
-  ]
-  ```
-  * emailNotification : OPTIONAL : If you want to send an email to a specific person when classification is completed. Such as: `["myemail@company.com"]`
+* metricJSON : REQUIRED : Calculated Metrics information to create. Required :  name, definition, rsid
+  more information can be found on the [API refrence](https://developer.adobe.com/analytics-apis/docs/2.0/guides/endpoints/calculatedmetrics/)
 
-* importClassificationFile : Import the file to the classification dataset.\
+#### createCalculatedMetricValidate
+Validate a calculated metrics definition or object passed.\
 Arguments:
-  * jobId : REQUIRED : The job ID to upload the file to
-  * filepath : REQUIRED : The path to your file such as "test_classification.tsv"
-  * filename : OPTIONAL : The file name that is to be sent
+* metricJSON : REQUIRED : Calculated Metrics information to create. (Required: name, definition, rsid)
+    More information can be found at this address <https://developer.adobe.com/analytics-apis/docs/2.0/guides/endpoints/calculatedmetrics>
 
-* createExportClassification : Create an export classification file. The job ID returned can be used with the method: `exportClassificationFile`.\
+#### createTags
+This method creates a tag and associate it with a component.\
 Arguments:
-  * datasetId : REQUIRED : The datasetId to be exported
-  * jobName : OPTIONAL : If you want to set a specific name for the export
-  * rowLimit : OPTIONAL : Maximum number of rows to export
-  * dataFormat : OPTIONAL : one of the following value: "json" (default), "tsv", "tab"
-  * offset : OPTIONAL : The position in the dataset of a particular record (default 0)
-  * columns : OPTIONAL : list of columns to be exporte, ex : `["column1"]`
-  * keys : OPTIONAL : if you want to export specific list of keys, ex : `["key1","key2"]`
-  * stateNotification : OPTIONAL : If you want to set a notification for one of the value: "created", "queued", "validated", "failed_validation", "processing", "done_processing", "failed_processing","completed".
-  * emailNotification : OPTIONAL : if you want to inform an email address for the state selected
-  * dateFilterStart : OPTIONAL : Find the first value starting a specific date, ex : "YYYY-12-07T22:29:07.446Z"
-  * dateFilterEnd : OPTIONAL : The last value in the date filter, ex : "YYYY-12-07T22:29:07.446Z"
+* data : REQUIRED : The list of the tag to be created with their component relation.\
+It looks like the following:
 
-* getExportClassificationFile : Retrieve the file based on the job ID created and possibly the filename.\
-Arguments:
-  * jobId : REQUIRED : The job ID
-  * fileName : OPTIONAL : If the filename is provided.
-  * listFile : OPTIONAL : Boolean if you want to retrieve a list of export file
-
-
-### Update methods
-
-* updateVirtualReportSuite : Updates a Virtual Report Suite based on a JSON-like dictionary (same structure as createVirtualReportSuite)
-  Note that to update components, you need to supply ALL components currently associated with this suite.
-  Supplying only the components you want to change will remove all others from the VR Suite!
-  Arguments:
-  * vrsid : REQUIRED : The id of the virtual report suite to update
-  * data_dict : a json-like dictionary of the vrs data to update
-
-* updateSegment : Method that updates a specific segment based on the dictionary passed to it.
-  Arguments:
-  * segmentID : REQUIRED : Segment ID to be updated
-  * segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment.
-
-* updateCalculatedMetric: Method that updates a specific Calculated Metrics based on the dictionary passed to it.
-  Arguments:
-  * calcID : REQUIRED : Calculated Metric ID to be updated
-  * calcJSON : REQUIRED : the dictionary that represents the JSON statement for the calculated metric.
-
-* updateDateRange : Method that updates a specific Date Range based on the dictionary passed to it.
-  Arguments:
-  * dateRangeID : REQUIRED : Date Range ID to be updated
-  * dateRangeJSON : REQUIRED : the dictionary that represents the JSON statement for the date Range.
-
-* updateComponentTags : Overwrite the component Tags with the list send.
-  Arguments:
-  * data : REQUIRED : list of the components to be udpated with their respective list of tag names.\
-  Object looks like the following:
-  ```python
-  [
+```JSON
+[
+  {
+      "id": 0,
+      "name": "string",
+      "description": "string",
+      "components": [
       {
           "componentType": "string",
           "componentId": "string",
           "tags": [
-              "Unknown Type: Tag"
+          "Unknown Type: Tag"
           ]
       }
+      ]
+  }
+]
+```
+
+#### createScheduledJob 
+Creates a schedule job based on the information provided as arguments.\
+Expiration will be in one year by default.\
+Arguments:
+* projectId : REQUIRED : The workspace project ID to send.
+* type : REQUIRED : how to send the project, default "pdf"
+* schedule : REQUIRED : object to specify the schedule used.
+    example: 
+    ```python
+    {  
+      "hour": 10,
+      "minute": 45,
+      "second": 25,
+      "interval": 1,
+      "type": "daily"
+    }
+    {
+      'type': 'weekly',
+      'second': 53,
+      'minute': 0,
+      'hour': 8,
+      'daysOfWeek': [2],
+      'interval': 1
+    }
+    {
+      'type': 'monthly',
+      'second': 53,
+      'minute': 30,
+      'hour': 16,
+      'dayOfMonth': 21,
+      'interval': 1
+    }
+    ```
+* loginIds : REQUIRED : A list of login ID of the users that are recipient of the report. It can be retrieved by the getUsers method.
+* emails : OPTIONAL : If users are not registered in AA, you can specify a list of email addresses.
+* groupIds : OPTIONAL : Group Id to send the report to.
+
+#### createDeliverySetting
+Create a delivery setting for a specific scheduled project. Automatically used when using `createScheduleJob`.\
+Arguments:
+* loginIds : REQUIRED : List of login ID to send the scheduled project to.   Can be retrieved by the getUsers method.
+* emails : OPTIONAL : In case the recipient are not in the analytics interface. 
+* groupIds : OPTIONAL : List of group ID to send the scheduled project to.
+
+#### createAnnotation
+Create an Annotation.\
+Arguments:
+* name : OPTIONAL : Name of the annotation
+* dateRange : OPTIONAL : Date range of the annotation to be used. 
+  Example: 2022-04-19T00:00:00/2022-04-19T23:59:59
+* rsid : OPTIONAL : ReportSuite ID 
+* metricIds : OPTIONAL : List of metrics ID to be annotated
+* filterIds : OPTIONAL : List of Segments ID to apply for annotation for context.
+* dimensionObj : OPTIONAL : List of dimensions object specification:
+  {
+    componentType: "dimension"
+    dimensionType: "string"
+    id: "variables/product"
+    operator: "streq"
+    terms: ["unknown"]
+  }
+* applyToAllReports : OPTIONAL : If the annotation apply to all ReportSuites.\
+* data : OPTIONAL : Full definition of an annotation. See possibility on [annotationCreator documentation](/.annotationCreator.md)
+possible kwargs:
+* colors: Color to be used, examples: "STANDARD1"
+* shares: List of userId for sharing the annotation
+* tags: List of tagIds to be applied
+* favorite: boolean to set the annotation as favorite (false by default)
+* approved: boolean to set the annotation as approved (false by default)
+
+#### createImportClassificationJob
+Create API import job entity on classification dataset, need to upload file after this API call\
+Arguments:
+* datasetId : REQUIRED : The datasetId to be used
+* dataFormat : OPTIONAL : If you want to specify another type of file to import (default "json",possible "tab" or "tsv")
+* jobName : OPTIONAL : Job Name to be given
+* delimiter : OPTIONAL : The delimiter of lists
+* encoding : OPTIONAL : Encoding to be used (default UTF8)
+
+#### commitImportClassificationJob
+Note a create per say but commit your upload job. Commit the API classification job uploaded.\
+Arguments:
+* jobId : REQUIRED : The job ID to commit
+
+#### importClassificationJSON
+Import data in a JSON/dictionary format when less than 50Mb of data.\
+Arguments:
+* datasetId : REQUIRED : The dataset ID to upload the data to
+* jobName : OPTIONAL : if you want to name your upload
+* data : REQUIRED : the data to be uploaded in the following format:
+```python
+  [
+    {
+    "key": "KeyYYYY0730-json1",
+    "data": {
+        "Column1": "value",
+        "Colume2": "value",
+        "Column3": "value",
+        }
+    }
   ]
-  ```
+```
+* emailNotification : OPTIONAL : If you want to send an email to a specific person when classification is completed. Such as: `["myemail@company.com"]`
 
-* updateScheduledJob : Update a schedule Job based on its id and the definition attached to it.
-  Arguments:
-  * scheduleId : REQUIRED : the jobs to be updated.
-  * scheduleObj : REQUIRED : The object to replace the current definition.
-
-* updateDeliverySetting : Create a delivery setting for a specific scheduled project.
-  Automatically created for email setting.
-  Arguments:
-  * deliveryId : REQUIRED : the delivery setting ID to be updated
-  * loginIds : REQUIRED : List of login ID to send the scheduled project to.   Can be retrieved by the getUsers method.
-  * emails : OPTIONAL : In case the recipient are not in the analytics interface. 
-  * groupIds : OPTIONAL : List of group ID to send the scheduled project to.
-
-* updateProject : Update your project with the new object placed as parameter.
-  Arguments:
-  * projectId : REQUIRED : the project ID to be updated.
-  * projectObj : REQUIRED : the dictionary to replace the previous Workspace.
-      requires the following elements: name,description,rsid, definition, owner
-
-* updateAnnotation : Update an annotation based on its ID. PUT method.
-  Arguments:
-  * annotationId : REQUIRED : The annotation ID to be updated
-  * annotationObj : REQUIRED : The object to replace the annotation.
-
-* updateAlert : Wrapper for all methods to update an Alert.\
+#### importClassificationFile
+Import the file to the classification dataset.\
 Arguments:
-  * alertId : REQUIRED : Alert ID to change
-  * data : REQUIRED : Parameters to change
+* jobId : REQUIRED : The job ID to upload the file to
+* filepath : REQUIRED : The path to your file such as "test_classification.tsv"
+* filename : OPTIONAL : The file name that is to be sent
 
-* disableAlert : Disable an Alert.\
+#### createExportClassification
+Create an export classification file. The job ID returned can be used with the method:`exportClassificationFile`\
 Arguments:
-  * alertId : REQUIRED : Alert ID to disable
+* datasetId : REQUIRED : The datasetId to be exported
+* jobName : OPTIONAL : If you want to set a specific name for the export
+* rowLimit : OPTIONAL : Maximum number of rows to export
+* dataFormat : OPTIONAL : one of the following value: "json" (default), "tsv", "tab"
+* offset : OPTIONAL : The position in the dataset of a particular record (default 0)
+* columns : OPTIONAL : list of columns to be exporte, ex : `["column1"]`
+* keys : OPTIONAL : if you want to export specific list of keys, ex : `["key1","key2"]`
+* stateNotification : OPTIONAL : If you want to set a notification for one of the value: "created", "queued", "validated", "failed_validation", "processing", "done_processing", "failed_processing","completed".
+* emailNotification : OPTIONAL : if you want to inform an email address for the state selected
+* dateFilterStart : OPTIONAL : Find the first value starting a specific date, ex : "YYYY-12-07T22:29:07.446Z"
+* dateFilterEnd : OPTIONAL : The last value in the date filter, ex : "YYYY-12-07T22:29:07.446Z"
 
-* enableAlert : Enable an Alert.\
+#### getExportClassificationFile
+Retrieve the file based on the job ID created and possibly the filename.\
 Arguments:
-  * alertId : REQUIRED : Alert ID to enable
+* jobId : REQUIRED : The job ID
+* fileName : OPTIONAL : If the filename is provided.
+* listFile : OPTIONAL : Boolean if you want to retrieve a list of export file
 
-* renewAlerts : Renew a list of Alerts. Returns a list of dictionaries with the status per Alert ID.\
+
+### Update methods
+
+#### updateVirtualReportSuite
+Updates a Virtual Report Suite based on a JSON-like dictionary (same structure as createVirtualReportSuite)\
+Note that to update components, you need to supply ALL components currently associated with this suite.\
+Supplying only the components you want to change will remove all others from the VR Suite!\
 Arguments:
-  * alertId : REQUIRED : IDs of Alerts to renew
+* vrsid : REQUIRED : The id of the virtual report suite to update
+* data_dict : a json-like dictionary of the vrs data to update
 
-* resendDataWarehouseReport : Resend the data warehouse already completed.\
+#### updateSegment
+Method that updates a specific segment based on the dictionary passed to it.\
+Arguments:
+* segmentID : REQUIRED : Segment ID to be updated
+* segmentJSON : REQUIRED : the dictionary that represents the JSON statement for the segment.
+
+#### updateCalculatedMetric
+Method that updates a specific Calculated Metrics based on the dictionary passed to it.\
+Arguments:
+* calcID : REQUIRED : Calculated Metric ID to be updated
+* calcJSON : REQUIRED : the dictionary that represents the JSON statement for the calculated metric.
+
+#### updateDateRange
+Method that updates a specific Date Range based on the dictionary passed to it.\
+Arguments:
+* dateRangeID : REQUIRED : Date Range ID to be updated
+* dateRangeJSON : REQUIRED : the dictionary that represents the JSON statement for the date Range.
+
+#### updateComponentTags
+Overwrite the component Tags with the list send.
+Arguments:
+* data : REQUIRED : list of the components to be udpated with their respective list of tag names.\
+Object looks like the following:
+```python
+[
+  {
+    "componentType": "string",
+    "componentId": "string",
+    "tags": [
+        "Unknown Type: Tag"
+    ]
+  }
+]
+```
+
+#### updateScheduledJob 
+Update a schedule Job based on its id and the definition attached to it.\
+Arguments:
+* scheduleId : REQUIRED : the jobs to be updated.
+* scheduleObj : REQUIRED : The object to replace the current definition.
+
+#### updateDeliverySetting
+Create a delivery setting for a specific scheduled project.\
+Automatically created for email setting.\
+Arguments:
+* deliveryId : REQUIRED : the delivery setting ID to be updated
+* loginIds : REQUIRED : List of login ID to send the scheduled project to.   Can be retrieved by the getUsers method.
+* emails : OPTIONAL : In case the recipient are not in the analytics interface. 
+* groupIds : OPTIONAL : List of group ID to send the scheduled project to.
+
+#### updateProject
+Update your project with the new object placed as parameter.\
+Arguments:
+* projectId : REQUIRED : the project ID to be updated.
+* projectObj : REQUIRED : the dictionary to replace the previous Workspace.
+    requires the following elements: name,description,rsid, definition, owner
+
+#### updateAnnotation
+Update an annotation based on its ID. PUT method.\
+Arguments:
+* annotationId : REQUIRED : The annotation ID to be updated
+* annotationObj : REQUIRED : The object to replace the annotation.
+
+#### updateAlert
+Wrapper for all methods to update an Alert.\
+Arguments:
+* alertId : REQUIRED : Alert ID to change
+* data : REQUIRED : Parameters to change
+
+#### disableAlert
+Disable an Alert.\
+Arguments:
+* alertId : REQUIRED : Alert ID to disable
+
+#### enableAlert
+Enable an Alert.\
+Arguments:
+* alertId : REQUIRED : Alert ID to enable
+
+#### renewAlerts
+Renew a list of Alerts. Returns a list of dictionaries with the status per Alert ID.\
+Arguments:
+* alertId : REQUIRED : IDs of Alerts to renew
+
+#### resendDataWarehouseReport
+Resend the data warehouse already completed.\
 Argument:
-  * reportUUID : REQUIRED : the report UUID
+* reportUUID : REQUIRED : the report UUID
 
 ### Delete methods
 
 There is a possibility to delete some elements with the Adobe Analytics API 2.0. Please find below the different options that you can delete.
 
-* deleteVirtualReportSuite: delete a Virtual reportSuite based on its ID.
-  Arguments:
-  * vrsid : REQUIRED : The id of the virtual reportSuite to delete.
+#### deleteVirtualReportSuite
+delete a Virtual reportSuite based on its ID.\
+Arguments:
+* vrsid : REQUIRED : The id of the virtual reportSuite to delete.
 
-* deleteSegment: delete a segment based on the ID.
-  Arguments:
-  * segmentID : the ID of the segment to be deleted.
+#### deleteSegment
+delete a segment based on the ID.\
+Arguments:
+* segmentID : the ID of the segment to be deleted.
 
-* deleteCalculatedMetrics: Delete a calculated metrics based on its ID.
-  Arguments:
-  * calcID : REQUIRED : Calculated Metrics ID to be deleted
+#### deleteCalculatedMetrics
+Delete a calculated metrics based on its ID.\
+Arguments:
+* calcID : REQUIRED : Calculated Metrics ID to be deleted
 
-* deleteTags: Delete all tags from the component Type and the component ids specified.
-  Arguments:
-  * componentIds : REQUIRED : the Comma-separated list of componentIds to operate on.
-  * componentType : REQUIRED : The component type to operate on.\
-    Available values : segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
+#### deleteTags
+Delete all tags from the component Type and the component ids specified.\
+Arguments:
+* componentIds : REQUIRED : the Comma-separated list of componentIds to operate on.
+* componentType : REQUIRED : The component type to operate on.\
+  Available values : segment, dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet
 
-* deleteTag : Delete a Tag based on its id.
-  Arguments:
-  * tagId : REQUIRED : The tag ID to be deleted.
+#### deleteTag
+Delete a Tag based on its id.\
+Arguments:
+* tagId : REQUIRED : The tag ID to be deleted.
 
-* deleteProject : Delete a Project basede on its id.
-  Arguments:
-  * projectId : REQUIRED : The project ID to be deleted.
+#### deleteProject 
+Delete a Project basede on its id.\
+Arguments:
+* projectId : REQUIRED : The project ID to be deleted.
 
-* deleteScheduledJob : Delete a schedule project based on its ID.
-  Arguments:
-  * scheduleId : REQUIRED : the schedule ID to be deleted.
+#### deleteScheduledJob
+Delete a schedule project based on its ID.\
+Arguments:
+* scheduleId : REQUIRED : the schedule ID to be deleted.
 
-* deleteDeliverySetting : Delete a delivery setting based on the ID passed.
-  Arguments:
-  * deliveryId : REQUIRED : The delivery setting ID to be deleted.
+#### deleteDeliverySetting
+Delete a delivery setting based on the ID passed.\
+Arguments:
+* deliveryId : REQUIRED : The delivery setting ID to be deleted.
 
-* deleteAnnotation : Delete a specific annotation definition.
-  Arguments:
-  * annotationId : REQUIRED : The annotation ID to be deleted
+#### deleteAnnotation
+Delete a specific annotation definition.\
+Arguments:
+* annotationId : REQUIRED : The annotation ID to be deleted
 
-* deleteClassification : Delete a specific dataset for classification.\
+#### deleteClassification
+Delete a specific dataset for classification.\
 Argument:
   * datasetId : REQUIRED : The classification dataset to delete
 
-* deleteAlert : Delete an Alert. Returns 200 if successful.\
+#### deleteAlert : 
+Delete an Alert. Returns 200 if successful.\
 Arguments:
-  * alertId : REQUIRED : ID of Alert to delete
+* alertId : REQUIRED : ID of Alert to delete
+
+### Project class
+
+From the Project data that are being returned from the `getProject` method, an additional class `Project` has been added.
+The `Project` class parse the data returned by the API and provide insights regarding your project information, such as metrics, dimensions, reportSuite, etc....
+For more information, see related [Project documentation](./projects.md).
 
 ### The scan methods
 
