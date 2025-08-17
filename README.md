@@ -22,28 +22,14 @@ Functionalities that are covered :
 ### Reporting API
 
 * Run a report statement
-* Retrieve Users
-* Retrieve Segments
-* Retrieve Metrics
-* Retrieve Dimensions
-* Retrieve Calculated Metrics
-* Retrieve Virtual Report Suites
-* Retrieve Virtual Report Suite Curated Components
-* Retrieve Tags
-* Retrieve Usage Logs from users
-* Retrieve Projects
-* Retrieve Scheduled Jobs / Projects
-* Update Segment
-* Update Calculated Metric
-* Update Tags
-* Update Project
-* Delete Segment
-* Delete CalculatedMetric
-* Delete VirtualReportSuite
-* Delete Project
-* Delete DateRange
+* Retrieve Users, Segments, Metrics, Dimensions, Calculated Metrics, DateRange ,Virtual Report Suites, Tags, Projects, Annotations
+* Update Segment, Calculated Metric, Tags, Project, DateRange, Annotation, 
+* Delete Segment, CalculatedMetric, VirtualReportSuite, Project, DateRange, Annotation
 * Create a Project
 * Create a Scheduling job for a Workspace Project
+* Retrieve Usage Logs from users
+* Manage Data Source
+* Manage Data Warehouse Requests 
 
 documentation on reporting [here](./docs/main.md)
 
@@ -66,6 +52,20 @@ The `aanalytics2` module enables you to generate request dictionary for the getR
 You will have no need to go to the UI in order to create a report template JSON anymore.\
 Do it automatically from the python interface.
 More information on the [`RequestCreator` documentation](./docs/requestCreator.md)
+
+## AnnotationCreator
+
+The `aanalytics2` module simplifies the creation of annotation definition via a specific module and class.\
+The `annotationCreator` module contains the `AnnotationCreator` class.\
+It is a builder that helps you create your annotation programmatically.\
+More information on the [`AnnotationCreator` documentation](./docs/annotationCreator.md)
+
+## Data Warehouse Creator
+
+The `aanalytics2` module tries to simplify the creation of the data warehouse request definitions.\
+A builder has been provided in an additional module: `dwhCreator`.\
+The module contains a class `DwhCreator` that should provide helpful functionalities to define your report requests.\
+More information on the [`DwhCreator` class](./docs/dwhCreator.md)
 
 ## Project Data
 

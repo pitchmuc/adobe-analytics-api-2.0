@@ -7,49 +7,46 @@ current_dir = os.path.dirname(os.path.abspath(
     inspect.getfile(inspect.currentframe())))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
-import aanalytics2
+import aanalytics2 as api2
 import pandas as pd
 
 def test_createFile():
     files = os.listdir()
     if 'config_analytics_template.json' in files:
         os.remove("config_analytics_template.json")
-    aanalytics2.createConfigFile()
+    api2.createConfigFile()
     files = os.listdir()
     assert 'config_analytics_template.json' in files
 
 def test_importingWrongFile():
     filename = 'test.json'
     with pytest.raises(FileNotFoundError):
-        aanalytics2.importConfigFile('config_analyticsFail.json')
+        api2.importConfigFile('config_analyticsFail.json')
 
 def test_loading():
     """
     Require to set a config_analytics.json to realize the next tests.
     """
-    aanalytics2.importConfigFile('./config_analytics.json')
-    assert aanalytics2.config.config_object['org_id'] != ""
-    assert aanalytics2.config.config_object['client_id'] != ""
-    assert aanalytics2.config.config_object['tech_id'] != ""
-    assert aanalytics2.config.config_object['pathToKey'] != ""
-    assert aanalytics2.config.config_object['secret'] != ""
-
-def test_token():
-    """
-    Test that the config set in the test folder is working
-    """
-    connector = aanalytics2.connector.AdobeRequest()
-    assert connector.token != ""
+    api2.importConfigFile('./test/config_analytics.json')
+    assert api2.config.config_object['org_id'] != ""
+    assert api2.config.config_object['client_id'] != ""
+    assert api2.config.config_object['scopes'] != ""
+    assert api2.config.config_object['secret'] != ""
 
 def test_core_elements():
-    aanalytics2.importConfigFile('./config_analytics.json')
-    logger = aanalytics2.Login()
+    api2.importConfigFile('./test/config_analytics.json')
+    logger = api2.Login()
     assert len(logger.COMPANY_IDS) == 0
     logger.getCompanyId()
     assert len(logger.COMPANY_IDS) >= 0
-    myCompany = logger.createAnalyticsConnection(logger.COMPANY_IDS[0]['globalCompanyId'])
-    assert isinstance(myCompany,aanalytics2.Analytics)
+    indexCompany = 0
+    myCompany = logger.createAnalyticsConnection(logger.COMPANY_IDS[indexCompany]['globalCompanyId'])
+    assert isinstance(myCompany,api2.Analytics)
     users = myCompany.getUsers()
+    while users.empty:
+        indexCompany += 1
+        myCompany = logger.createAnalyticsConnection(logger.COMPANY_IDS[indexCompany]['globalCompanyId'])
+        users = myCompany.getUsers()
     assert isinstance(users,pd.DataFrame)
     assert len(users)>0
     rsids = myCompany.getReportSuites()
@@ -66,3 +63,4 @@ def test_core_elements():
     assert isinstance(segs,pd.DataFrame)
     calcs = myCompany.getCalculatedMetrics()
     assert isinstance(calcs,pd.DataFrame)
+

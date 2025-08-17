@@ -3,6 +3,41 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.4.3
+* adding the `datarepair` module and `DataRepair` class [documentation](.datarepair.md)
+* adding the `DataRepairJobCreator` class in `datarepair` module, [documentation](.datarepair.md#DataRepairJobCreator)
+* adding annotationCreator module and class [documentation](.annotationCreator.md)
+* refactor of the documentation to allow id of the method for better shareability
+* simplify header creation for requests
+* adding new share management methods:
+  * getShares
+  * getShare
+  * getShareComponents
+  * deleteShare
+  * updateShare
+* adding `getReportSuiteTimeZones` method
+* adding methods on data sources:
+  * getDataSourceAccounts
+  * getDataSourceAccount
+  * getDataSourceJobs
+  * getDataSourceJob
+  * sendDataToDataSource
+  * createDataSourceAccount
+  * deleteDataSourceAccount
+* improve datawarehouse requests
+* create the `dwhCreator` module with the `DwhCreator` class [documentation](./dwhCreator.md)
+* add Cloud methods:
+  * getCloudAccounts
+  * getCloudAccountProperties
+  * getCloudLocations
+  * getCloudLocation
+  * createCloudLocation
+  * updateCloudLocation
+  * deleteCloudLocation
+  * updateCloudAccount
+* improve `getUsers`
+* improving test scenarios
+
 ## version 0.4.2
 
 * adding `getAlerts` method

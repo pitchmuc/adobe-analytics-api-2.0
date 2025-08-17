@@ -518,6 +518,82 @@ Return a single request information out of the schedule UUID.\
 Arguments:
 * scheduleUUID : REQUIRED : the scheduled Request UUID
 
+#### getShares
+Returns a list of all shares available for the company.
+
+#### getShare
+Returns a specific share information.\
+Arguments:
+* shareId : REQUIRED : The share ID to be retrieved
+
+#### getShareComponents
+Returns a list of components shared.\
+Arguments:
+* componentType : REQUIRED : The component type to be retrieved (dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet)
+* componentIds : REQUIRED : List of component IDs to be retrieved
+
+#### getReportSuiteTimeZones
+Return the list of timezones ID that can be used for reportSuite creation.
+
+#### getDataSourceAccounts
+List all Data Sources accounts for a given report suite ID\
+Arguments:
+* rsid : REQUIRED : The report suite ID to retrieve the data source accounts for.
+
+#### getDataSourceAccount
+Retrieve a specific Data Source account by its ID.\
+Arguments:
+* rsid : REQUIRED : The report suite ID to which the data source account belongs.
+* accountId : REQUIRED : The ID of the data source account to retrieve.
+
+
+#### getDataSourceJobs
+Retrieve all jobs associated with a Data Sources account. Jobs are automatically created with each file upload.\
+Arguments:
+* rsid : REQUIRED : The report suite ID to which the data source account belongs.
+* accountId : REQUIRED : The ID of the data source account to retrieve jobs for.
+* status : OPTIONAL : Possible to filter for certain status: "uploaded", "processing", "success", "failure", and "deleted"
+* start_date : OPTIONAL : The start date to filter jobs from (format: 'YYYY-MM-DD hh:mm:ss').
+* end_date : OPTIONAL : The end date to filter jobs to (format: 'YYYY-MM-DD hh:mm:ss').
+* format : OPTIONAL : format of the output. 2 values "df" for dataframe (default) and "raw" for raw json.
+
+#### getDataSourceJob
+Retrieve a specific Data Source job by its ID.\
+Arguments:
+* rsid : REQUIRED : The report suite ID to which the data source account belongs.
+* accountId : REQUIRED : The ID of the data source account to which the job belongs.
+* jobId : REQUIRED : The ID of the data source job to retrieve.
+
+#### getExportClassificationFile
+Retrieve the file based on the job ID created and possibly the filename.\
+Arguments:
+* jobId : REQUIRED : The job ID
+* fileName : OPTIONAL : If the filename is provided.
+* listFile : OPTIONAL : Boolean if you want to retrieve a list of export file
+
+#### getCloudLocation
+Get a specific cloud location by its UUID.\
+Arguments:
+* uuid : REQUIRED : The UUID of the cloud location
+
+#### getCloudLocations
+Returns the list of all cloud Locations for a specified organization.\
+Arguments:
+* accountUuid : OPTIONAL : The account UUID to filter the locations (default None)
+* application : OPTIONAL : The application to filter the locations. Possible values: "TAXONOMIST", "DATA_WAREHOUSE", "DATA_FEED"
+* limit : OPTIONAL : The number of items to be returned (default 1000)
+
+#### getCloudAccountProperties
+Returns the list of properties that can be used for the definition in the createCloudLocation method.
+Arguments:
+* accountType : REQUIRED : The type of account. Possible values: email, ftp, sftp, gcp, azure, azure_rbac, azure_sas, s3, s3_role_arn
+
+#### getCloudAccounts
+Returns the list of all cloud accounts for the company.\
+Arguments:
+* accountType : OPTIONAL : The type of the account to filter the accounts. Possible values: "s3", "GCS", "ADLS", "AZURE_BLOB" (default None)
+
+
 ### Create methods
 
 The Adobe Analytics API 2.0 provides some endpoint to create elements in your Analytics setup.
@@ -711,13 +787,31 @@ Arguments:
 * dateFilterStart : OPTIONAL : Find the first value starting a specific date, ex : "YYYY-12-07T22:29:07.446Z"
 * dateFilterEnd : OPTIONAL : The last value in the date filter, ex : "YYYY-12-07T22:29:07.446Z"
 
-#### getExportClassificationFile
-Retrieve the file based on the job ID created and possibly the filename.\
+#### sendDataToDataSource
+Send data to a specific Data Source account.\
 Arguments:
-* jobId : REQUIRED : The job ID
-* fileName : OPTIONAL : If the filename is provided.
-* listFile : OPTIONAL : Boolean if you want to retrieve a list of export file
+* rsid : REQUIRED : The report suite ID to which the data source account belongs.
+* accountId : REQUIRED : The ID of the data source account to send data to.
+* data : REQUIRED : The path to the data to be sent. Expecting a .txt format.
 
+#### createDataSourceAccount
+Create a new Data Source account for a given report suite ID.\
+Arguments:
+* rsid : REQUIRED : The report suite ID to create the data source account for.
+* dstype : REQUIRED : the type of data source account to create (e.g., "adobe", "custom").
+* name : REQUIRED : The name of the data source account.
+* email : REQUIRED : The email address associated with the data source account.
+
+#### createCloudLocation
+Create a new cloud location for the company.\
+Arguments:
+* name : REQUIRED : The name of the cloud location
+* locType : REQUIRED : The type of the location, possible values: "s3", "GCS", "ADLS", "AZURE_BLOB"
+* properties : REQUIRED : The properties of the location.
+* accountUuid : OPTIONAL : The account UUID to be used (default None)
+* application : OPTIONAL : The application to be used, possible values: "TAXONOMIST", "DATA_WAREHOUSE", "DATA_FEED" (default None)
+* shareTo : OPTIONAL : The user or group to share the location with (default None)
+* description : OPTIONAL : A description for the cloud location (default None)
 
 ### Update methods
 
@@ -818,6 +912,38 @@ Resend the data warehouse already completed.\
 Argument:
 * reportUUID : REQUIRED : the report UUID
 
+#### updateShare
+Update the share with a new definition via the PUT method.\
+Definition following this patttern:
+```JSON
+[
+  {
+    "componentType": "{COMPONENT_TYPE}",
+    "componentId": "{ID}",
+    "shares": [
+    {
+      "shareId": 11684456,
+      "shareToId": 622291,
+      "shareToType": "user",
+      "componentType": "{COMPONENT_TYPE}",
+      "componentId": "{ID}",
+      "shareToDisplayName": null
+    }
+    ]
+  }
+]
+```
+Arguments:
+* shareId : REQUIRED : The share ID to be updated
+* data : REQUIRED : The data to be used for the update.
+
+#### updateCloudLocation
+Update a specific cloud location by its UUID using the PUT method.\
+Arguments:
+* uuid : REQUIRED : The UUID of the cloud location
+* data : REQUIRED : The cloud location new definition to be used for the update.
+
+
 ### Delete methods
 
 There is a possibility to delete some elements with the Adobe Analytics API 2.0. Please find below the different options that you can delete.
@@ -878,6 +1004,22 @@ Argument:
 Delete an Alert. Returns 200 if successful.\
 Arguments:
 * alertId : REQUIRED : ID of Alert to delete
+
+#### deleteShare
+Delete a specific share.\
+Arguments:
+* shareId : REQUIRED : The share ID to be deleted
+
+#### deleteDataSourceAccount
+Delete a specific Data Source account by its ID.\
+Arguments:
+* rsid : REQUIRED : The report suite ID to which the data source account belongs.
+* accountId : REQUIRED : The ID of the data source account to delete.
+
+#### deleteCloudLocation
+Delete a specific cloud location by its UUID.\
+Arguments:
+* uuid : REQUIRED : The UUID of the cloud location
 
 ### Project class
 

@@ -21,7 +21,8 @@ class AdobeRequest:
                  verbose: bool = False,
                  retry: int = 0,
                  loggingEnabled:bool=False,
-                 logger:object=None
+                 logger:object=None,
+                 company_id:str=None
                 ) -> None:
         """
         Set the connector to be used for handling request to AAM
@@ -31,7 +32,8 @@ class AdobeRequest:
             verbose : OPTIONAL : display comment on the request.
             retry : OPTIONAL : If you wish to retry failed GET requests
             loggingEnabled : OPTIONAL : if the logging is enable for that instance.
-            logger : OPTIONAL : instance of the logger created 
+            logger : OPTIONAL : instance of the logger created
+            company_id: OPTIONAL : company id to be used for the request
         """
         if config_object['org_id'] == '':
             raise Exception(
@@ -57,6 +59,7 @@ class AdobeRequest:
             self.config['token'] = token
             self.config['date_limit'] = time.time() + expiry - 500
             self.header.update({'Authorization': f'Bearer {token}'})
+            self.header.update({'x-proxy-global-company-id': company_id})
 
     def _checkingDate(self) -> None:
         """
@@ -148,21 +151,23 @@ class AdobeRequest:
                     return res_json
         return res_json
 
-    def postData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, *args, **kwargs):
+    def postData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, files:dict=None, *args, **kwargs):
         """
         Abstraction for posting data
         """
         self._checkingDate()
+        if params is None:
+            params = {}
         if headers is None:
             headers = self.header
-        if params is None and data is None:
-            res = requests.post(endpoint, headers=headers)
-        elif params is not None and data is None:
-            res = requests.post(endpoint, headers=headers, params=params)
-        elif params is None and data is not None:
-            res = requests.post(endpoint, headers=headers, data=json.dumps(data))
-        elif params is not None and data is not None:
-            res = requests.post(endpoint, headers=headers, params=params, data=json.dumps(data))
+        if data is None and files is None:
+            res = requests.post(endpoint, headers=headers,params=params)
+        elif data is not None and files is None:
+            res = requests.post(endpoint, headers=headers, data=json.dumps(data),params=params)
+        elif data is None and files is not None:
+            res = requests.post(endpoint, headers=headers, params=params, files=files)
+        elif data is not None and files is not None:
+            res = requests.post(endpoint, headers=headers, params=params, data=json.dumps(data), files=files)
         try:
             res_json = res.json()
             if res.status_code == 429 or res_json.get('error_code', None) == "429050":

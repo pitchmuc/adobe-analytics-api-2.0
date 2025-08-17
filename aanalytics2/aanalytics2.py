@@ -137,8 +137,12 @@ class Analytics:
     loggingEnabled = False
     logger = None
 
-    def __init__(self, company_id: str = None, config_object: dict = config.config_object, header: dict = config.header,
-                 retry: int = 0, loggingObject: dict = None):
+    def __init__(self, 
+                 company_id: str = None,
+                 config_object: dict = config.config_object, 
+                 header: dict = config.header,
+                 retry: int = 0, 
+                 loggingObject: dict = None):
         """
         Instantiate the Analytics class.
         The Analytics class will be automatically connected to the API 2.0.
@@ -173,10 +177,8 @@ class Analytics:
                 self.logger.addHandler(streamHandler)
         self.connector = connector.AdobeRequest(
             config_object=config_object, header=header, retry=retry, loggingEnabled=self.loggingEnabled,
-            logger=self.logger)
+            logger=self.logger,company_id=company_id)
         self.header = self.connector.header
-        self.connector.header['x-proxy-global-company-id'] = company_id
-        self.header['x-proxy-global-company-id'] = company_id
         self.endpoint_company = f"{self._endpoint}/{company_id}"
         self.company_id = company_id
         self.listProjectIds = []
@@ -438,8 +440,8 @@ class Analytics:
         params = {}
         if extended_info:
             params['expansion'] = expansion_values
-        path = f"{self.endpoint_company}/reportsuites/virtualreportsuites/{vrsid}"
-        data = self.connector.getData(path, params=params, headers=self.header)
+        path = f"/reportsuites/virtualreportsuites/{vrsid}"
+        data = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
         if format == "df":
             data = pd.DataFrame({vrsid: data})
         return data
@@ -447,7 +449,8 @@ class Analytics:
     def getVirtualReportSuiteComponents(self, vrsid: str = None, nan_value=""):
         """
         Uses the getVirtualReportSuite function to get a VRS and returns
-        the VRS components for a VRS as a dataframe. VRS must have Component Curation enabled.
+        the VRS components for a VRS as a dataframe. 
+        VRS must have Component Curation enabled.
         Arguments:
             vrsid : REQUIRED : Virtual Report Suite ID
             nan_value : OPTIONAL : how to handle empty cells, default = ""
@@ -460,6 +463,17 @@ class Analytics:
         components_cell = vrs_data[vrs_data.index ==
                                    "curatedComponents"].iloc[0, 0]
         return pd.DataFrame(components_cell).fillna(value=nan_value)
+    
+    def getReportSuiteTimeZones(self)->dict:
+        """
+        Return the list of timezones ID that can be used for reportSuite creation.
+        """
+        path = "/reportsuites/reportsuites/timezones"
+        if self.loggingEnabled:
+            self.logger.debug(f"Starting getReportSuiteTimeZones")
+        res = self.connector.getData(
+            self.endpoint_company + path, headers=self.header)
+        return res
 
     def createVirtualReportSuite(self, name: str = None, parentRsid: str = None, segmentList: list = None,
                                  dataSchema: str = "Cache", data_dict: dict = None, **kwargs) -> dict:
@@ -668,8 +682,8 @@ class Analytics:
             params["expansion"] = kwargs.get("expansion", None)
         path = "/users"
         users = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
-        data = users['content']
-        lastPage = users['lastPage']
+        data = users.get('content',[])
+        lastPage = users.get('lastPage',True)
         if not lastPage:  # check if lastpage is inversed of False
             callsToMake = users['totalPages']
             list_params = [{'limit': params['limit'], 'page': page}
@@ -692,11 +706,12 @@ class Analytics:
                            for val in sublist]  # flatten list of list
             data = data + append_data
         df_users = pd.DataFrame(data)
-        columns = ['email', 'login', 'fullName', 'firstName', 'lastName', 'admin', 'loginId', 'imsUserId', 'login',
-                   'createDate', 'lastAccess', 'title', 'disabled', 'phoneNumber', 'companyid']
-        df_users = df_users[columns]
-        df_users['createDate'] = pd.to_datetime(df_users['createDate'])
-        df_users['lastAccess'] = pd.to_datetime(df_users['lastAccess'])
+        if df_users.empty == False:
+            columns = ['email', 'login', 'fullName', 'firstName', 'lastName', 'admin', 'loginId', 'imsUserId', 'login',
+                    'createDate', 'lastAccess', 'title', 'disabled', 'phoneNumber', 'companyid']
+            df_users = df_users[columns]
+            df_users['createDate'] = pd.to_datetime(df_users['createDate'])
+            df_users['lastAccess'] = pd.to_datetime(df_users['lastAccess'])
         if save:
             df_users.to_csv(f'users_{int(time.time())}.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
@@ -1995,6 +2010,153 @@ class Analytics:
             raise ValueError("Requires definition key to be a dictionary")
         res = self.connector.postData(self.endpoint_company + path, data=projectObj, headers=self.header)
         return res
+    
+    def getDataSourceAccounts(self,rsid:str=None)->list:
+        """
+        List all Data Sources accounts for a given report suite ID
+        Arguments:
+            rsid : REQUIRED : The report suite ID to retrieve the data source accounts for.
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getDataSourceAccounts for rsid: {rsid}")
+        if rsid is None:
+            raise ValueError("A report suite ID is required")
+        path = f"/datasources/account/{rsid}"
+        res = self.connector.getData(self.endpoint_company + path, headers=self.header)
+        return res
+    
+    def getDataSourceAccount(self, rsid:str=None, accountId: str = None) -> dict:
+        """
+        Retrieve a specific Data Source account by its ID.
+        Arguments:
+            rsid : REQUIRED : The report suite ID to which the data source account belongs.
+            accountId : REQUIRED : The ID of the data source account to retrieve.
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getDataSourceAccount for accountId: {accountId}")
+        if accountId is None:
+            raise ValueError("A data source account ID is required")
+        path = f"/datasources/account/{rsid}/{accountId}"
+        res = self.connector.getData(self.endpoint_company + path, headers=self.header)
+        return res
+    
+    def createDataSourceAccount(self, rsid: str = None, dstype: str = None,name:str=None,email:str=None) -> dict:
+        """
+        Create a new Data Source account for a given report suite ID.
+        Arguments:
+            rsid : REQUIRED : The report suite ID to create the data source account for.
+            dstype : REQUIRED : the type of data source account to create (e.g., "adobe", "custom").
+            name : REQUIRED : The name of the data source account.
+            email : REQUIRED : The email address associated with the data source account.
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting createDataSourceAccount for rsid: {rsid}")
+        if rsid is None:
+            raise ValueError("A report suite ID is required")
+        params = {
+            'type': dstype,
+            'name': name,
+            'email': email
+        }
+        path = f"/datasources/account/{rsid}"
+        res = self.connector.postData(self.endpoint_company + path, params=params)
+        return res
+    
+    def deleteDataSourceAccount(self, rsid: str = None, accountId: str = None) -> dict:
+        """
+        Delete a specific Data Source account by its ID.
+        Arguments:
+            rsid : REQUIRED : The report suite ID to which the data source account belongs.
+            accountId : REQUIRED : The ID of the data source account to delete.
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting deleteDataSourceAccount for accountId: {accountId}")
+        if rsid is None or accountId is None:
+            raise ValueError("Both report suite ID and data source account ID are required")
+        path = f"/datasources/account/{rsid}/{accountId}"
+        res = self.connector.deleteData(self.endpoint_company + path, headers=self.header)
+        return res
+    
+    def sendDataToDataSource(self, rsid: str = None, accountId: str = None, data: str = None) -> dict:
+        """
+        Send data to a specific Data Source account.
+        Arguments:
+            rsid : REQUIRED : The report suite ID to which the data source account belongs.
+            accountId : REQUIRED : The ID of the data source account to send data to.
+            data : REQUIRED : The path to the data to be sent. Expecting a .txt format.
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting sendDataToDataSource for accountId: {accountId}")
+        if rsid is None or accountId is None:
+            raise ValueError("Both report suite ID and data source account ID are required")
+        if data is None:
+            raise ValueError("Data to be sent is required")
+        path = f"/datasources/job/{rsid}/{accountId}"
+        privateHeader = deepcopy(self.header)
+        privateHeader['Content-Type'] = 'text/csv'
+        files = {'file': (data,open(data, 'rb'),'multipart/form-data')}
+        res = self.connector.postData(self.endpoint_company + path, files=files, headers=privateHeader)
+        return res
+    
+    def getDataSourceJobs(self, rsid: str = None, accountId: str = None, status:str=None, start_date:str=None,end_date:str=None,format: str = "df") -> JsonListOrDataFrameType:
+        """
+        Retrieve all jobs associated with a Data Sources account. Jobs are automatically created with each file upload.
+        Arguments:
+            rsid : REQUIRED : The report suite ID to which the data source account belongs.
+            accountId : REQUIRED : The ID of the data source account to retrieve jobs for.
+            status : OPTIONAL : Possible to filter for certain status: "uploaded", "processing", "success", "failure", and "deleted"
+            start_date : OPTIONAL : The start date to filter jobs from (format: 'YYYY-MM-DD hh:mm:ss').
+            end_date : OPTIONAL : The end date to filter jobs to (format: 'YYYY-MM-DD hh:mm:ss').
+            format : OPTIONAL : format of the output. 2 values "df" for dataframe (default) and "raw" for raw json.
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getDataSourceJobs for accountId: {accountId}")
+        if rsid is None or accountId is None:
+            raise ValueError("Both report suite ID and data source account ID are required")
+        path = f"/datasources/job/{rsid}/{accountId}"
+        params = {'page':1}
+        if status is not None:
+            params['status'] = status
+        if start_date is not None:
+            params['startDate'] = start_date
+        if end_date is not None:
+            params['endDate'] = end_date
+        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
+        data = res.get('jobs', [])
+        lastPage = res.get('totalPages', 1)
+        curr_page = res.get('page', 1)
+        while curr_page < lastPage:
+            curr_page += 1
+            params['page'] = curr_page
+            res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
+            data += res.get('jobs', [])
+            lastPage = res.get('totalPages', 1)
+            curr_page = res.get('page', 1)
+        if format == "df":
+            df = pd.DataFrame(data)
+            if df.empty != False:
+                df['started_processing_date'] = pd.to_datetime(df['started_processing_date'], format='%Y-%m-%d %H:%M:%S')
+                df['finished_processing_date'] = pd.to_datetime(df['finished_processing_date'], format='%Y-%m-%d %H:%M:%S')
+            return df
+        return data
+    
+    def getDataSourceJob(self, rsid: str = None, accountId: str = None, jobId: str = None) -> dict:
+        """
+        Retrieve a specific Data Source job by its ID.
+        Arguments:
+            rsid : REQUIRED : The report suite ID to which the data source account belongs.
+            accountId : REQUIRED : The ID of the data source account to which the job belongs.
+            jobId : REQUIRED : The ID of the data source job to retrieve.
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getDataSourceJob for jobId: {jobId}")
+        if rsid is None or accountId is None or jobId is None:
+            raise ValueError("Report suite ID, data source account ID, and job ID are all required")
+        path = f"/datasources/job/{rsid}/{accountId}/{jobId}"
+        res = self.connector.getData(self.endpoint_company + path, headers=self.header)
+        return res
+    
+
 
     def findComponentsUsage(self, components: list = None,
                             projectDetails: list = None,
@@ -2354,7 +2516,7 @@ class Analytics:
         params = {"includeType": includeType, "page": page}
         if full:
             params[
-                'expansion'] = "name,description,dateRange,color,applyToAllReports,scope,createdDate,modifiedDate,modifiedById,tags,shares,approved,favorite,owner,usageSummary,companyId,reportSuiteName,rsid"
+                'expansion'] = "name,description,dateRange,color,applyToAllReports,scope,createdDate,modifiedDate,modifiedById,tags,shares,sharesFullName,approved,favorite,owner,usageSummary,companyId,reportSuiteName,rsid,usageSummary,ownerFullName,usageSummaryWithRelevancyScore"
         path = f"/annotations"
         lastPage = False
         data = []
@@ -2401,7 +2563,9 @@ class Analytics:
                          description: str = None,
                          filterIds: list = None,
                          applyToAllReports: bool = False,
-                         **kwargs) -> dict:
+                         data:dict=None,
+                         **kwargs
+                         ) -> dict:
 
         """
         Create an Annotation.
@@ -2421,22 +2585,17 @@ class Analytics:
                     terms: ["unknown"]
                 }
             applyToAllReports : OPTIONAL : If the annotation apply to all ReportSuites.
+            data : OPTIONAL : If you want to pass a dictionary representing annotation definition to be used for the annotation.
         possible kwargs:
             colors: Color to be used, examples: "STANDARD1"
             shares: List of userId for sharing the annotation
             tags: List of tagIds to be applied
             favorite: boolean to set the annotation as favorite (false by default)
             approved: boolean to set the annotation as approved (false by default)
+            
         """
         path = f"/annotations"
-        if name is None:
-            raise ValueError("A name must be specified")
-        if dateRange is None:
-            raise ValueError("A dateRange must be specified")
-        if rsid is None:
-            raise ValueError("a master ReportSuite ID must be specified")
         description = description or "api generated"
-
         data = {
             "name": name,
             "description": description,
@@ -2567,16 +2726,17 @@ class Analytics:
                                           limit: int = 1000,
                                           createdAfter: str = None,
                                           createdBefore: str = None,
-                                          updatedAfter: str = None, ) -> dict:
+                                          updatedAfter: str = None, 
+                                          status:str=None) -> dict:
         """
         Get all DW scheduled requests that matched filter parameters.
         Arguments:
-            rsid : OPTIONAL : The reportSuite ID
-            status : OPTIONAL : Status of the report Generation, can be any of [COMPLETED, CANCELED, ERROR_DELIVERY, ERROR_PROCESSING, CREATED, PROCESSING, PENDING]
+            rsid : REQUIRED : The reportSuite ID
             limit : OPTIONAL : Maximum amount of data returned (default 1000)
             createdAfter : OPTIONAL : Filters for reports created on or after the specified datetime
             createdBefore : OPTIONAL : Filters for reports created on or before the specified datetime
             updatedAfter : OPTIONAL : Filters for reports updated on or after the specified datetime
+            status : OPTIONAL : Status of the report Generation, can be any of ["Scheduled", "Completed", "Canceled", "Error"]
         """
         if rsid is None:
             raise ValueError("Required a reportSuite ID")
@@ -2588,6 +2748,8 @@ class Analytics:
             params['createdBefore'] = createdBefore
         if updatedAfter is not None:
             params["updatedAfter"] = updatedAfter
+        if status is not None and status in ["Scheduled", "Completed", "Canceled", "Error"]:
+            params["status"] = status
         res = self.connector.getData(self.endpoint_company + path, params=params)
         return res
 
@@ -2842,6 +3004,383 @@ class Analytics:
             "shareToType": shareToType
         }
         res = self.connector.postData(self.endpoint_company + path, data=data)
+        return res
+
+    def getShares(self)->list:
+        """
+        Returns a list of all shares available for the company.
+        """
+        params = {"limit": 100}
+        path = f"/componentmetadata/shares"
+        res = self.connector.getData(self.endpoint_company + path, params=params)
+        lastPage = res.get('lastPage', True)
+        data = res.get('content', [])
+        if lastPage == False:
+            params["page"] = 1
+            while lastPage == False:
+                res = self.connector.getData(self.endpoint_company + path, params=params)
+                data += res.get('content', [])
+                lastPage = res.get('lastPage', True)
+                params['page'] += 1
+        return data
+    
+    def getShare(self,shareId:str=None)->dict:
+        """
+        Returns a specific share information.
+        Arguments:
+            shareId : REQUIRED : The share ID to be retrieved
+        """
+        if shareId is None:
+            raise ValueError("Require a share ID")
+        path = f"/componentmetadata/shares/{shareId}"
+        res = self.connector.getData(self.endpoint_company + path)
+        return res
+    
+    def getShareComponents(self,componentType:str=None,componentIds:list=None)->list:
+        """
+        Returns a list of components shared.
+        Arguments:
+            componentType : REQUIRED : The component type to be retrieved (dashboard, bookmark, calculatedMetric, project, dateRange, metric, dimension, virtualReportSuite, scheduledJob, alert, classificationSet)
+            componentIds : REQUIRED : List of component IDs to be retrieved
+        """
+        if componentType is None or componentIds is None:
+            raise ValueError("Require a componentType and a list of componentIds")
+        path = f"/componentmetadata/shares/component/search"
+        data = {
+            "componentType": componentType,
+            "componentIds": componentIds
+        }
+        res = self.connector.postData(self.endpoint_company + path, data=data)
+        data = res.get('content', [])
+        lastPage = res.get('lastPage', True)
+        if lastPage == False:
+            params = {"page": 1}
+            while lastPage == False:
+                res = self.connector.postData(self.endpoint_company + path, data=data, params=params)
+                data += res.get('content', [])
+                lastPage = res.get('lastPage', True)
+                params['page'] += 1
+        return data
+    
+    def deleteShare(self, shareId: str = None) -> dict:
+        """
+        Delete a specific share.
+        Arguments:
+            shareId : REQUIRED : The share ID to be deleted
+        """
+        if shareId is None:
+            raise ValueError("Require a share ID")
+        path = f"/componentmetadata/shares/{shareId}"
+        res = self.connector.deleteData(self.endpoint_company + path)
+        return res
+    
+    def updateShare(self, shareId: str = None, data: dict = None) -> dict:
+        """
+        Update the share with a new definition via the PUT method.
+        Definition following this patttern:
+        [
+            {
+                "componentType": "{COMPONENT_TYPE}",
+                "componentId": "{ID}",
+                "shares": [
+                {
+                    "shareId": 11684456,
+                    "shareToId": 622291,
+                    "shareToType": "user",
+                    "componentType": "{COMPONENT_TYPE}",
+                    "componentId": "{ID}",
+                    "shareToDisplayName": null
+                }
+                ]
+            }
+        ]
+        Arguments:
+            shareId : REQUIRED : The share ID to be updated
+            data : REQUIRED : The data to be used for the update.
+        """
+        if shareId is None:
+            raise ValueError("Require a share ID")
+        if data is None or type(data) != dict:
+            raise ValueError("Require a dictionary representing the share definition")
+        path = f"/componentmetadata/shares"
+        res = self.connector.putData(self.endpoint_company + path, data=data)
+        return res
+    
+    def getCloudLocations(self,accountUuid:str=None,application:str=None,limit:int=1000)->list:
+        """
+        Returns the list of all cloud Locations for a specified organization.
+        Arguments:
+            accountUuid : OPTIONAL : The account UUID to filter the locations (default None)
+            application : OPTIONAL : The application to filter the locations. Possible values: "TAXONOMIST", "DATA_WAREHOUSE", "DATA_FEED"
+            limit : OPTIONAL : The number of items to be returned (default 1000)
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getCloudLocations")
+        path = f"/export_locations/analytics/exportlocations/location"
+        params = {"limit": limit}
+        if accountUuid is not None:
+            params['accountUuid'] = accountUuid
+        if application is not None:
+            params['application'] = application
+        res = self.connector.getData(self.endpoint_company + path)
+        data = res.get('content', [])
+        last = res.get('last', True)
+        while last == False:
+            params = {"page": 1}
+            res = self.connector.getData(self.endpoint_company + path, params=params)
+            data += res.get('content', [])
+            last = res.get('last', True)
+            params['page'] += 1
+        return data
+    
+    def getCloudLocationProperties(self, accountType: str = None) -> dict:
+        """
+        Returns the list of properties that can be used for the definition in the createCloudLocation method.
+        Arguments:
+        accountType : REQUIRED : The type of account. Possible values: email, ftp, sftp, gcp, azure, azure_rbac, azure_sas, s3, s3_role_arn
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getCloudLocationProperties")
+        if accountType is None:
+            raise ValueError("Require a location type")
+        if accountType not in ["email", "ftp", "sftp", "gcp", "azure", "azure_rbac", "azure_sas", "s3", "s3_role_arn"]:
+            raise ValueError("Invalid account type. Possible values: email, ftp, sftp, gcp, azure, azure_rbac, azure_sas, s3, s3_role_arn")
+        properties_definition = {
+            "email": {
+                "to": "exampleuser@example.com"
+            },
+            "ftp":{
+                "hostname": "string",
+                "username": "string",
+                "port": 21
+            },
+            "sftp":{
+                 "hostname": "string",
+                    "username": "string",
+                    "port": 22,
+                    "uploadTemporaryFile": True
+            },
+            "gcp": {
+                "projectId": "exampleprojectId"
+            },
+            "azure":{
+                "accountName": "string"
+            },
+            "azure_rbac": {
+                "appId": "string",
+                "tenantId": "string"
+            },
+            "azure_sas": {
+                "appId": "string",
+                "tenantId": "string",
+                "keyVaultURI": "string",
+                "keyVaultSecretName": "string"
+            },
+            "s3": {},
+            "s3_role_arn": {
+                "roleARN": "arn:aws:iam::{CUSTOMER_ACCOUNT_ID}:role/{ROLE ARN}",
+                "userARN": "arn:aws:iam::{SERVICE_ACCOUNT_ID}:user/{USER ARN}"
+            }
+        }
+        return properties_definition[accountType]
+    
+    def getCloudAccounts(self,accountType:str=None)->list:
+        """
+        Returns the list of all cloud accounts for the company.
+        Arguments:
+            accountType : OPTIONAL : The type of the account to filter the accounts. Possible values: "s3", "GCS", "ADLS", "AZURE_BLOB" (default None)
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getCloudAccounts")
+        path = f"/export_locations/analytics/exportlocations/account"
+        params = {}
+        if accountType is not None:
+            if accountType not in ["s3", "GCS", "ADLS", "AZURE_BLOB"]:
+                raise ValueError("Invalid account type. Possible values: s3, GCS, ADLS, AZURE_BLOB")
+            params['type'] = accountType
+        res = self.connector.getData(self.endpoint_company + path)
+        data = res.get('content', [])
+        last = res.get('last', True)
+        while last == False:
+            params = {"page": 1}
+            res = self.connector.getData(self.endpoint_company + path, params=params)
+            data += res.get('content', [])
+            last = res.get('last', True)
+            params['page'] += 1
+        return data
+    
+    def getCloudAccount(self, uuid: str = None) -> dict:
+        """
+        Get a specific cloud account by its UUID.
+        Arguments:
+            uuid : REQUIRED : The UUID of the cloud account
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getCloudAccount")
+        if uuid is None:
+            raise ValueError("Require a cloud account UUID")
+        path = f"/export_locations/analytics/exportlocations/account/{uuid}"
+        res = self.connector.getData(self.endpoint_company + path)
+        return res
+    
+    def updateCloudAccount(self, uuid: str = None, data: dict = None) -> dict:
+        """
+        Update a specific cloud account by its UUID using the PUT method.
+        Arguments:
+            uuid : REQUIRED : The UUID of the cloud account
+            data : REQUIRED : The data to be used for the update.
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting updateCloudAccount")
+        if uuid is None:
+            raise ValueError("Require a cloud account UUID")
+        if data is None or type(data) != dict:
+            raise ValueError("Require a dictionary representing the cloud account definition")
+        path = f"/export_locations/analytics/exportlocations/account/{uuid}"
+        res = self.connector.putData(self.endpoint_company + path, data=data)
+        return res
+
+    def createCloudLocation(self, 
+                            name: str = None,
+                            locType:str=None,
+                            properties:dict=None,
+                            accountUuid: str = None, 
+                            application: str = None,
+                            shareTo:str = None,
+                            description: str = None,
+        )-> dict:
+        """
+        Create a new cloud location for the company.
+        Arguments:
+            name : REQUIRED : The name of the cloud location
+            locType : REQUIRED : The type of the location, possible values: "s3", "GCS", "ADLS", "AZURE_BLOB"
+            properties : REQUIRED : The properties of the location. 
+                See getCloudLocationProperties for the properties to be used.
+            accountUuid : OPTIONAL : The account UUID to be used (default None)
+            application : OPTIONAL : The application to be used, possible values: "TAXONOMIST", "DATA_WAREHOUSE", "DATA_FEED" (default None)
+            shareTo : OPTIONAL : The user or group to share the location with (default None)
+            description : OPTIONAL : A description for the cloud location (default None)
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting createCloudLocation")
+        if name is None or locType is None or properties is None or accountUuid is None:
+            raise ValueError("Require a name, accountUuid, locType and properties for the cloud location")
+        path = f"/export_locations/analytics/exportlocations/location"
+        data = {
+            "name": name,
+            "locType": locType,
+            "properties": properties,
+            "accountUuid": accountUuid,
+            "application": application
+        }
+        if shareTo is not None:
+            data['shareTo'] = shareTo
+        if description is not None:
+            data['description'] = description
+        res = self.connector.postData(self.endpoint_company + path, data=data)
+        return res
+    
+    def createCloudAccount(self,
+                            name: str = None,
+                            description:str = None,
+                            accountType: str = None,
+                            properties: dict = None,
+                            ) -> dict:
+        """
+        Create a new cloud account for the company.
+        Arguments:
+            name : REQUIRED : The name of the cloud account
+            description : OPTIONAL : A description for the cloud account (default None)
+            accountType : REQUIRED : The type of the account, possible values: "s3", "GCS", "ADLS", "AZURE_BLOB"
+            properties : REQUIRED : The properties of the account. 
+                See getCloudLocationProperties for the properties to be used.
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting createCloudAccount")
+        if name is None or accountType is None or properties is None:
+            raise ValueError("Require a name, accountType and properties for the cloud account")
+        path = f"/export_locations/analytics/exportlocations/account"
+        data = {
+            "name": name,
+            "description": description,
+            "type": accountType,
+            "accountProperties": properties
+        }
+        res = self.connector.postData(self.endpoint_company + path, data=data)
+        return res
+
+
+    def getCloudLocation(self, uuid: str = None) -> dict:
+        """
+        Get a specific cloud location by its UUID.
+        Arguments:
+            uuid : REQUIRED : The UUID of the cloud location
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getCloudLocation")
+        if uuid is None:
+            raise ValueError("Require a cloud location UUID")
+        path = f"/export_locations/analytics/exportlocations/location/{uuid}"
+        res = self.connector.getData(self.endpoint_company + path)
+        return res
+    
+    def updateCloudLocation(self, uuid: str = None, data: dict = None) -> dict:
+        """
+        Update a specific cloud location by its UUID using the PUT method.
+        Arguments:
+            uuid : REQUIRED : The UUID of the cloud location
+            data : REQUIRED : The data to be used for the update.
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting updateCloudLocation")
+        if uuid is None:
+            raise ValueError("Require a cloud location UUID")
+        if data is None or type(data) != dict:
+            raise ValueError("Require a dictionary representing the cloud location definition")
+        path = f"/export_locations/analytics/exportlocations/location/{uuid}"
+        res = self.connector.putData(self.endpoint_company + path, data=data)
+        return res
+
+    def deleteCloudLocation(self, uuid: str = None) -> dict:
+        """
+        Delete a specific cloud location by its UUID.
+        Arguments:
+            uuid : REQUIRED : The UUID of the cloud location
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting deleteCloudLocation")
+        if uuid is None:
+            raise ValueError("Require a cloud location UUID")
+        path = f"/export_locations/analytics/exportlocations/location/{uuid}"
+        res = self.connector.deleteData(self.endpoint_company + path)
+        return res
+
+    def deleteCloudAccount(self, uuid: str = None) -> dict:
+        """
+        Delete a specific cloud account by its UUID.
+        Arguments:
+            uuid : REQUIRED : The UUID of the cloud account
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting deleteCloudAccount")
+        if uuid is None:
+            raise ValueError("Require a cloud account UUID")
+        path = f"/export_locations/analytics/exportlocations/account/{uuid}"
+        res = self.connector.deleteData(self.endpoint_company + path)
+        return res
+    
+    def getS3RoleARN(self, uuid: str = None, ) -> dict:
+        """
+        Get the S3 Role ARN information.
+        Arguments:
+            uuid : REQUIRED : The UUID of the cloud account
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getS3RoleARN")
+        if uuid is None:
+            raise ValueError("Require a cloud account UUID")
+        path = f"/export_locations/analytics/exportlocations/account/{uuid}"
+        res = self.connector.getData(self.endpoint_company + path)
         return res
 
     def getClassificationDatasets(self, rsid: str = None) -> dict:
