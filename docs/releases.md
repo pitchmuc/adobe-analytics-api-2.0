@@ -4,9 +4,9 @@ This page will give you the change that are occuring when a new version has been
 The changes have been tracked starting version 0.1.0
 
 ## version 0.4.3
-* adding the `datarepair` module and `DataRepair` class [documentation](.datarepair.md)
-* adding the `DataRepairJobCreator` class in `datarepair` module, [documentation](.datarepair.md#DataRepairJobCreator)
-* adding annotationCreator module and class [documentation](.annotationCreator.md)
+* adding the `datarepair` module and `DataRepair` class [documentation](./datarepair.md)
+* adding the `DataRepairJobCreator` class in `datarepair` module, [documentation](./datarepair.md#DataRepairJobCreator)
+* adding annotationCreator module and class [documentation](./annotationCreator.md)
 * refactor of the documentation to allow id of the method for better shareability
 * simplify header creation for requests
 * adding new share management methods:
