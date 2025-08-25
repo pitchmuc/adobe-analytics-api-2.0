@@ -67,6 +67,12 @@ A builder has been provided in an additional module: `dwhCreator`.\
 The module contains a class `DwhCreator` that should provide helpful functionalities to define your report requests.\
 More information on the [`DwhCreator` class](./docs/dwhCreator.md)
 
+## Data Repair API
+
+The data repair API allows to delete or transform data that has been already ingested in Adobe Analytics.\
+The Data Repair API is an additional SKU in the Adobe Analytics licence, make sure you are provisionned before trying to use the module and API.\
+More information on the [data repair module](./docs/datarepair.md)
+
 ## Project Data
 
 There is a feature to retrieve the Workspace projects and the components used.\
