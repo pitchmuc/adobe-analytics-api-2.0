@@ -54,7 +54,10 @@ Returns:
 Create a job for data repair.\
 Arguments:
 * rsid: REQUIRED : The report suite ID to be used for the job.
-* data: REQUIRED : DataRepairJobCreator instance or dictionary containing the job data or JSON file path.\
+* data: REQUIRED : DataRepairJobCreator instance or dictionary containing the job data or JSON file path.
+* token : REQUIRED : The validation Token needed for the request
+* dateStart: REQUIRED : The start date for the estimate in ISO format (YYYY-MM-DD).
+* dateEnd: REQUIRED : The end date for the estimate in ISO format (YYYY-MM-DD).\
 Returns:
 * dict: The response from the API as a dictionary.
 

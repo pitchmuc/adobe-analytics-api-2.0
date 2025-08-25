@@ -122,15 +122,31 @@ class DataRepair:
         response = self.connector.getData(self.endpoint + path, params=params)
         return response
     
-    def createJob(self,rsid:str=None,data:Union[dict,'DataRepairJobCreator',str]=None) -> dict:
+    def createJob(self,
+        rsid:str=None,
+        data:Union[dict,'DataRepairJobCreator',str]=None,
+        token:str=None,
+        dateStart:str=None,
+        dateEnd:str=None,
+    ) -> dict:
         """
         Create a job for data repair.
         Arguments:
             rsid: REQUIRED : The report suite ID to be used for the job.
             data: REQUIRED : DataRepairJobCreator instance or dictionary containing the job data or JSON file path.
+            token : REQUIRED : The validation Token needed for the request
+            dateStart: REQUIRED : The start date for the estimate in ISO format (YYYY-MM-DD).
+            dateEnd: REQUIRED : The end date for the estimate in ISO format (YYYY-MM-DD).
         Returns:
             dict: The response from the API as a dictionary.
         """
+        if rsid is None: 
+            raise Exception('Need a ReportSuite ID')
+        if data is None:
+            raise Exception('Need a job description')
+        if token is None:
+            raise Exception('Need a token')
+        params = {'validationToken':token,'dateRangeStart':dateStart,'dateRangeEnd':dateEnd}
         if isinstance(data, DataRepairJobCreator):
             data = data.to_dict()
         elif isinstance(data, dict):
@@ -149,7 +165,7 @@ class DataRepair:
         else:
             raise TypeError("Data must be a DataRepairJobCreator instance or a dictionary")
         path = f"/{rsid}/job"
-        response = self.connector.postData(self.endpoint + path, json=data)
+        response = self.connector.postData(self.endpoint + path, data=data,params=params)
         return response
     
     def getJobs(self, rsid: str = None) -> list:

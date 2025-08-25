@@ -181,7 +181,10 @@ class AdobeRequest:
                     if self.loggingEnabled:
                         self.logger.error(f"POST method failed: {res.status_code}, {res.text}")
                     return res.text
-            res_json = {'error': res.get('status_code','Request Error')}
+            if type(res) == dict:
+                res_json = {'error': res.get('status_code','Request Error')}
+            else:
+                res_json = res
         return res_json
 
     def patchData(self, endpoint: str, params: dict = None, data:dict = None, headers: dict = None, files : dict = None,  *args, **kwargs):
