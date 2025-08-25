@@ -36,7 +36,10 @@ The changes have been tracked starting version 0.1.0
   * deleteCloudLocation
   * updateCloudAccount
 * improve `getUsers`
-* improving test scenarios
+* improving test scenarios\
+Patch: 
+* fix `datetime` reference in datarepair API
+* adding `getReportWait` method in Legacy API [documentation](./legacyAnalytics.md#getReportWait)
 
 ## version 0.4.2
 

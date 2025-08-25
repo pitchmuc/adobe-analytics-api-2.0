@@ -2,6 +2,7 @@ import json
 from copy import deepcopy
 from aanalytics2 import config, connector
 from typing import Union
+from datetime import datetime,timedelta
 
 class DataRepair:
 
@@ -114,8 +115,8 @@ class DataRepair:
             raise ValueError("Both dateStart and dateEnd are required")
         
         params = {
-            'dateRangeEnd': dateStart,
-            'dateRangeStart': dateEnd
+            'dateRangeEnd': dateEnd,
+            'dateRangeStart': dateStart
         }
         path = f"/{rsid}/serverCallEstimate"
         response = self.connector.getData(self.endpoint + path, params=params)

@@ -59,7 +59,7 @@ myCompany.postData(method="Company.GetTrackingServer",data={"rsid": "myrsid"})
 
 The getData will use the GET method to retrieve information from the 1.4 API.\
 It is not reference in the documentation but I do believe it exists and there are methods supported with this protocole.\
-It takes 3 possible arguments.\
+It takes 3 possible arguments.
 
 * path: in case the path you want to use is not '/'.
 * method: You reference the method that you want to use.
@@ -70,6 +70,15 @@ Example:
 ```python
 myCompany.getData(method="Company.GetReportSuites")
 ```
+
+### `getReportWait`
+
+Take a report description, send it to the queue and wait for the data in a loop.\
+Returns a dataframe\
+Argument:
+* reportDescription : REQUIRED : The data report definition needed (dictionary or a ReportBuilder instance)
+* wait : OPTIONAL : How long in seconds to wait before next request to get data
+
 
 ## Attributes & tips for LegacyAnalytics
 

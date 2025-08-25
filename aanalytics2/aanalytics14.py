@@ -5,6 +5,7 @@ from typing import Union
 from copy import deepcopy
 import pandas as pd
 import json
+import time
 
 class Report:
 
@@ -93,6 +94,32 @@ class LegacyAnalytics:
         path = path
         res = self.connector.postData(self.endpoint + path,params=myParams, data=data,headers=self.header,legacy=True)
         return res
+
+    def getReportWait(self,reportDescription:Union[dict,'ReportBuilder14']=None,wait:int=60)->pd.DataFrame:
+        """
+        Take a report description, send it to the queue and wait for the data in a loop.
+        Returns a dataframe
+        Argument:
+            reportDescription : REQUIRED : The data report definition needed (dictionary or a ReportBuilder instance)
+            wait : OPTIONAL : How long in seconds to wait before next request to get data
+        """
+        if reportDescription is None:
+            raise Exception("Require a reportDescription")
+        if hasattr(reportDescription,'to_dict'):
+            reportDescription = reportDescription.to_dict()
+        methodQueue = "Report.Queue"
+        res = self.postData(method=methodQueue,data=reportDescription)
+        if 'reportID' not in res.keys():
+            raise Exception(res)
+        data = pd.DataFrame
+        while data.empty:
+            methodGet = "Report.Get"
+            mydata = self.postData(method=methodGet,data=res)
+            if 'report' in mydata.keys():
+                data = self.transformReportToDataFrame(mydata)
+                return data
+            time.sleep(wait)
+
 
     def __recursiveBuild__(self,row,context:list=None,level:int=0,targetLevel:int=0) -> list:
         """
