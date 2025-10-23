@@ -707,9 +707,10 @@ class Analytics:
             data = data + append_data
         df_users = pd.DataFrame(data)
         if df_users.empty == False:
-            columns = ['email', 'login', 'fullName', 'firstName', 'lastName', 'admin', 'loginId', 'imsUserId', 'login',
+            columns = ['email', 'login', 'fullName', 'firstName', 'lastName', 'admin', 'loginId', 'imsUserId', 
                     'createDate', 'lastAccess', 'title', 'disabled', 'phoneNumber', 'companyid']
-            df_users = df_users[columns]
+            columns_to_keep = [col for col in columns if col in df_users.columns]
+            df_users = df_users[columns_to_keep]
             df_users['createDate'] = pd.to_datetime(df_users['createDate'])
             df_users['lastAccess'] = pd.to_datetime(df_users['lastAccess'])
         if save:
