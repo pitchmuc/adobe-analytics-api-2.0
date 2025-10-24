@@ -510,6 +510,45 @@ class Analytics:
             path, params=params, data=body, headers=self.header)
         return res
 
+    def getReportSuite(self, rsid:str=None)->dict:
+        """
+        Get a unique reportSuite information based on the rsid passed.
+        Argument: 
+            rsid : REQUIRED : The reportSuite ID to retrieve.
+        """
+        if rsid is None:
+            raise Exception("require a reportSuite ID")
+        params = {'expansion': "name,parentRsid,calendarType,timezoneZoneinfo",}
+        path = f"/report_suites/collections/suites/{rsid}"
+        res = self.connector.getData(self.endpoint_company + path,params=params)
+        return res
+    
+    def createReportSuite(self,rsid:str=None,name:str=None,hits:int=1000000,timezone:str='Europe/Berlin',currency:str="EUR",baseUrl:str=None)->dict:
+        """
+        Create a reportSuite.
+        Arguments:
+            rsid : REQUIRED : The reportSuite ID to create.
+            name : REQUIRED : The name of the reportSuite to create.
+            hits : OPTIONAL : The number of hits per day. Default 1,000,000
+            timezone : OPTIONAL : The timezone of the reportSuite. Default Europe/Berlin
+            currency : OPTIONAL : The currency of the reportSuite. Default EUR
+            baseUrl : OPTIONAL : The baseUrl of the reportSuite. Default None.
+        Returns the response of the creation.
+        """
+        path = f"/report_suites/reportsuites/{rsid}"
+        if name is None:
+            raise Exception("require a name for the reportSuite")
+        body = {
+            "name": name,
+            "hitsPerDay": hits,
+            "timezone": timezone,
+            "baseUrl" : baseUrl,
+            "currency" : currency,
+            }
+        res = self.connector.postData(self.endpoint_company + path, data=body, headers=self.header)
+        return res
+        
+
     def updateVirtualReportSuite(self, vrsid: str = None, data_dict: dict = None, **kwargs) -> dict:
         """
         Updates a Virtual Report Suite based on a JSON-like dictionary (same structure as createVirtualReportSuite)
@@ -664,11 +703,12 @@ class Analytics:
             df_metrics.to_csv(f'metrics_{rsid}.csv', sep='\t')
         return df_metrics
 
-    def getUsers(self, save: bool = False, **kwargs) -> pd.DataFrame:
+    def getUsers(self, format:str='df',save: bool = False, **kwargs) -> pd.DataFrame:
         """
         Retrieve the list of users for a login company.Returns a data frame.
         Arguments:
             save : OPTIONAL : Save the data in a file (bool : default False).
+            format = OPTIONAL : format of the output. 2 values "df" for dataframe and "raw" for raw json.
         Possible kwargs:
             limit :  Nummber of results per requests. Default 100.
             expansion : string list such as "lastAccess,createDate"
@@ -704,11 +744,17 @@ class Analytics:
                            and len(elem['content']) == 0)
             append_data = [val for sublist in [data for data in users_lists]
                            for val in sublist]  # flatten list of list
-            data = data + append_data
+            data += append_data
+        if format == 'raw':
+            if save:
+                with open(f'users_{int(time.time())}.json', 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=4)
+            return data
         df_users = pd.DataFrame(data)
         if df_users.empty == False:
-            columns = ['email', 'login', 'fullName', 'firstName', 'lastName', 'admin', 'loginId', 'imsUserId', 'login',
+            columns = ['email', 'login', 'fullName', 'firstName', 'lastName', 'admin', 'loginId', 'imsUserId',
                     'createDate', 'lastAccess', 'title', 'disabled', 'phoneNumber', 'companyid']
+            columns = [col for col in columns if col in df_users.columns]
             df_users = df_users[columns]
             df_users['createDate'] = pd.to_datetime(df_users['createDate'])
             df_users['lastAccess'] = pd.to_datetime(df_users['lastAccess'])
@@ -747,7 +793,7 @@ class Analytics:
             rsid_list : OPTIONAL : Filter list to only include segments tied to specified RSID list (list)
             sidFilter : OPTIONAL : Filter list to only include segments in the specified list (list)
             extended_info : OPTIONAL : additional segment metadata fields to include on response (bool : default False)
-                if set to true, returns reportSuiteName, ownerFullName, modified, tags, compatibility, definition, publishingStatus
+                if set to true, returns reportSuiteName, ownerFullName, created, modified, tags, compatibility, definition, shares, publishingStatus, lastRecordedAccess
             format : OPTIONAL : defined the format returned by the query. (Default df)
                 possibe values :
                     "df" : default value that return a dataframe
@@ -2814,9 +2860,6 @@ class Analytics:
                                 "cancelMethod": "afterOccurrences",
                                 "endAfterNumOccurrences": 10
                             }
-
-
-
         Example of requestDict:
         {
             "schedule": {

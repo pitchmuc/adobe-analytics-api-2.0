@@ -40,6 +40,9 @@ The changes have been tracked starting version 0.1.0
 Patch: 
 * fix `datetime` reference in datarepair API
 * adding `getReportWait` method in Legacy API [documentation](./legacyAnalytics.md#getReportWait)
+* adding `getReportSuite`
+* adding `createReportSuite` 
+* fixing `getUsers`
 
 ## version 0.4.2
 
