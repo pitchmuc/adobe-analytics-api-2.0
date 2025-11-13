@@ -3,6 +3,20 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.4.4
+* adding the data feed API capabilities
+  * getDataFeeds
+  * getDataFeed
+  * getDataFeedRequests
+  * updateDataFeed
+  * createDataFeed
+  * reprocessDataFeedRequest
+  * resendDataFeedRequest
+  * getDataFeedColumnNames
+  * createColumnPreset
+  * getColumnPreset
+* adding `createDateRange` method 
+
 ## version 0.4.3
 * adding the `datarepair` module and `DataRepair` class [documentation](./datarepair.md)
 * adding the `DataRepairJobCreator` class in `datarepair` module, [documentation](./datarepair.md#DataRepairJobCreator)

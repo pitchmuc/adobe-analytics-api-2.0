@@ -593,6 +593,42 @@ Returns the list of all cloud accounts for the company.\
 Arguments:
 * accountType : OPTIONAL : The type of the account to filter the accounts. Possible values: "s3", "GCS", "ADLS", "AZURE_BLOB" (default None)
 
+#### getDataFeeds
+
+
+#### getDataFeed
+Retrieve a specific data feed by its ID.\
+Arguments:
+* datafeedId : REQUIRED : The data feed ID to be retrieved
+
+#### getDataFeedRequests
+This endpoint allows searching for datafeed requests using various filtering criteria.\
+Arguments:
+* rsids : OPTIONAL : List of Report Suite IDs to filter the requests (default None)
+* feedIds : OPTIONAL : List of Data Feed IDs to filter the requests (default None)
+* requestStates : OPTIONAL : Filter by request states [created, processing, completed]
+* billingCustomerId: Filter by billing customer ID.
+* useUtc: Indicates whether the date filters should use UTC (default=false).
+* minRequestPeriodStartDate:Filter by request period start date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+* maxRequestPeriodStartDate: Filter by request period start date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+* minAttemptDate: Filter by attempt date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+* maxAttemptDate: Filter by attempt date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+* minCompletionDate: Filter by completion date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+* maxCompletionDate: Filter by completion date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+* minSubmittedDate: Filter by submission date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+* maxSubmittedDate: Filter by submission date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+
+
+#### getDataFeedColumnNames
+Retrieve the column names available for data feeds.\
+Returns a list
+
+#### getColumnPreset
+Retrieve a specific column preset by its ID or by reportSuite ID.\
+Arguments:
+* rsid : REQUIRED : The report suite ID to be used
+* presetId : REQUIRED : The column preset ID to be retrieved
+
 
 ### Create methods
 
@@ -813,6 +849,73 @@ Arguments:
 * shareTo : OPTIONAL : The user or group to share the location with (default None)
 * description : OPTIONAL : A description for the cloud location (default None)
 
+#### createDataFeed
+Create a datafeed based on the arguments used.\
+See reference documentation for more information about the parameters here: https://developer.adobe.com/analytics-apis/docs/2.0/apis/data-feeds/#operation/create_1\
+Arguments:
+* name : REQUIRED : The name of the data feed
+* rsid : REQUIRED : The report suite ID to be used
+* columnPreset : OPTIONAL : Integer representing the column preset to be used (default 1)
+* dynamicLookups : OPTIONAL : Boolean to enable/disable dynamic lookups (default False)
+* replaceEscapedChars : OPTIONAL : Boolean to enable/disable replacing escaped characters (default False)
+* customerVisible : OPTIONAL : Boolean to define if the data feed is customer visible (default True)
+* schedule : OPTIONAL : Dictionary representing the schedule to be used.\
+    example: 
+    ```py
+    {"startDate": "2024-01-01T00:00:00Z",
+        "endDate": "string",
+        "interval": "daily" or "hourly"(default),
+        "delay": 0}
+    ```
+* packaging : OPTIONAL : Dictionary representing the packaging configuration.
+    example: 
+    ```py
+    {
+      "type": "flat" or "chunked",
+      "chunkSize": 0, // Integer representing the chunk size in MB
+      "compression": "gzip" or "zip",
+      "manifest":  "no-file" or "fin-file" or "manifest-file", // representing the manifest type
+      "noDataManifest": True
+    } // Boolean to enable/disable no data manifest
+    ```
+* delivery : OPTIONAL : Dictionary representing the delivery to be used.
+    example: 
+    ```py
+    {
+      "cloudLocationUUID": "string",
+      "notificationEmail": ["string"]
+    }
+    ```
+* lateHits : OPTIONAL : Dictionary representing the late hit configuration.
+    example: 
+    ```py
+    {
+      "enabled": True,
+      "lookback": 0
+    }
+    ```
+* note : OPTIONAL : Notes to be added to the data feed
+* state : OPTIONAL : The status of the data feed to be created. One of the following value: "active", "created" and "hold" (default "active")
+* dataFeedDefinition : OPTIONAL : The full dictionary representing the data feed definition.
+    example: 
+    ```py
+    {
+        "feedName": "string",
+        "rsid": "string",
+        "schedule": {"startDate": "2024-01-01T00:00:00Z"},
+        "delivery": {"cloudLocationUUID": "string"}
+    }
+    ```
+
+#### createColumnPreset
+Create a column preset for data feeds.\
+Arguments:
+* name : REQUIRED : The name of the column preset
+* rsid : REQUIRED : The report suite ID to be used
+* columnNames : OPTIONAL : List of column names to be included in the preset such as `[{'name': 'column_name1'},{'name': 'column_name2'}]`
+
+
+
 ### Update methods
 
 #### updateVirtualReportSuite
@@ -943,6 +1046,64 @@ Arguments:
 * uuid : REQUIRED : The UUID of the cloud location
 * data : REQUIRED : The cloud location new definition to be used for the update.
 
+
+#### updateDataFeed
+Update a specific data feed by its ID using the PUT method.
+It can update the status, or any of the data feed attributes allowed to be changed.
+Arguments:
+* datafeedId : REQUIRED : The data feed ID to be updated
+* status : OPTIONAL : changing the status to one of the following value: "active", "canceled" and "hold"
+* columnPreset : OPTIONAL : Integer value representing the column preset
+* notes : OPTIONAL : Notes to be added to the data feed
+* dynamicLookups : OPTIONAL : Boolean to enable/disable dynamic lookups.
+* replaceEscapedChars : OPTIONAL : Boolean to enable/disable replacing escaped characters.
+* schedule : OPTIONAL : Dictionary representing the schedule to be used.
+  example:
+  ```JSON
+  {
+    "startDate": "string",
+    "endDate": "string", // can be replaced
+    "interval": "string", 
+    "delay": 0 // can be replaced 
+    } 
+  ```
+* delivery : OPTIONAL : Dictionary representing the delivery to be used.
+  example:
+  ```JSON 
+  {
+    "cloudLocationUUID": "string",
+    "notificationEmail": ["string"]
+  }
+  ```
+* lateHit : OPTIONAL : Dictionary representing the late hit configuration.
+  example:
+  ```JSON
+    {
+      "enabled": true,
+      "lookback": 0
+      }
+  ```
+* packaging : OPTIONAL : Dictionary representing the packaging configuration.
+  example:
+  ```py
+  {"type": 'flat' or 'chunked',
+  "chunkSize": 0, // Integer representing the chunk size in MB
+  "compression": 'gzip' or 'zip',
+  "manifest":  'no-file' or 'fin-file' or 'manifest-file', // representing the manifest type
+  "noDataManifest": True // Boolean to enable/disable no data manifest
+  } 
+  ```
+
+
+#### reprocessDataFeedRequest
+Reprocess a specific data feed request by its ID.\
+Arguments:
+* requestId : REQUIRED : The data feed request ID to be reprocessed
+
+#### resendDataFeedRequest
+Resend a specific data feed request by its ID.\
+Arguments:
+* requestId : REQUIRED : The data feed request ID to be resent
 
 ### Delete methods
 

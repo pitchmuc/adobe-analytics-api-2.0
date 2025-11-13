@@ -1233,6 +1233,24 @@ class Analytics:
         if save:
             df_dates.to_csv('date_range.csv', index=False)
         return df_dates
+    
+    def createDateRange(self,dateRangeJSON: dict = None) -> dict:
+        """
+        Create a date range based on the dictionary passed to it.
+        Arguments:
+            dateRangeJSON : REQUIRED : the dictionary that represents the JSON statement for the date Range.
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting createDateRange")
+        if dateRangeJSON is None:
+            print('No date range data has been pushed')
+            return None
+        data = deepcopy(dateRangeJSON)
+        dr = self.connector.postData(
+            self.endpoint_company + self._getDateRanges,
+            data=data,
+        )
+        return dr
 
     def getDateRange(self, dateRangeID: str = None) -> dict:
         """
@@ -3813,6 +3831,355 @@ class Analytics:
             raise TypeError("alertIds must be a list")
         path = f"{self._getAlerts}/reenable"
         return self.connector.putData(self.endpoint_company + path, data=alertIds, headers=self.header)
+    
+    def getDataFeeds(self, rsid:str=None) -> list:
+        """
+        Retrieve all data feeds for the company.
+        Arguments:
+            rsid : REQUIRED : Report Suite ID to filter the data feeds (default None)
+        """
+        if rsid is None:
+            raise ValueError("Require a reportSuite ID")
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getDataFeeds")
+        path = f"/data_feed/datafeeds"
+        params = {"rsid": rsid}
+        res = self.connector.getData(self.endpoint_company + path, params=params)
+        data = res.get('data', [])
+        return data
+    
+    def getDataFeed(self, datafeedId: str = None) -> dict:
+        """
+        Retrieve a specific data feed by its ID.
+        Arguments:
+            datafeedId : REQUIRED : The data feed ID to be retrieved
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getDataFeed")
+        if datafeedId is None:
+            raise ValueError("Require a data feed ID")
+        path = f"/data_feed/datafeed/{datafeedId}"
+        res = self.connector.getData(self.endpoint_company + path)
+        return res
+    
+    def updateDataFeed(self, 
+                       datafeedId: str = None,
+                       status : str = None, 
+                       columnPreset: int = None,
+                       notes : str = None,
+                       dynamicLookups: bool = None,
+                       replaceEscapedChars: bool = None,
+                       schedule : dict = None,
+                       delivery : dict = None,
+                       lateHit : dict = None,
+                       packaging : dict = None
+                       ) -> dict:
+        """
+        Update a specific data feed by its ID using the PUT method.
+        It can update the status, or any of the data feed attributes allowed to be changed.
+        Arguments:
+            datafeedId : REQUIRED : The data feed ID to be updated
+            status : OPTIONAL : changing the status to one of the following value: "active", "canceled" and "hold"
+            columnPreset : OPTIONAL : Integer value representing the column preset
+            notes : OPTIONAL : Notes to be added to the data feed
+            dynamicLookups : OPTIONAL : Boolean to enable/disable dynamic lookups.
+            replaceEscapedChars : OPTIONAL : Boolean to enable/disable replacing escaped characters.
+            schedule : OPTIONAL : Dictionary representing the schedule to be used.
+                example: {"startDate": "string",
+                    "endDate": "string", // can be replaced
+                    "interval": "string",
+                    "delay": 0} // can be replaced 
+            delivery : OPTIONAL : Dictionary representing the delivery to be used.
+                example: {"cloudLocationUUID": "string",
+                        "notificationEmail": ["string"]}
+            lateHit : OPTIONAL : Dictionary representing the late hit configuration.
+                example: {"enabled": True,
+                    "lookback": 0}
+            packaging : OPTIONAL : Dictionary representing the packaging configuration.
+                example: {"type": 'flat' or 'chunked',
+                            "chunkSize": 0, // Integer representing the chunk size in MB
+                            "compression": 'gzip' or 'zip',
+                            "manifest":  'no-file' or 'fin-file' or 'manifest-file', // representing the manifest type
+                            "noDataManifest": True} // Boolean to enable/disable no data manifest
+        """
+        if datafeedId is None:
+            raise ValueError("Require a data feed ID")
+        if self.loggingEnabled:
+            self.logger.debug(f"starting updateDataFeed")
+        path = f"/data_feed/datafeed/{datafeedId}"
+        params = {}
+        if status is not None and status in ["active", "canceled", "hold"]:
+            params['status'] = status
+            path = f"{path}/status"
+            res = self.connector.putData(self.endpoint_company + path, params=params)
+            return res
+        data = {}
+        if columnPreset is not None:
+            data['columnPreset'] = columnPreset
+        if notes is not None:
+            data['notes'] = notes
+        if dynamicLookups is not None:
+            data['dynamicLookups'] = dynamicLookups
+        if replaceEscapedChars is not None:
+            data['replaceEscapedChars'] = replaceEscapedChars
+        if schedule is not None:
+            data['schedule'] = schedule
+        if delivery is not None:
+            data['delivery'] = delivery
+        if lateHit is not None:
+            data['lateHit'] = lateHit
+        if packaging is not None:
+            data['packaging'] = packaging
+        res = self.connector.putData(self.endpoint_company + path, data=data)
+        return res
+
+    def getDataFeedRequests(self,rsids:list=None,
+                            feedsIds:list=None,
+                            requestStates:str=None,
+                            billingCustomerId:str=None,
+                            useUtc:bool=False,
+                            minRequestPeriodStartDate:str=None,
+                            maxRequestPeriodStartDate:str=None,
+                            minAttemptDate:str=None,
+                            maxAttemptDate:str=None,
+                            minCompletionDate:str=None,
+                            maxCompletionDate:str=None,
+                            minSubmittedDate:str=None,
+                            maxSubmittedDate:str=None,
+                            limit:int=100
+                            )->list:
+        """
+        This endpoint allows searching for datafeed requests using various filtering criteria.
+        Arguments:
+            rsids : OPTIONAL : List of Report Suite IDs to filter the requests (default None)
+            feedIds : OPTIONAL : List of Data Feed IDs to filter the requests (default None)
+            requestStates : OPTIONAL : Filter by request states [created, processing, completed]
+            billingCustomerId: Filter by billing customer ID.
+            useUtc: Indicates whether the date filters should use UTC (default=false).
+            minRequestPeriodStartDate:Filter by request period start date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+            maxRequestPeriodStartDate: Filter by request period start date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+            minAttemptDate: Filter by attempt date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+            maxAttemptDate: Filter by attempt date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+            minCompletionDate: Filter by completion date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+            maxCompletionDate: Filter by completion date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+            minSubmittedDate: Filter by submission date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+            maxSubmittedDate: Filter by submission date range (ISO 8601 format with timezone (yyyy-MM-dd'T'HH:mm:ssXXX) or UTC (yyyy-MM-ddTHH:mm:ssZ))
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getDataFeedRequests")
+        path = f"/data_feed/datafeed/requests/search"
+        data = {}
+        if rsids is not None:
+            data['rsids'] = rsids
+        if feedsIds is not None:
+            data['feedsIds'] = feedsIds
+        if requestStates is not None:
+            data['requestStates'] = requestStates
+        if billingCustomerId is not None:
+            data['billingCustomerId'] = billingCustomerId
+        if useUtc is not None:
+            data['useUtc'] = useUtc
+        if minRequestPeriodStartDate is not None:
+            data['minRequestPeriodStartDate'] = minRequestPeriodStartDate
+        if maxRequestPeriodStartDate is not None:
+            data['maxRequestPeriodStartDate'] = maxRequestPeriodStartDate
+        if minAttemptDate is not None:
+            data['minAttemptDate'] = minAttemptDate
+        if maxAttemptDate is not None:
+            data['maxAttemptDate'] = maxAttemptDate
+        if minCompletionDate is not None:
+            data['minCompletionDate'] = minCompletionDate
+        if maxCompletionDate is not None:
+            data['maxCompletionDate'] = maxCompletionDate
+        if minSubmittedDate is not None:
+            data['minSubmittedDate'] = minSubmittedDate
+        if maxSubmittedDate is not None:
+            data['maxSubmittedDate'] = maxSubmittedDate
+        data['limit'] = limit
+        data['offset'] = 0
+        res = self.connector.postData(self.endpoint_company + path,data=data)
+        data = res.get('data', [])
+        length_data_received = len(data)
+        while length_data_received == limit:
+            data['offset'] +=1
+            res = self.connector.postData(self.endpoint_company + path,data=data)
+            data += res.get('data', [])
+            length_data_received = len(res.get('data', []))
+        return data
+    
+    def createDataFeed(self,
+                       name:str=None,
+                       rsid:str=None,
+                       columnPreset:int=1,
+                       dynamicLookups:bool=False,
+                       replaceEscapedChars:bool=False,
+                       customerVisible:bool=True,
+                       schedule:dict=None,
+                       packaging:dict=None,
+                       delivery:dict=None,
+                       lateHits:dict=None,
+                       note:str=None,
+                       state:str='active',
+                       dataFeedDefinition:dict=None
+                        )->dict:
+        """
+        Create a datafeed based on the arguments used.
+        See reference documentation for more information about the parameters here: https://developer.adobe.com/analytics-apis/docs/2.0/apis/data-feeds/#operation/create_1
+        Arguments:
+            name : REQUIRED : The name of the data feed
+            rsid : REQUIRED : The report suite ID to be used
+            columnPreset : OPTIONAL : Integer representing the column preset to be used (default 1)
+            dynamicLookups : OPTIONAL : Boolean to enable/disable dynamic lookups (default False)
+            replaceEscapedChars : OPTIONAL : Boolean to enable/disable replacing escaped characters (default False)
+            customerVisible : OPTIONAL : Boolean to define if the data feed is customer visible (default True)
+            schedule : OPTIONAL : Dictionary representing the schedule to be used.
+                example: {"startDate": "2024-01-01T00:00:00Z",
+                    "endDate": "string",
+                    "interval": "daily" or "hourly"(default),
+                    "delay": 0}
+            packaging : OPTIONAL : Dictionary representing the packaging configuration.
+                example: {"type": 'flat' or 'chunked',
+                            "chunkSize": 0, // Integer representing the chunk size in MB
+                            "compression": 'gzip' or 'zip',
+                            "manifest":  'no-file' or 'fin-file' or 'manifest-file', // representing the manifest type
+                            "noDataManifest": True} // Boolean to enable/disable no data manifest
+            delivery : OPTIONAL : Dictionary representing the delivery to be used.
+                example: {"cloudLocationUUID": "string",
+                        "notificationEmail": ["string"]}
+            lateHits : OPTIONAL : Dictionary representing the late hit configuration.
+                example: {"enabled": True,
+                    "lookback": 0}
+            note : OPTIONAL : Notes to be added to the data feed
+            state : OPTIONAL : The status of the data feed to be created. One of the following value: "active", "created" and "hold" (default "active")
+            dataFeedDefinition : OPTIONAL : The full dictionary representing the data feed definition.
+                example: {
+                    "feedName": "string",
+                    "rsid": "string",
+                    "schedule": {"startDate": "2024-01-01T00:00:00Z"},
+                    "delivery": {"cloudLocationUUID": "string"}
+                }
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting createDataFeed")
+        path = f"/data_feed/datafeed"
+        if dataFeedDefinition is not None:
+            data = dataFeedDefinition
+            res = self.connector.postData(self.endpoint_company + f"/data_feed/datafeed", data=data)
+        else:
+            if name is None:
+                raise ValueError("Require a name for the data feed")
+            if rsid is None:
+                raise ValueError("Require a report suite ID")
+            if schedule is None:
+                raise ValueError("Require a schedule definition")
+            if delivery is None:
+                raise ValueError("Require a delivery definition")
+            data = {}
+            data['feedName'] = name
+            data['rsid'] = rsid
+            data['columnPreset'] = columnPreset
+            data['dynamicLookups'] = dynamicLookups
+            data['replaceEscapedChars'] = replaceEscapedChars
+            data['customerVisible'] = customerVisible
+            data['schedule'] = schedule
+            data['delivery'] = delivery
+            if packaging is not None:
+                data['packaging'] = packaging
+            if note is not None:
+                data['notes'] = note
+            if lateHits is not None:
+                data['lateHit'] = lateHits
+            if state in ['active', 'created', 'hold']:
+                data['status'] = state
+            res = self.connector.postData(self.endpoint_company + path, data=data)
+        return res
+
+    def reprocessDataFeedRequest(self,feedId:int=None,requestId:str=None)->dict:
+        """
+        Reprocess a specific data feed request by its ID.
+        Arguments:
+            requestId : REQUIRED : The data feed request ID to be reprocessed
+        """
+        if feedId is None:
+            raise ValueError("Require a data feed ID")
+        if requestId is None:
+            raise ValueError("Require a data feed request ID")
+        if self.loggingEnabled:
+            self.logger.debug(f"starting reprocessDataFeedRequest")
+        path = f"/data_feed/datafeed/{feedId}/{requestId}/reprocess"
+        res = self.connector.putData(self.endpoint_company + path)
+        return res
+    
+    def resendDataFeedRequest(self,feedId:int=None,requestId:str=None)->dict:
+        """
+        Resend a specific data feed request by its ID.
+        Arguments:
+            requestId : REQUIRED : The data feed request ID to be resent
+        """
+        if feedId is None:
+            raise ValueError("Require a data feed ID")
+        if requestId is None:
+            raise ValueError("Require a data feed request ID")
+        if self.loggingEnabled:
+            self.logger.debug(f"starting resendDataFeedRequest")
+        path = f"/data_feed/datafeed/{feedId}/{requestId}/resend"
+        res = self.connector.putData(self.endpoint_company + path)
+        return res
+    
+    def getDataFeedColumnNames(self)->list:
+        """
+        Retrieve the column names available for data feeds.
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getDataFeedColumns")
+        path = f"/data_feed/columnNames/all"
+        res = self.connector.getData(self.endpoint_company + path)
+        data = res.get('data', [])
+        return data
+    
+    def createColumnPreset(self,name:str=None,rsid:str=None,columnNames:list=None)->dict:
+        """
+        Create a column preset for data feeds.
+        Arguments:
+            name : REQUIRED : The name of the column preset
+            rsid : REQUIRED : The report suite ID to be used
+            columnNames : OPTIONAL : List of column names to be included in the preset such as [{'name': 'column_name1'},{'name': 'column_name2'}]
+        """
+        if name is None:
+            raise ValueError("Require a name for the column preset")
+        if rsid is None:
+            raise ValueError("Require a report suite ID")
+        if columnNames is None:
+            raise ValueError("Require a list of column names")
+        if self.loggingEnabled:
+            self.logger.debug(f"starting createColumnPreset")
+        path = f"/data_feed/columnPreset"
+        params = {'rsid': rsid}
+        data = {
+            "name": name,
+            "columnNames": columnNames
+        }
+        res = self.connector.postData(self.endpoint_company + path, data=data,params=params)
+        return res
+    
+    def getColumnPreset(self,rsid:str=None,presetId:int=None)->list:
+        """
+        Retrieve a specific column preset by reportSuiteID or by its ID.
+        Arguments:
+            rsid : REQUIRED : The report suite ID to be used
+            presetId : REQUIRED : The column preset ID to be retrieved
+        """
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getColumnPreset")
+        if presetId is not None:
+            path = f"/data_feed/columnPreset/{presetId}"
+            res = self.connector.getData(self.endpoint_company + path)
+        elif rsid is not None:
+            path = f"/data_feed/columnPresets"
+            params = {'rsid': rsid}
+            res = self.connector.getData(self.endpoint_company + path,params=params)
+        return res
+    
 
     def _dataDescriptor(self, json_request: dict):
         """
