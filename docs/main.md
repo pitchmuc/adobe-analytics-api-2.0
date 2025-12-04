@@ -14,7 +14,7 @@ The different section will quickly explain the methods available in the differen
   - [Retry Parameter](#retry-parameter)
 - [Analytics Class](#analytics-class)
   - [The get methods](#the-get-methods)
-  - [The create methods](#create)
+  - [The create methods](#create-methods)
   - [The update methods](#update-methods)
   - [The delete methods](#delete-methods)
   - [The Project class](#project-class)
