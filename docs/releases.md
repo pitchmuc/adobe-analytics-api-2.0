@@ -15,7 +15,9 @@ The changes have been tracked starting version 0.1.0
   * getDataFeedColumnNames
   * createColumnPreset
   * getColumnPreset
-* adding `createDateRange` method 
+* adding `createDateRange` method\
+Patch: 
+* improving classification methods
 
 ## version 0.4.3
 * adding the `datarepair` module and `DataRepair` class [documentation](./datarepair.md)

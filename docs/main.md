@@ -771,10 +771,12 @@ possible kwargs:
 Create API import job entity on classification dataset, need to upload file after this API call\
 Arguments:
 * datasetId : REQUIRED : The datasetId to be used
+* import_def : OPTIONAL : The full definition to be used for the job (no need for other parameters)
 * dataFormat : OPTIONAL : If you want to specify another type of file to import (default "json",possible "tab" or "tsv")
 * jobName : OPTIONAL : Job Name to be given
 * delimiter : OPTIONAL : The delimiter of lists
 * encoding : OPTIONAL : Encoding to be used (default UTF8)
+* data : OPTIONAL : The data to be used for the import when using the different parameters (other than import_def)
 
 #### commitImportClassificationJob
 Note a create per say but commit your upload job. Commit the API classification job uploaded.\
