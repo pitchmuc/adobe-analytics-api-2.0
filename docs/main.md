@@ -70,6 +70,28 @@ myfilePath = './myCredential/config.json'
 api2.importConfigFile(myfilePath)
 ```
 
+#### Multi-credential usage with `return_object`
+
+When working with multiple Adobe Analytics accounts (different API credentials / client IDs), you can pass `return_object=True` to get back an isolated `ConfigObj` instance instead of writing to the global config state.
+Each `ConfigObj` owns fully independent copies of its config dict and header dict — no shared memory between instances.
+
+```python
+import aanalytics2 as api2
+
+cfg1 = api2.importConfigFile('creds_client1.json', return_object=True)
+cfg2 = api2.importConfigFile('creds_client2.json', return_object=True)
+```
+
+The returned `ConfigObj` exposes:
+- `cfg.config` — the credential dictionary (org_id, client_id, secret, scopes, …)
+- `cfg.header` — the pre-built request header (x-api-key already set to the right client_id)
+- `cfg.config_object` — alias for `cfg.config`, matching the `config_object` parameter of `Analytics`
+
+The same `return_object` parameter is available on the lower-level `configure()` function:  
+```python
+cfg = api2.configure(org_id='...', client_id='...', secret='...', scopes='...', return_object=True)
+```
+
 ## Login class
 
 The `Login` class is the capability to get the different Login Company ID to create your conneciton later on.\
@@ -83,6 +105,21 @@ login = api2.Login()
 
 ## Here retrieving the cids
 cids = login.getCompanyId()
+```
+
+When using multiple credentials, pass a `ConfigObj` directly via `**` unpacking:
+
+```python
+import aanalytics2 as api2
+
+cfg1 = api2.importConfigFile('creds_client1.json', return_object=True)
+cfg2 = api2.importConfigFile('creds_client2.json', return_object=True)
+
+login1 = api2.Login(**cfg1)
+login2 = api2.Login(**cfg2)
+
+cids1 = login1.getCompanyId()
+cids2 = login2.getCompanyId()
 ```
 
 From this implementation, you can then retrieve the list of loginCompanyId from your __cids__ variable or the **__COMPANY_IDS__** attributes.
@@ -160,7 +197,48 @@ import aanalytics2 as api2
 mycompany = api2.Analytics(cid)
 
 ## or with retry parameter
-mycompany = api2.Analytics(cid,retry=2)
+mycompany = api2.Analytics(cid, retry=2)
+```
+
+### Multi-credential instantiation
+
+You can also instantiate `Analytics` directly from a `ConfigObj` using `**` unpacking.
+This is the recommended pattern when working with several API credentials in parallel — each instance will use its own isolated client ID, token, and headers.
+
+```python
+import aanalytics2 as api2
+from concurrent.futures import ThreadPoolExecutor
+
+# Load two independent credential files
+cfg1 = api2.importConfigFile('creds_client1.json', return_object=True)
+cfg2 = api2.importConfigFile('creds_client2.json', return_object=True)
+
+# Option A — via Login (lets you call getCompanyId first)
+login1 = api2.Login(**cfg1)
+login2 = api2.Login(**cfg2)
+analytics1 = login1.createAnalyticsConnection('company_A')
+analytics2 = login2.createAnalyticsConnection('company_B')
+
+# Option B — directly to Analytics (when you already know the companyId)
+analytics1 = api2.Analytics(company_id='company_A', **cfg1)
+analytics2 = api2.Analytics(company_id='company_B', **cfg2)
+
+# Each instance uses its own client_id for token acquisition and API calls.
+# They can safely be used in parallel threads:
+with ThreadPoolExecutor() as pool:
+    f1 = pool.submit(analytics1.getSegments)
+    f2 = pool.submit(analytics2.getSegments)
+    segments1 = f1.result()
+    segments2 = f2.result()
+```
+
+**Memory isolation guarantee:** each `ConfigObj` holds deep-copied config and header dicts, and `AdobeRequest` (the internal connector) deep-copies them again. No credential data is shared between instances.
+
+**Backward compatibility:** the legacy single-credential flow is unchanged:
+```python
+api2.importConfigFile('config.json')   # updates global state
+login = api2.Login()                   # picks up global state
+analytics = api2.Analytics(cid)        # picks up global state
 ```
 
 You instance will have all of the Analytics endpoint wrapped.

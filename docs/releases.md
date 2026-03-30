@@ -3,6 +3,18 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.5.1
+* `importConfigFile` and `configure` accept a new `return_object=True` parameter that returns an isolated `ConfigObj` instance instead of updating global state. This enables loading multiple credential files simultaneously without them overwriting each other.
+* New `ConfigObj` class in `configs.py`: owns deep-copied `config` and `header` dicts, exposes a `config_object` property alias, and supports `**` unpacking so it can be passed directly to `Login` or `Analytics`.
+* `Login.__init__` and `Analytics.__init__` now accept `None` as the default for `config`/`config_object` and `header`, falling back to the global config at call time (backward-compatible). `Analytics` also accepts `config` as an alias for `config_object` to support `**cfg` unpacking from a `ConfigObj`.
+* Token and client_id isolation confirmed: the internal `AdobeRequest` connector deep-copies both the config dict and the header, so each `Analytics` instance manages its own independent token lifecycle.
+
+## version 0.5.0 
+* refactor of the connector.py file to better handle the token generation, refreshing token and retries.
+* refactor of the `getReport2` method to better handle the filters and breakdowns. Also being more robust on the parsing of the data returned by Adobe Analytics API 2.0. 
+* Allow a configObject to be generated from the `configure` method and use it to generate the token for better flexibility.
+
+
 ## version 0.4.4
 * adding the data feed API capabilities
   * getDataFeeds

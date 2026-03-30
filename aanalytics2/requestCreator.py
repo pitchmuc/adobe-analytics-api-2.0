@@ -204,6 +204,47 @@ class RequestCreator:
         ### incrementing the filter counter
         self.__metricFilterCount += 1
 
+    def getMetrics(self)->list:
+        """
+        return a list of the metrics used
+        """
+        return [metric["id"] for metric in self.__request["metricContainer"]["metrics"]]
+    
+    def getGlobalTimeRange(self)->str:
+        """
+        return the dateRange used in the globalFilter if any.
+        """
+        for filter in self.__request["globalFilters"]:
+            if filter["type"] == "dateRange":
+                return filter["dateRange"]
+        return None
+    
+    def getFilters(self) -> list:
+        """
+        return a list of the global filters associated with a metric.
+        Arguments:
+            metricId : REQUIRED : the metric ID to get the filters for.
+        """
+        filters = []
+        for segment in self.__request["globalFilters"]:
+            filters.append(segment)
+        return filters
+    
+    def getMetricFilters(self, metricId: str = None) -> list:
+        """
+        return a list of the filters associated with a metric.
+        Arguments:
+            metricId : REQUIRED : the metric ID to get the filters for.
+        """
+        filters = []
+        for metric in self.__request["metricContainer"]["metrics"]:
+            if metric["id"] == metricId and "filters" in metric.keys():
+                for filterId in metric["filters"]:
+                    for metricFilter in self.__request["metricContainer"]["metricFilters"]:
+                        if filterId == metricFilter["id"]:
+                            filters.append(metricFilter)
+        return filters
+
     def removeMetricFilter(self, filterId: str = None) -> None:
         """
         remove a filter from a metric

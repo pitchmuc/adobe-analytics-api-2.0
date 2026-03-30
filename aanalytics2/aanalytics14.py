@@ -49,10 +49,10 @@ class LegacyAnalytics:
         self.connector = connector.AdobeRequest(config_object=config)
         self.token = self.connector.token
         self.endpoint = "https://api.omniture.com/admin/1.4/rest"
-        self.header = header = {
+        self.header = {
             'Accept': 'application/json',
             'Authorization': f'Bearer {self.token}',
-            'X-ADOBE-DMA-COMPANY': company_name
+            'x-api-key': config.get('client_id')
         }
 
     

@@ -5,35 +5,41 @@ from copy import deepcopy
 # Non standard libraries
 import requests
 import io
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from aanalytics2 import config, token_provider
 
 
 class AdobeRequest:
     """
-    Handle request to Audience Manager and taking care that the request have a valid token set each time.
-    Attributes:
-        restTime : Time to rest before sending new request when reaching too many request status code.
+    Handle requests to the Adobe Analytics API, ensuring a valid OAuth v2 token
+    is present on every call.
+
+    Uses a requests.Session backed by an HTTPAdapter with automatic retry logic
+    (exponential back-off) for 429 and common 5xx transient errors.
     """
+
     loggingEnabled = False
+
     def __init__(self,
                  config_object: dict = config.config_object,
                  header: dict = config.header,
                  verbose: bool = False,
                  retry: int = 0,
-                 loggingEnabled:bool=False,
-                 logger:object=None,
-                 company_id:str=None
-                ) -> None:
+                 loggingEnabled: bool = False,
+                 logger: object = None,
+                 company_id: str = None
+                 ) -> None:
         """
-        Set the connector to be used for handling request to AAM
+        Set the connector to be used for handling requests to Adobe Analytics.
         Arguments:
             config_object : OPTIONAL : Require the importConfig file to have been used.
-            header : OPTIONAL : header of the config modules
-            verbose : OPTIONAL : display comment on the request.
-            retry : OPTIONAL : If you wish to retry failed GET requests
-            loggingEnabled : OPTIONAL : if the logging is enable for that instance.
-            logger : OPTIONAL : instance of the logger created
-            company_id: OPTIONAL : company id to be used for the request
+            header        : OPTIONAL : header dict from the config module.
+            verbose       : OPTIONAL : print request details.
+            retry         : OPTIONAL : minimum number of retries (floor is 3).
+            loggingEnabled: OPTIONAL : enable logging for this instance.
+            logger        : OPTIONAL : logger instance.
+            company_id    : OPTIONAL : global company id header value.
         """
         if config_object['org_id'] == '':
             raise Exception(
@@ -42,221 +48,203 @@ class AdobeRequest:
         self.header = deepcopy(header)
         self.loggingEnabled = loggingEnabled
         self.logger = logger
-        self.restTime = 30
         self.retry = retry
+
         if self.config['token'] == '' or time.time() > self.config['date_limit']:
-            if 'scopes' in self.config.keys() and self.config.get('scopes',None) is not None:
-                self.connectionType = 'oauthV2'
-                token_and_expiry = token_provider.get_oauth_token_and_expiry_for_config(config=self.config, verbose=verbose)
-            elif self.config.get("private_key",None) is not None or self.config.get("pathToKey",None) is not None:
-                self.connectionType = 'jwt'
-                token_and_expiry = token_provider.get_jwt_token_and_expiry_for_config(config=self.config, verbose=verbose)
+            token_and_expiry = token_provider.get_oauth_token_and_expiry_for_config(
+                config=self.config, verbose=verbose)
             token = token_and_expiry['token']
             expiry = token_and_expiry['expiry']
             self.token = token
             if self.loggingEnabled:
-                self.logger.info("token retrieved : {token}")
+                self.logger.info(f"token retrieved : {self.token}")
             self.config['token'] = token
             self.config['date_limit'] = time.time() + expiry - 500
             self.header.update({'Authorization': f'Bearer {token}'})
             self.header.update({'x-proxy-global-company-id': company_id})
+            if self.loggingEnabled:
+                self.logger.info("OAuth v2 token retrieved")
+
+        self.session = self._build_session(retry)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _build_session(self, max_retries: int) -> requests.Session:
+        """
+        Build a requests.Session with an HTTPAdapter configured for retrying
+        on 429 and common 5xx server errors with exponential back-off.
+
+        The adapter honours the ``Retry-After`` response header so the wait
+        time advertised by the server is respected automatically.
+        """
+        session = requests.Session()
+        retry_strategy = Retry(
+            total=max(max_retries, 3),
+            status_forcelist=[429, 500, 502, 503, 504],
+            # Include POST and PATCH so retries apply to all HTTP methods used here
+            allowed_methods={"DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT", "TRACE"},
+            backoff_factor=1,               # waits 0 s, 2 s, 4 s, 8 s … between attempts
+            respect_retry_after_header=True,  # honour Retry-After on 429
+            raise_on_status=False,          # return the last response instead of raising
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        session.headers.update(self.header)
+        return session
 
     def _checkingDate(self) -> None:
         """
-        Checking if the token is still valid
+        Verify the OAuth v2 token is still valid; refresh it if it has expired.
+        Also syncs the updated Authorization header into the active session.
         """
-        now = time.time()
-        if now > self.config['date_limit']:
+        if time.time() > self.config['date_limit']:
             if self.loggingEnabled:
-                self.logger.warning("token expired. Trying to retrieve a new token")
-            if self.connectionType =='oauthV2':
-                token_and_expiry = token_provider.get_oauth_token_and_expiry_for_config(config=self.config)
-            elif self.connectionType == 'jwt':
-                token_and_expiry = token_provider.get_jwt_token_and_expiry_for_config(config=self.config)
+                self.logger.warning("OAuth v2 token expired — retrieving a new one")
+            token_and_expiry = token_provider.get_oauth_token_and_expiry_for_config(
+                config=self.config)
             token = token_and_expiry['token']
-            if self.loggingEnabled:
-                self.logger.info(f"new token retrieved : {token}")
             self.config['token'] = token
+            self.token = token
             self.config['date_limit'] = time.time() + token_and_expiry['expiry'] - 500
-            self.header.update({'Authorization': f'Bearer {token}'})
+            updated_auth = {'Authorization': f'Bearer {token}'}
+            self.header.update(updated_auth)
+            self.session.headers.update(updated_auth)
+            if self.loggingEnabled:
+                self.logger.info("New OAuth v2 token applied")
+
+    # ------------------------------------------------------------------
+    # HTTP verb abstractions
+    # ------------------------------------------------------------------
 
     def getData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, *args, **kwargs):
         """
-        Abstraction for getting data
+        Abstraction for GET requests.
         """
-        internRetry = kwargs.get("retry",  self.retry)
         self._checkingDate()
         if self.loggingEnabled:
-            self.logger.info(f"endpoint: {endpoint}")
+            self.logger.info(f"GET endpoint: {endpoint}")
             self.logger.info(f"params: {params}")
-        if headers is None:
-            headers = self.header
-        if params is None and data is None:
-            res = requests.get(
-                endpoint, headers=headers)
-        elif params is not None and data is None:
-            res = requests.get(
-                endpoint, headers=headers, params=params)
-        elif params is None and data is not None:
-            res = requests.get(
-                endpoint, headers=headers, data=data)
-        elif params is not None and data is not None:
-            res = requests.get(endpoint, headers=headers, params=params, data=data)
+        request_headers = headers if headers is not None else self.header
+        res = self.session.get(endpoint, headers=request_headers, params=params, data=data)
         if kwargs.get("verbose", False):
             print(f"request URL : {res.request.url}")
-            print(f"statut_code : {res.status_code}")
+            print(f"status_code : {res.status_code}")
         try:
-            while str(res.status_code) == "429":
-                if kwargs.get("verbose", False):
-                    print(f'Too many requests: retrying in {self.restTime} seconds')
-                if self.loggingEnabled:
-                    self.logger.info(f"Too many requests: retrying in {self.restTime} seconds")
-                time.sleep(self.restTime)
-                res = requests.get(endpoint, headers=headers, params=params, data=data)
             res_json = res.json()
-        except:
-            ## handling 1.4 and classification
+        except Exception:
             if self.loggingEnabled:
-                self.logger.warning(f"handling exception as res.json() cannot be managed")
+                self.logger.warning("res.json() could not be parsed")
                 self.logger.warning(f"status code: {res.status_code}")
-            if kwargs.get('classFile'): ## reading classification files
+            if kwargs.get('classFile'):  # reading newline-delimited JSON classification files
                 text = res.text
-                textIO = io.StringIO(text)
-                list_lines = list(textIO.readlines())
-                data = []
-                for line in list_lines:
-                    data.append(json.loads(line.strip()))
-                return data
-            elif kwargs.get('legacy',False): ## handling 1.4
+                result = []
+                for line in io.StringIO(text).readlines():
+                    result.append(json.loads(line.strip()))
+                return result
+            elif kwargs.get('legacy', False):  # handling Analytics 1.4
                 try:
                     return json.loads(res.text)
-                except:
+                except Exception:
                     if self.loggingEnabled:
                         self.logger.error(f"GET method failed: {res.status_code}, {res.text}")
                     return res.text
             else:
                 if self.loggingEnabled:
-                    self.logger.error(f"text: {res.text}")
+                    self.logger.error(f"GET response text: {res.text}")
             res_json = {'error': 'Request Error'}
-            while internRetry > 0:
-                if self.loggingEnabled:
-                    self.logger.warning(f"Trying again with internal retry")
-                if kwargs.get("verbose", False):
-                    print('Retry parameter activated')
-                    print(f'{internRetry} retry left')
-                if 'error' in res_json.keys():
-                    time.sleep(self.restTime)
-                    kwargs["retry"] = internRetry - 1
-                    res_json = self.getData(endpoint, params=params, data=data, headers=headers, **kwargs)
-                    return res_json
         return res_json
 
-    def postData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, files:dict=None, *args, **kwargs):
+    def postData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, files: dict = None, *args, **kwargs):
         """
-        Abstraction for posting data
+        Abstraction for POST requests.
         """
         self._checkingDate()
         if params is None:
             params = {}
-        if headers is None:
-            headers = self.header
+        request_headers = headers if headers is not None else self.header
         if data is None and files is None:
-            res = requests.post(endpoint, headers=headers,params=params)
+            res = self.session.post(endpoint, headers=request_headers, params=params)
         elif data is not None and files is None:
-            res = requests.post(endpoint, headers=headers, data=json.dumps(data),params=params)
+            res = self.session.post(endpoint, headers=request_headers, data=json.dumps(data), params=params)
         elif data is None and files is not None:
-            res = requests.post(endpoint, headers=headers, params=params, files=files)
-        elif data is not None and files is not None:
-            res = requests.post(endpoint, headers=headers, params=params, data=json.dumps(data), files=files)
+            res = self.session.post(endpoint, headers=request_headers, params=params, files=files)
+        else:
+            res = self.session.post(endpoint, headers=request_headers, params=params, data=json.dumps(data), files=files)
         try:
             res_json = res.json()
-            if res.status_code == 429 or res_json.get('error_code', None) == "429050":
+            if res.status_code == 429 or res_json.get('error_code') == "429050":
                 res_json['status_code'] = 429
-        except:
-            ## handling 1.4
-            if kwargs.get('legacy',False):
+        except Exception:
+            if kwargs.get('legacy', False):  # handling Analytics 1.4
                 try:
                     return json.loads(res.text)
-                except:
+                except Exception:
                     if self.loggingEnabled:
                         self.logger.error(f"POST method failed: {res.status_code}, {res.text}")
                     return res.text
-            if type(res) == dict:
-                res_json = {'error': res.get('status_code','Request Error')}
-            else:
-                res_json = res
+            res_json = {'error': 'Request Error'}
         return res_json
 
-    def patchData(self, endpoint: str, params: dict = None, data:dict = None, headers: dict = None, files : dict = None,  *args, **kwargs):
+    def patchData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, files: dict = None, *args, **kwargs):
         """
-        Abstraction for patching data
+        Abstraction for PATCH requests.
         """
         self._checkingDate()
-        if headers is None:
-            headers = self.header
+        request_headers = headers if headers is not None else self.header
         if params is not None and data is None and files is None:
-            res = requests.patch(endpoint, headers=headers, params=params)
+            res = self.session.patch(endpoint, headers=request_headers, params=params)
         elif params is None and data is not None and files is None:
-            res = requests.patch(endpoint, headers=headers, data=json.dumps(data))
+            res = self.session.patch(endpoint, headers=request_headers, data=json.dumps(data))
         elif params is not None and data is not None and files is None:
-            res = requests.patch(endpoint, headers=headers, params=params, data=json.dumps(data))
-        elif files is not None:
-            res = requests.patch(endpoint, headers=headers, params=params, files=files)
+            res = self.session.patch(endpoint, headers=request_headers, params=params, data=json.dumps(data))
+        else:
+            res = self.session.patch(endpoint, headers=request_headers, params=params, files=files)
         try:
-            while str(res.status_code) == "429":
-                if kwargs.get("verbose", False):
-                    print(f'Too many requests: retrying in {self.restTime} seconds')
-                time.sleep(self.restTime)
-                res = requests.patch(endpoint, headers=headers, params=params,data=json.dumps(data))
             res_json = res.json()
-        except:
+        except Exception:
             if self.loggingEnabled:
                 self.logger.error(f"PATCH method failed: {res.status_code}, {res.text}")
-            res_json = {'error': res.get('status_code','Request Error')}
+            res_json = {'error': 'Request Error'}
         return res_json
 
-    def putData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, files:dict=None,*args, **kwargs):
+    def putData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, files: dict = None, *args, **kwargs):
         """
-        Abstraction for putting data
+        Abstraction for PUT requests.
         """
         self._checkingDate()
-        if headers is None:
-            headers = self.header
+        request_headers = headers if headers is not None else self.header
         if params is not None and data is None and files is None:
-            res = requests.put(endpoint, headers=headers, params=params)
+            res = self.session.put(endpoint, headers=request_headers, params=params)
         elif params is None and data is not None and files is None:
-            res = requests.put(endpoint, headers=headers, data=json.dumps(data))
+            res = self.session.put(endpoint, headers=request_headers, data=json.dumps(data))
         elif params is not None and data is not None and files is None:
-            res = requests.put(endpoint, headers=headers, params=params, data=json.dumps(data=data))
-        elif files is not None:
-            res = requests.put(endpoint, headers=headers, params=params, files=files)
+            res = self.session.put(endpoint, headers=request_headers, params=params, data=json.dumps(data))
+        else:
+            res = self.session.put(endpoint, headers=request_headers, params=params, files=files)
         try:
             status_code = res.json()
-        except:
+        except Exception:
             if self.loggingEnabled:
                 self.logger.error(f"PUT method failed: {res.status_code}, {res.text}")
-            status_code = {'error': res.get('status_code','Request Error')}
+            status_code = {'error': 'Request Error'}
         return status_code
 
     def deleteData(self, endpoint: str, params: dict = None, headers: dict = None, *args, **kwargs):
         """
-        Abstraction for deleting data
+        Abstraction for DELETE requests.
         """
         self._checkingDate()
-        if headers is None:
-            headers = self.header
+        request_headers = headers if headers is not None else self.header
         if params is None:
-            res = requests.delete(endpoint, headers=headers)
-        elif params is not None:
-            res = requests.delete(endpoint, headers=headers, params=params)
+            res = self.session.delete(endpoint, headers=request_headers)
+        else:
+            res = self.session.delete(endpoint, headers=request_headers, params=params)
         try:
-            while str(res.status_code) == "429":
-                if kwargs.get("verbose", False):
-                    print(f'Too many requests: retrying in {self.restTime} seconds')
-                time.sleep(self.restTime)
-                res = requests.delete(endpoint, headers=headers, params=params)
             status_code = res.status_code
-        except:
+        except Exception:
             if self.loggingEnabled:
                 self.logger.error(f"DELETE method failed: {res.status_code}, {res.text}")
             status_code = {'error': 'Request Error'}

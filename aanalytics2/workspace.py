@@ -45,9 +45,9 @@ class Workspace:
                 self.startDate = filter["dateRange"].split("/")[0]
                 self.endDate = filter["dateRange"].split("/")[1]
         self.dataRequest = RequestCreator(dataRequest)
-        self.requestSize = dataRequest["settings"]["limit"]
-        self.settings = dataRequest["settings"]
-        self.pageRequested = dataRequest["settings"]["page"] + 1
+        self.requestSize = dataRequest.get("settings", {}).get("limit")
+        self.settings = dataRequest.get("settings", {})
+        self.pageRequested = dataRequest.get("settings", {}).get("page", 0) + 1
         self.summaryData = summaryData
         self.reportType = reportType
         self.analyticsObject = analyticsConnector
@@ -103,7 +103,8 @@ class Workspace:
                             segName = seg.get("name",metric)
                             metricResolvedName.append(segName)
                         elif metric.startswith("metrics/"):
-                            metricName = rsMetricsList[rsMetricsList["id"] == metric]["name"].iloc[0]
+                            matched = rsMetricsList[rsMetricsList["id"] == metric]["name"]
+                            metricName = matched.iloc[0] if not matched.empty else metric
                             metricResolvedName.append(metricName)
                         else:
                             metricResolvedName.append(metric)

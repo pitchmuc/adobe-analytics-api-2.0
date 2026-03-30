@@ -119,12 +119,45 @@ This option will be set for every GET method in your instance.
 
 ```python
 
-mycompany = api2.Analytics(cid,retry=3)
+mycompany = api2.Analytics(cid, retry=3)
 
 # new method directly in the Login class
-mycompany = loggin.createAnalyticsConnection(cid,retry=3)
+mycompany = login.createAnalyticsConnection(cid, retry=3)
 
 ```
+
+### Multi-credential setup (several API keys in parallel)
+
+If you need to connect to Adobe Analytics with **different credentials** (e.g. different client IDs / API keys) at the same time, use `return_object=True` when importing each config file.\
+This returns an isolated `ConfigObj` instance that carries its own copy of the credentials and header, with no shared memory between instances.
+
+```python
+import aanalytics2 as api2
+from concurrent.futures import ThreadPoolExecutor
+
+# Load each credential file into an independent ConfigObj
+cfg1 = api2.importConfigFile('creds_client1.json', return_object=True)
+cfg2 = api2.importConfigFile('creds_client2.json', return_object=True)
+
+# Option A — via Login (use when you need to call getCompanyId first)
+login1 = api2.Login(**cfg1)
+login2 = api2.Login(**cfg2)
+company1 = login1.createAnalyticsConnection('company_A')
+company2 = login2.createAnalyticsConnection('company_B')
+
+# Option B — directly to Analytics (use when you already know the companyId)
+company1 = api2.Analytics(company_id='company_A', **cfg1)
+company2 = api2.Analytics(company_id='company_B', **cfg2)
+
+# Both instances can be used concurrently — each manages its own token lifecycle
+with ThreadPoolExecutor() as pool:
+    f1 = pool.submit(company1.getSegments)
+    f2 = pool.submit(company2.getSegments)
+    segments1 = f1.result()
+    segments2 = f2.result()
+```
+
+**Note**: the classic single-credential flow (`importConfigFile` → `Login()` → `Analytics(cid)`) is unchanged and fully backward-compatible.
 
 ## 6. Use the methods in your instance
 

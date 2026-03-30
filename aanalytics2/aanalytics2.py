@@ -14,28 +14,13 @@ import logging
 import pandas as pd
 from urllib import parse
 
-from aanalytics2 import config, connector, token_provider
+from aanalytics2 import config as config_module, connector, token_provider
 from .projects import *
 from .requestCreator import RequestCreator
 from .workspace import Workspace
 
 JsonOrDataFrameType = Union[pd.DataFrame, dict]
 JsonListOrDataFrameType = Union[pd.DataFrame, List[dict]]
-
-
-def retrieveToken(verbose: bool = False, save: bool = False, **kwargs) -> str:
-    """
-    LEGACY retrieve token directly following the importConfigFile or Configure method.
-    """
-    token_with_expiry = token_provider.get_jwt_token_and_expiry_for_config(config.config_object, **kwargs)
-    token = token_with_expiry['token']
-    config.config_object['token'] = token
-    config.config_object['date_limit'] = time.time() + token_with_expiry['expiry'] / 1000 - 500
-    config.header.update({'Authorization': f'Bearer {token}'})
-    if verbose:
-        print(f"token valid till : {time.ctime(time.time() + token_with_expiry['expiry'] / 1000)}")
-    return token
-
 
 class Login:
     """
@@ -44,16 +29,20 @@ class Login:
     loggingEnabled = False
     logger = None
 
-    def __init__(self, config: dict = config.config_object, header: dict = config.header, retry: int = 0,
+    def __init__(self, config: dict = None, header: dict = None, retry: int = 0,
                  loggingObject: dict = None) -> None:
         """
         Instantiate the Loggin class.
         Arguments:
-            config : REQUIRED : dictionary with your configuration information.
-            header : REQUIRED : dictionary of your header.
+            config : REQUIRED : dictionary with your configuration information. Falls back to global config.
+            header : REQUIRED : dictionary of your header. Falls back to global header.
             retry : OPTIONAL : if you want to retry, the number of time to retry
             loggingObject : OPTIONAL : If you want to set logging capability for your actions.
         """
+        if config is None:
+            config = config_module.config_object
+        if header is None:
+            header = config_module.header
         if loggingObject is not None and sorted(["level", "stream", "format", "filename", "file"]) == sorted(
                 list(loggingObject.keys())):
             self.loggingEnabled = True
@@ -139,8 +128,9 @@ class Analytics:
 
     def __init__(self, 
                  company_id: str = None,
-                 config_object: dict = config.config_object, 
-                 header: dict = config.header,
+                 config_object: dict = None,
+                 config: dict = None,
+                 header: dict = None,
                  retry: int = 0, 
                  loggingObject: dict = None):
         """
@@ -152,12 +142,18 @@ class Analytics:
             company_id : REQUIRED : company ID retrieved by the getCompanyId
             retry : OPTIONAL : Number of time you want to retrieve fail calls
             loggingObject : OPTIONAL : logging object to log actions during runtime.
-            config_object : OPTIONAL : config object to be used for setting token (do not update if you do not know)
-            header : OPTIONAL : template header used for all requests (do not update if you do not know!)
+            config_object : OPTIONAL : config dict to be used for setting token. Falls back to the global config.
+            config : OPTIONAL : alias for config_object; used when unpacking a ConfigObj via **cfg.
+            header : OPTIONAL : header dict for all requests. Falls back to the global header.
         """
         if company_id is None:
             raise AttributeError(
                 'Expected "company_id" to be referenced.\nPlease ensure you pass the globalCompanyId when instantiating this class.')
+        # Resolve config: explicit config_object > config alias (from ConfigObj unpacking) > global default
+        if config_object is None:
+            config_object = config if config is not None else config_module.config_object
+        if header is None:
+            header = config_module.header
         if loggingObject is not None and sorted(["level", "stream", "format", "filename", "file"]) == sorted(
                 list(loggingObject.keys())):
             self.loggingEnabled = True
@@ -4597,6 +4593,7 @@ class Analytics:
             raise ValueError("Require a JSON or Dictionary to request data")
         ### Settings
         dataRequest = deepcopy(dataRequest)
+        dataRequest.setdefault("settings", {})
         dataRequest["settings"]["page"] = 0
         dataRequest["settings"]["limit"] = limit
         if returnsNone:
@@ -4614,7 +4611,7 @@ class Analytics:
         if rsid is not None:
             dataRequest["rsid"] = rsid
         if ignoreZeroes:
-            dataRequest.get("statistics", {'ignoreZeroes': True})["ignoreZeroes"] = True
+            dataRequest.setdefault("statistics", {})["ignoreZeroes"] = True
         deepCopyRequest = deepcopy(dataRequest)
         ### Request data
         if self.loggingEnabled:
@@ -4622,14 +4619,18 @@ class Analytics:
         res = self.connector.postData(
             self.endpoint_company + path, data=dataRequest, params=params
         )
+        if "errorCode" in res or "error" in res:
+            error_code = res.get("errorCode", res.get("error", "unknown"))
+            error_msg = res.get("errorDescription", res.get("message", ""))
+            raise RuntimeError(f"Analytics API returned an error: {error_code} — {error_msg}")
         if "rows" in res.keys():
             reportType = "normal"
             if self.loggingEnabled:
                 self.logger.debug(f"reportType: {reportType}")
-            dataRows = res.get("rows")
+            dataRows = res.get("rows", [])
             columns = res.get("columns")
             summaryData = res.get("summaryData")
-            totalElements = res.get("numberOfElements")
+            totalElements = res.get("numberOfElements", 0)
             lastPage = res.get("lastPage", True)
             if float(len(dataRows)) >= float(n_results):
                 ## force end of loop when a limit is set on n_results
@@ -4639,9 +4640,16 @@ class Analytics:
                 res = self.connector.postData(
                     self.endpoint_company + path, data=dataRequest, params=params
                 )
-                dataRows += res.get("rows")
+                if "errorCode" in res or "error" in res:
+                    error_code = res.get("errorCode", res.get("error", "unknown"))
+                    error_msg = res.get("errorDescription", res.get("message", ""))
+                    raise RuntimeError(f"Analytics API returned an error on page {dataRequest['settings']['page']}: {error_code} — {error_msg}")
+                page_rows = res.get("rows")
+                if page_rows is None:
+                    raise RuntimeError(f"Analytics API returned no rows on page {dataRequest['settings']['page']}. Full response: {res}")
+                dataRows += page_rows
                 lastPage = res.get("lastPage", True)
-                totalElements += res.get("numberOfElements")
+                totalElements += res.get("numberOfElements", 0)
                 if float(len(dataRows)) >= float(n_results):
                     ## force end of loop when a limit is set on n_results
                     lastPage = True
@@ -4666,14 +4674,16 @@ class Analytics:
                 if filter["type"] == "breakdown":
                     filterValue = f"{filter['dimension']}:{filter['itemId']}"
                     metricFilters[filter["dimension"]] = filter["itemId"]
-                if filter["type"] == "dateRange":
+                elif filter["type"] == "dateRange":
                     filterValue = f"{filter['dateRange']}"
                     metricFilters[filterValue] = filterValue
-                if filter["type"] == "segment":
+                elif filter["type"] == "segment":
                     filterValue = f"{filter['segmentId']}"
                     if filterValue.startswith("s") and "@AdobeOrg" in filterValue:
                         seg = self.getSegment(filterValue)
                         metricFilters[filterValue] = seg["name"]
+                else:
+                    filterValue = filterId  ## fallback: use the filter id itself
                 metricFilterTranslation[filterId] = filterValue
             metricColumns = {}
             for colId in columnIdRelations.keys():
