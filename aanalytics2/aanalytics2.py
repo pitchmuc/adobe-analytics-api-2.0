@@ -1218,17 +1218,26 @@ class Analytics:
         if extended_info:
             params.update(
                 {'expansion': 'definition,ownerFullName,modified,tags'})
-        dateRanges = self.connector.getData(
-            self.endpoint_company + self._getDateRanges,
-            params=params,
-            headers=self.header,
-            verbose=verbose
-        )
-        data = dateRanges['content']
-        df_dates = pd.DataFrame(data)
+        all_data = []
+        page = params.get('page', 0)
+        while True:
+            params['page'] = page
+            dateRanges = self.connector.getData(
+                self.endpoint_company + self._getDateRanges,
+                params=params,
+                headers=self.header,
+                verbose=verbose
+            )
+            all_data.extend(dateRanges['content'])
+            if dateRanges.get('lastPage', True):
+                break
+            page += 1
+        
+        df_dates = pd.DataFrame(all_data)
         if save:
             df_dates.to_csv('date_range.csv', index=False)
         return df_dates
+
     
     def createDateRange(self,dateRangeJSON: dict = None) -> dict:
         """
