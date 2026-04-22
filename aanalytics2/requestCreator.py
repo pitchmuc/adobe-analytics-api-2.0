@@ -143,7 +143,7 @@ class RequestCreator:
         """
         Add a filter to a metric.
         Arguments:
-            metricId : REQUIRED : metric where the filter is added
+            metricId : REQUIRED : metric where the filter is added. Use "all" to add the filter to all metrics.
             filterId : REQUIRED : The filter to add.
                 when breakdown, use the following format for the value "dimension:::itemId"
             metricIndex : OPTIONAL : If used, set the filter to the metric located on that index.
@@ -189,12 +189,19 @@ class RequestCreator:
             self.__request["metricContainer"]["metricFilters"].append(filter)
         ### adding filter to the metric
         if metricIndex is None:
-            for metric in self.__request["metricContainer"]["metrics"]:
-                if metric["id"] == metricId:
+            if metricId == "all":
+                for metric in self.__request["metricContainer"]["metrics"]:
                     if "filters" in metric.keys():
                         metric["filters"].append(str(filterIdCount))
                     else:
                         metric["filters"] = [str(filterIdCount)]
+            else:
+                for metric in self.__request["metricContainer"]["metrics"]:
+                    if metric["id"] == metricId:
+                        if "filters" in metric.keys():
+                            metric["filters"].append(str(filterIdCount))
+                        else:
+                            metric["filters"] = [str(filterIdCount)]
         else:
             metric = self.__request["metricContainer"]["metrics"][metricIndex]
             if "filters" in metric.keys():

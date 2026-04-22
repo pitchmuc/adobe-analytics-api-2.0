@@ -1,6 +1,6 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
-import json, os, re
+import json, os, re, math
 import time, datetime
 from concurrent import futures
 from copy import deepcopy
@@ -14,13 +14,81 @@ import logging
 import pandas as pd
 from urllib import parse
 
-from aanalytics2 import config as config_module, connector, token_provider
-from .projects import *
-from .requestCreator import RequestCreator
-from .workspace import Workspace
+from aanalytics2 import config as config_module, connector
+from aanalytics2.projects import *
+from aanalytics2.requestCreator import RequestCreator
+from aanalytics2.workspace import Workspace, TargetWorkspace
 
 JsonOrDataFrameType = Union[pd.DataFrame, dict]
 JsonListOrDataFrameType = Union[pd.DataFrame, List[dict]]
+
+
+def _betacf(a: float, b: float, x: float, max_iter: int = 200, eps: float = 3e-7) -> float:
+    """Lentz continued-fraction evaluation of the incomplete beta function."""
+    qab = a + b
+    qap = a + 1.0
+    qam = a - 1.0
+    c = 1.0
+    d = 1.0 - qab * x / qap
+    if abs(d) < 1e-30:
+        d = 1e-30
+    d = 1.0 / d
+    h = d
+    for m in range(1, max_iter + 1):
+        m2 = 2 * m
+        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+        d = 1.0 + aa * d
+        if abs(d) < 1e-30:
+            d = 1e-30
+        c = 1.0 + aa / c
+        if abs(c) < 1e-30:
+            c = 1e-30
+        d = 1.0 / d
+        h *= d * c
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
+        d = 1.0 + aa * d
+        if abs(d) < 1e-30:
+            d = 1e-30
+        c = 1.0 + aa / c
+        if abs(c) < 1e-30:
+            c = 1e-30
+        d = 1.0 / d
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < eps:
+            break
+    return h
+
+
+def _betai(a: float, b: float, x: float) -> float:
+    """Regularized incomplete beta function I_x(a, b)."""
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    lbeta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
+    if x < (a + 1.0) / (a + b + 2.0):
+        front = math.exp(a * math.log(x) + b * math.log(1.0 - x) - lbeta) / a
+        return front * _betacf(a, b, x)
+    else:
+        front = math.exp(b * math.log(1.0 - x) + a * math.log(x) - lbeta) / b
+        return 1.0 - front * _betacf(b, a, 1.0 - x)
+
+
+def _t_pvalue(t: float, df: float, evaluation: str) -> float:
+    """P-value of Welch's t-statistic using the regularized incomplete beta function."""
+    x = df / (df + t * t)
+    # I_x(df/2, 0.5) is the two-tailed p-value
+    two_tail = _betai(df / 2.0, 0.5, x)
+    if evaluation == '2sides':
+        return two_tail
+    elif evaluation == 'rightOneSided':
+        return two_tail / 2.0 if t <= 0 else 1.0 - two_tail / 2.0
+    elif evaluation == 'leftOneSided':
+        return two_tail / 2.0 if t >= 0 else 1.0 - two_tail / 2.0
+    else:
+        raise ValueError("evaluation must be '2sides', 'leftOneSided', or 'rightOneSided'")
+
 
 class Login:
     """
@@ -657,7 +725,7 @@ class Analytics:
             df_dims.to_csv(f'dimensions_{rsid}.csv')
         return df_dims
 
-    def getMetrics(self, rsid: str, tags: bool = False, save=False, description: bool = False, dataGroup: bool = False,
+    def getMetrics(self, rsid: str, tags: bool = False, save=False, description: bool = False, dataGroup: bool = False, format:str='df',
                    **kwargs) -> pd.DataFrame:
         """
         Retrieve the list of metrics from a specific reportSuite. Shrink columns to simplify output.
@@ -668,6 +736,7 @@ class Analytics:
             dataGroup : OPTIONAL : Adding dataGroups to the column exported. Default False.
                 May break the report.
             save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
+            format : OPTIONAL : Specify the type of format to return, default "df" for dataframe, other options "raw" for a list.
         Possible kwargs:
             full : Boolean : Doesn't shrink the number of columns if set to true.
         """
@@ -678,26 +747,33 @@ class Analytics:
             params.update({'expansion': 'tags'})
         params.update({'rsid': rsid})
         metrics = self.connector.getData(self.endpoint_company +
-                                         self._getMetrics, params=params, headers=self.header)
-        df_metrics = pd.DataFrame(metrics)
-        columns = ['id', 'name', 'category', 'type',
-                   'precision', 'segmentable']
-        if dataGroup:
-            columns.append('dataGroup')
-        if description:
-            columns.append('description')
-        if kwargs.get('full', False):
-            new_cols = pd.DataFrame(df_metrics.support.values.tolist(),
-                                    columns=['support_oberon', 'support_dw', 'support_realtime'])
-            new_df = df_metrics.merge(
-                new_cols, right_index=True, left_index=True)
-            new_df.drop('support', axis=1, inplace=True)
-            df_metrics = new_df
-        else:
-            df_metrics = df_metrics[columns]
+                                         self._getMetrics, 
+                                         params=params, 
+                                         headers=self.header)
+        if format == "df":
+            metrics = pd.DataFrame(metrics)
+            columns = ['id', 'name', 'category', 'type',
+                    'precision', 'segmentable']
+            if dataGroup:
+                columns.append('dataGroup')
+            if description:
+                columns.append('description')
+            if kwargs.get('full', False):
+                new_cols = pd.DataFrame(metrics.support.values.tolist(),
+                                        columns=['support_oberon', 'support_dw', 'support_realtime'])
+                new_df = metrics.merge(
+                    new_cols, right_index=True, left_index=True)
+                new_df.drop('support', axis=1, inplace=True)
+                metrics = new_df
+            else:
+                metrics = metrics[columns]
         if save:
-            df_metrics.to_csv(f'metrics_{rsid}.csv', sep='\t')
-        return df_metrics
+            if format == 'df':
+                metrics.to_csv(f'metrics_{rsid}.csv', sep='\t')
+            elif format == 'raw':
+                with open(f'metrics_{rsid}.json','w') as f:
+                    json.dump(metrics,f)
+        return metrics
 
     def getUsers(self, format:str='df',save: bool = False, **kwargs) -> pd.DataFrame:
         """
@@ -4552,6 +4628,8 @@ class Analytics:
             resolveColumns: bool = True,
             save: bool = False,
             returnClass: bool = True,
+            workspaceClass: type = None,
+            workspaceKwargs: dict = None,
     ) -> Union[Workspace, dict]:
         """
         Return an instance of Workspace that contains the data requested.
@@ -4571,6 +4649,9 @@ class Analytics:
             resolveColumns: OPTIONAL : automatically resolve columns from ID to name for calculated metrics & segments. Default True. (works on returnClass only)
             save : OPTIONAL : If you want to save the data (in JSON or CSV, depending the class is used or not)
             returnClass : OPTIONAL : return the class building dataframe and better comprehension of data. (default yes)
+        kwargs:
+        * workspaceClass : OPTIONAL : class to instantiate instead of Workspace (e.g. TargetWorkspace). Must share the same __init__ signature.
+        * workspaceKwargs : OPTIONAL : additional keyword arguments forwarded to workspaceClass.__init__ beyond the standard Workspace parameters.
         """
         if self.loggingEnabled:
             self.logger.debug(f"Start getReport")
@@ -4582,6 +4663,8 @@ class Analytics:
             "includeOberonXml": includeOberonXml,
             "includePlatformPredictiveObjects": includePredictiveObjects,
         }
+        workspaceClass = workspaceClass if workspaceClass is not None else Workspace
+        workspaceKwargs = workspaceKwargs if workspaceKwargs is not None else {}
         if type(request) == dict:
             dataRequest = request
         elif isinstance(request, RequestCreator):
@@ -4735,7 +4818,8 @@ class Analytics:
             if self.loggingEnabled:
                 self.logger.debug(f"returning Workspace class")
             ## Using the class
-            data = Workspace(
+            klass = workspaceClass if workspaceClass is not None else Workspace
+            data = klass(
                 responseData=preparedData,
                 dataRequest=deepCopyRequest,
                 columns=columns,
@@ -4745,7 +4829,134 @@ class Analytics:
                 metrics=metricColumns,  ## for normal type   ## for staticReport
                 metricFilters=metricFilters,
                 resolveColumns=resolveColumns,
+                **(workspaceKwargs or {}),
             )
             if save:
                 data.to_csv()
             return data
+
+
+    def getTargetReport(self,
+                        activity:str=None,
+                        timeframe:str=None,
+                        rsid:str=None,
+                        metrics:list=None,
+                        segments:list=None,
+                        confidenceLevel:float=0.95,
+                        evaluation:str='2sides',
+                        controlGroup:str=None,
+                        method:str='z-test',
+                        **kwargs
+                        )->"TargetWorkspace":
+        """
+        Build a report for target activities.
+        It will return a TargetWorkspace instance containing the experience-level data,
+        confidence/significance columns, and methods for conversion rate and uplift analysis.
+        Arguments:
+            activity : REQUIRED : The name of the activity you want to retrieve. If multiple activities have the same name, it will take the most recent one.
+            timeframe : REQUIRED : The timeframe for which you want to retrieve the data. It should be in format "YYYY-MM-DD/YYYY-MM-DD"
+            rsid : REQUIRED : The report suite ID to be used
+            metrics : REQUIRED : List of metrics Ids you want to retrieve such as ["metrics/event1","cm_12321"]
+                if the metric is a calculated metric, you can also use the name of the metric instead of the ID. 
+                In that case, the function will look for the metric with that name and use its ID. If multiple metrics have the same name, it will take the most recent one.
+            segments : OPTIONAL : If you wish to add a segments to your reporting.
+                Either a list of segment Ids or list of name of segments. 
+                if segment name is used, the function will look for the segment with that name and use its ID. If multiple segments have the same name, it will take the most recent one.
+            confidenceLevel : OPTIONAL : confidence level threshold used to determine statistical significance (default 0.95)
+            evaluation : OPTIONAL : "leftOneSided", "rightOneSided" or "2sides" (default "2sides")
+            controlGroup : OPTIONAL : Name of the experience to use as the control group.
+                If not provided, the experience whose name contains "default" (case-insensitive) is used.
+                Note: confidence is computed when at least 2 metrics are provided.
+                The first metric is used as the base exposure count (N) and each subsequent metric as a conversion count.
+                e.g. metrics=["metrics/vists","My Calculated Metrics"] -> rate = Web Requests / occurrences
+                e.g. metrics=["metrics/uniquevisitors","cm_1232214","other_metric"] -> rate = other_metric
+            method : OPTIONAL : Statistical test used to compute confidence.
+                "z-test" (default) : two-proportion Z-test with pooled variance. Reliable for large sample sizes.
+                "t-test" : Welch's t-test with unpooled variance. More robust when groups have different sizes or rates.
+        """
+        if activity is None:
+            raise ValueError("Require an activity name")
+        if timeframe is None:
+            raise ValueError("Require a timeframe")
+        elif timeframe.count("/") != 1:
+            raise ValueError("timeframe should be in format 'YYYY-MM-DDT00:00:00.000//YYYY-MM-DDT00:00:00.000'")
+        if rsid is None:
+            raise ValueError("Require a report suite ID")
+        if metrics is None:
+            raise ValueError("Require a list of metrics")
+        api_call_count = 0
+        global_request = RequestCreator()
+        global_request.setRSID(rsid)
+        global_request.addGlobalFilter(timeframe)
+        global_request.setDimension('variables/targetraw.activity')
+        all_metrics = None
+        for metric in metrics:
+            if metric.startswith("metrics/") or metric.startswith("cm_"):
+                global_request.addMetric(metric)
+            else:
+                if all_metrics is None:
+                    all_metrics = []
+                    all_metrics += self.getMetrics(rsid=rsid, format="raw")
+                    all_metrics += self.getCalculatedMetrics(format="raw")
+                    api_call_count += 2
+                my_metric = [met['id'] for met in all_metrics if met["name"] == metric]
+                if len(my_metric) == 0:
+                    raise ValueError(f"metric {metric} not found")
+                global_request.addMetric(my_metric[0])
+        all_segments = None
+        for segment in segments or []:
+            if segment.startswith("s_") and "@AdobeOrg" in segment:
+                global_request.addGlobalFilter(segment)
+            else:
+                if all_segments is None:
+                    all_segments = []
+                    all_segments += self.getSegments(format="raw")
+                    api_call_count += 1
+                my_segment = [seg['id'] for seg in all_segments if seg["name"] == segment]
+                if len(my_segment) == 0:
+                    raise ValueError(f"segment {segment} not found")
+                global_request.addGlobalFilter(my_segment[0])
+        reportActivities = self.getReport2(global_request, returnClass=True)
+        api_call_count += 1
+        df_activities = reportActivities.dataframe.copy()
+        itemId = df_activities.loc[df_activities["variables/targetraw.activity"] == activity, "itemId"].values[0]
+        ## ensuring which experiences exist for that activity
+        activty_breakdown = reportActivities.breakdown(index=activity, dimension='variables/targetraw.activityexperience')
+        api_call_count += 1
+        df_breakdown = activty_breakdown.dataframe.copy()
+        ### elements expected in the final result
+        list_items = [el.split('> ').pop() for el in df_breakdown['variables/targetraw.activityexperience'].to_list()]
+        report_activities = RequestCreator()
+        report_activities.setRSID(rsid)
+        report_activities.setDimension('variables/targetraw.experience')
+        for metric in metrics:
+            if metric.startswith("metrics/") or metric.startswith("cm_"):
+                report_activities.addMetric(metric)
+            else:
+                if all_metrics is None:
+                    all_metrics = []
+                    all_metrics += self.getMetrics(rsid=rsid, format="raw")
+                    all_metrics += self.getCalculatedMetrics(format="raw")
+                    api_call_count += 2
+                my_metric = [met['id'] for met in all_metrics if met["name"] == metric]
+                if len(my_metric) == 0:
+                    raise ValueError(f"metric {metric} not found")
+                report_activities.addMetric(my_metric[0])
+        report_activities.addGlobalFilter(timeframe)
+        report_activities.addMetricFilter(metricId="all", filterId=f"variables/targetraw.activity:::{itemId}")
+        api_call_count += 1
+        return self.getReport2(
+            report_activities,
+            returnClass=True,
+            workspaceClass=TargetWorkspace,
+            workspaceKwargs={
+                'activityName': activity,
+                'list_items': list_items,
+                'controlGroup': controlGroup,
+                'targetMetrics': metrics,
+                'confidenceLevel': confidenceLevel,
+                'evaluation': evaluation,
+                'method': method,
+                'apiCalls': api_call_count,
+            }
+        )
