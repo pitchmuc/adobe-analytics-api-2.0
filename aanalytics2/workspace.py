@@ -501,6 +501,7 @@ class TargetWorkspace(Workspace):
         index: Union[int, str] = None,
         dimension: str = None,
         n_results: Union[int, str] = 10,
+        focusMetricId: str = None,
     ) -> object:
         """
         Breakdown a specific index or value of the dataframe, by another dimension.
@@ -510,6 +511,7 @@ class TargetWorkspace(Workspace):
             index : REQUIRED : Value to use as filter for the breakdown or index of the dataframe to use for the breakdown.
             dimension : REQUIRED : dimension to report.
             n_results : OPTIONAL : number of results you want to have on your breakdown. Default 10, can use "inf"
+            focusMetricId : OPTIONAL : If you want to focus on a specific metric for the breakdown, provide its column name here. Default None, which means all metrics will be included in the breakdown request.
         """
         n_results = float(n_results) ## transforming n_result in float
         if index is None or dimension is None:
@@ -525,6 +527,9 @@ class TargetWorkspace(Workspace):
         breakdown = f"{breadown_dimension}:::{itemValue}"
         new_request = RequestCreator(self.dataRequest.to_dict())
         new_request.setDimension(dimension)
+        if focusMetricId is not None:
+            new_request.removeMetrics()
+            new_request.addMetric(focusMetricId)
         metrics = new_request.getMetrics()
         for metric in metrics:
             new_request.addMetricFilter(metricId=metric, filterId=breakdown)
@@ -538,6 +543,7 @@ class TargetWorkspace(Workspace):
         self,
         dimension: str = None,
         n_results: Union[int, str] = 10,
+        focusMetric : str | None = None,
     ) -> pd.DataFrame:
         """
         Breakdown every experience row by the given dimension and return a single combined DataFrame.
@@ -548,13 +554,27 @@ class TargetWorkspace(Workspace):
         Arguments:
             dimension : REQUIRED : Dimension to break down each experience by.
             n_results : OPTIONAL : Number of results per breakdown request. Default 10, can use "inf".
+            focusMetric : OPTIONAL : Metric to focus on for the breakdown. Default None. If provided, the request will only contain that single metric.
         Returns a merged DataFrame with the breakdown dimension and one set of metric columns per experience.
         """
         if dimension is None:
             raise ValueError("Require a dimension for the breakdown")
         combined = None
+        focusMetricId = None
+        if focusMetric is not None:
+            if focusMetric.startswith("metrics/") == False and focusMetric.startswith("cm") == False:
+                metricsList:list = self.analyticsObject.getMetrics(rsid=self.dataRequest.rsid,format="raw")
+                cmList:list = self.analyticsObject.getCalculatedMetrics(format="raw")
+                self.apiCalls += 2
+                completeList= metricsList + cmList
+                matched = [m for m in completeList if m["name"] == focusMetric]
+                if not matched:
+                    raise ValueError(f"focusMetric '{focusMetric}' not found in the report suite metrics or calculated metrics")
+                focusMetricId= matched[0]['id']
+            else:
+                focusMetricId = focusMetric
         for exp in self.dataframe['Target Experience'].to_list():
-            sub_report = self.__single_breakdown__(index=exp, dimension=dimension, n_results=n_results)
+            sub_report = self.__single_breakdown__(index=exp, dimension=dimension, n_results=n_results, focusMetricId=focusMetricId)
             self.apiCalls += 1
             sub_df = sub_report.dataframe.copy()
             # Second column is the breakdown dimension; first is itemId
@@ -566,6 +586,7 @@ class TargetWorkspace(Workspace):
                 combined = sub_df
             else:
                 combined = combined.merge(sub_df, on=key_cols, how="outer")
+        combined = combined.drop(columns=["itemId"])
         return combined
 
     def upliftCalculation(self, metric: str = None) -> pd.DataFrame:

@@ -31,6 +31,7 @@ class RequestCreator:
         Arguments:
             request : OPTIONAL : overwrite the template with the definition provided.
         """
+        self.rsid = None
         if request is not None:
             if '.json' in request and type(request) == str:
                 with open(request,'r') as f:
@@ -41,6 +42,8 @@ class RequestCreator:
             self.__request["metricContainer"].get("metricFilters", [])
         )
         self.__globalFiltersCount = len(self.__request["globalFilters"])
+        if self.__request["rsid"] != "" and self.__request["rsid"] is not None:
+            self.rsid = self.__request["rsid"]
         ### Preparing some time statement.
         today = datetime.datetime.now()
         today_date_iso = today.isoformat().split("T")[0]
@@ -105,6 +108,22 @@ class RequestCreator:
         """
         self.__request["metricContainer"]["metrics"] = []
         self.__metricCount = 0
+
+    def removeMetric(self, metricId: str = None) -> None:
+        """
+        Remove a specific metric from the request.
+        Arguments:
+            metricId : REQUIRED : The metric to remove
+        """
+        if metricId is None:
+            raise ValueError("Require a metric ID")
+        pos = -1
+        for index, metric in enumerate(self.__request["metricContainer"]["metrics"]):
+            if metric["id"] == metricId:
+                pos = index
+        if pos > -1:
+            del self.__request["metricContainer"]["metrics"][pos]
+            self.__metricCount -= 1
     
     def getMetrics(self) -> list:
         """
@@ -326,6 +345,7 @@ class RequestCreator:
         if rsid is None:
             raise ValueError("A reportSuite ID must be passed")
         self.__request["rsid"] = rsid
+        self.rsid = rsid
 
     def addGlobalFilter(self, filterId: str = None) -> None:
         """
