@@ -4,6 +4,7 @@ import json
 from typing import Union, IO
 import time
 from .requestCreator import RequestCreator
+from .workspaceCreator import WorkspaceCreator, TextBuilder
 from copy import deepcopy
 
 
@@ -263,6 +264,7 @@ class TargetWorkspace(Workspace):
         evaluation: str = '2sides',
         method: str = 'z-test',
         apiCalls: int = 0,
+        activityFilter: str = None,
     ) -> None:
         """
         Build a TargetWorkspace directly from raw report API response data.
@@ -292,6 +294,9 @@ class TargetWorkspace(Workspace):
             evaluation      : OPTIONAL : '2sides', 'leftOneSided', or 'rightOneSided' (default '2sides').
             method          : OPTIONAL : 'z-test' (default) or 't-test'.
             apiCalls        : OPTIONAL : number of upstream API calls used to produce the workspace.
+            activityFilter  : OPTIONAL : dimension item filter string for the Target activity
+                              (e.g. 'variables/targetraw.activity:::itemId'). Used as a dropdown
+                              filter on Workspace panels created by linkToWorkspace.
         """
         super().__init__(
             responseData=responseData,
@@ -315,6 +320,7 @@ class TargetWorkspace(Workspace):
         self.method = method
         self.apiCalls = apiCalls
         self.analyticsObject = analyticsConnector
+        self.activityFilter = activityFilter
 
         # Rename dimension column to 'Target Experience' and metric columns to targetMetrics
         if self.metrics:
@@ -653,3 +659,192 @@ class TargetWorkspace(Workspace):
 
     def __repr__(self) -> str:
         return self.__str__()
+
+    def linkToWorkspace(
+        self,
+        workspaceName: str,
+    ) -> dict:
+        """
+        Link this Target activity to an Adobe Analytics Workspace project.
+
+        If a project named `workspaceName` already exists, the method loads its
+        definition via WorkspaceCreator, prepends a new 'Target Results' panel
+        (containing a Text visualisation summarising confidence scores and
+        significance per experience), and calls updateProject to save the change.
+
+        If no such project exists, the method creates a brand-new Workspace with
+        two panels in order:
+          1. 'Target Results'  – Text panel summarising experiment results.
+          2. 'Target Data'     – Freeform table on 'variables/targetraw.experience'
+                                 with the same metrics used for this report.
+
+        Both panels are scoped to the same date range and segment filters as the
+        original report request.
+
+        Arguments:
+            workspaceName : REQUIRED : Name of the Workspace project to find or create.
+            owner         : OPTIONAL : Owner for the newly created project.
+                            Accepts an int (IMS user ID) or a dict with keys
+                            'id', 'name', 'login'.  Defaults to an empty dict
+                            when not provided (required by the API).
+        Returns the raw API response dict from createProject or updateProject.
+        """
+        rsid = self.dataRequest.rsid
+        metric_ids = self.dataRequest.getMetrics()
+        owner = self.analyticsObject.getUserMe()
+        # Resolve display names for standard metrics (e.g. 'metrics/visits' → 'Visits')
+        _std_metrics_cache = None
+        resolved_metric_names = []
+        for mid, mname in zip(metric_ids, self.metrics):
+            if mid.startswith("metrics/") and mid == mname:
+                # Name was never resolved — fetch the metric list once
+                if _std_metrics_cache is None:
+                    _std_metrics_cache = self.analyticsObject.getMetrics(rsid=rsid, format="raw")
+                    self.apiCalls += 1
+                matched = next((m for m in _std_metrics_cache if m["id"] == mid), None)
+                resolved_metric_names.append(matched["name"] if matched else mname)
+            else:
+                resolved_metric_names.append(mname)
+        # Pair original metric IDs with their display names
+        metrics_spec = [
+            {"id": mid, "name": mname}
+            for mid, mname in zip(metric_ids, resolved_metric_names)
+        ]
+
+        # ── Build text summary ──────────────────────────────────────────────
+        start_display = (self.startDate or "").split("T")[0]
+        end_display = (self.endDate or "").split("T")[0]
+
+        tb = TextBuilder()
+        tb.addTitle(f"Target A/B Test: {self.activityName or 'Activity'}", level=2)
+        tb.addNewline()
+        tb.addBold("Report period: ")
+        tb.addText(f"{start_display} \u2192 {end_display}")
+        tb.addNewline()
+        tb.addBold("Control group: ")
+        tb.addText(self.controlGroup or "N/A")
+        tb.addNewline()
+        tb.addBold("Statistical test: ")
+        tb.addText(self.method)
+        tb.addNewline()
+        tb.addNewline()
+
+        df = self.dataframe
+        for _, row in df.iterrows():
+            exp_name = row.get(self._experience_col, "")
+            if exp_name == self.controlGroup:
+                continue
+            tb.addBold(f"Experience: {exp_name}")
+            tb.addNewline()
+            for metric in self.conversionMetrics:
+                conf_col = f"{metric}_confidence"
+                sig_col = f"{metric}_is_significant"
+                conf_val = row.get(conf_col, float("nan"))
+                is_sig = bool(row.get(sig_col, False))
+                if pd.isna(conf_val):
+                    tb.addText(f"  {metric}: N/A")
+                else:
+                    conf_pct = f"{conf_val * 100:.1f}%"
+                    if is_sig:
+                        tb.addText(f"  {metric}: confidence ")
+                        tb.addColor(conf_pct, "var(--spectrum-celery-600)")
+                        tb.addText(" \u2713 Significant")
+                    else:
+                        tb.addText(f"  {metric}: confidence ")
+                        tb.addColor(conf_pct, "var(--spectrum-red-800)")
+                        tb.addText(" \u2717 Not significant")
+                tb.addNewline()
+            tb.addNewline()
+
+        # ── Date range for panels ───────────────────────────────────────────
+        if self.startDate and self.endDate:
+            date_range_id = f"{self.startDate}/{self.endDate}"
+            date_range_name = f"{start_display} \u2013 {end_display}"
+        else:
+            date_range_id = "thisMonth"
+            date_range_name = "This month"
+
+        # ── Segment filters from the original request ───────────────────────
+        segment_filters = [
+            f for f in self.globalFilters
+            if f.get("type") == "segment"
+            and not str(f.get("segmentId", "")).startswith("Dynamic:")
+        ]
+
+        def _apply_segments(wc: WorkspaceCreator) -> None:
+            for sf in segment_filters:
+                wc.addSegmentFilter(
+                    sf.get("segmentId", ""),
+                    sf.get("segmentName", ""),
+                )
+
+        # ── Normalise owner for new projects ────────────────────────────────
+        owner_dict = {"id": owner['loginId'], "name": owner['fullName'], "login": owner['login']}
+
+        # ── Find existing workspace by name ─────────────────────────────────
+        self.apiCalls += 1
+        all_projects = self.analyticsObject.getProjects(format="raw")
+        existing = next(
+            (p for p in all_projects if p.get("name") == workspaceName), None
+        )
+
+        if existing is not None:
+            # ── Update path: load existing definition, prepend results panel ─
+            self.apiCalls += 1
+            project_dict = self.analyticsObject.getProject(existing["id"])
+            wc = WorkspaceCreator(data=project_dict)
+            wc.addPanel(
+                name="Target Results",
+                date_range_id=date_range_id,
+                date_range_name=date_range_name,
+                position=0,
+            )
+            _apply_segments(wc)
+            wc.addTextFreeform("Experiment Results", tb)
+            updated_obj = wc.to_dict()
+            self.apiCalls += 1
+            return self.analyticsObject.updateProject(
+                projectId=existing["id"], projectObj=updated_obj
+            )
+        else:
+            # ── Create path: two-panel workspace ─────────────────────────────
+            wc = WorkspaceCreator(rsid=rsid, name=workspaceName)
+            wc.setOwner(owner_dict) if owner_dict else None
+
+            # Panel 1 – results text
+            wc.addPanel(
+                name="Target Results",
+                date_range_id=date_range_id,
+                date_range_name=date_range_name,
+            )
+            _apply_segments(wc)
+            wc.addTextFreeform("Experiment Results", tb)
+
+            # Panel 2 – activity×experience breakdown freeform
+            dim_item_id = self.activityFilter.replace(":::", "::") if self.activityFilter else None
+            if dim_item_id:
+                wc.addActivityBreakdownFreeform(
+                    title=self.activityName or "Target Experiences",
+                    activity_dim_item_id=dim_item_id,
+                    activity_name=self.activityName or "",
+                    breakdown_dim_id="variables/targetraw.experience",
+                    breakdown_dim_name="Target Experiences",
+                    metrics=metrics_spec,
+                    rows=50,
+                    breakdown_rows=10,
+                )
+            else:
+                wc.addSimpleFreeform(
+                    title=self.activityName or "Target Experiences",
+                    dimension_id="variables/targetraw.experience",
+                    dimension_name="Target Experience",
+                    metrics=metrics_spec,
+                    rows=50,
+                )
+
+            project_obj = wc.to_dict()
+            # Ensure owner key is always present (required by createProject)
+            if "owner" not in project_obj:
+                project_obj["owner"] = owner_dict
+            self.apiCalls += 1
+            return self.analyticsObject.createProject(projectObj=project_obj)

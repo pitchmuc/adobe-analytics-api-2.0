@@ -1,6 +1,6 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
-import json, os, re, math
+import json, os, re, io, time
 import time, datetime
 from concurrent import futures
 from copy import deepcopy
@@ -126,6 +126,30 @@ class Analytics:
     loggingEnabled = False
     logger = None
 
+    JSON_CLASSIFICATION_IMPORT_JOB = {
+          "dataFormat": "json",
+          "encoding": "UTF8",
+          "jobName": "",
+          "notifications": [
+            {
+              "method": "email",
+              "state": "completed",
+              "recipients": [
+                "example@example.com"
+              ]
+            }
+          ],
+          "listDelimiter": ",",
+          "source": "Direct API Upload",
+          "data":[{'key':'','data':{}}]
+        }
+    JSON_CLASSIFICATION_DATA = {
+    "key": "",
+    "data": {
+        "classification":"",
+        "" : "",
+    }}
+
     def __init__(self, 
                  company_id: str = None,
                  config_object: dict = None,
@@ -150,10 +174,15 @@ class Analytics:
             raise AttributeError(
                 'Expected "company_id" to be referenced.\nPlease ensure you pass the globalCompanyId when instantiating this class.')
         # Resolve config: explicit config_object > config alias (from ConfigObj unpacking) > global default
-        if config_object is None:
+        if config is not None:
+            config_object = config.to_dict()
+        elif config_object is None:
             config_object = config if config is not None else config_module.config_object
         if header is None:
-            header = config_module.header
+            if config is not None:
+                header = config.header
+            else:
+                header = config_module.header
         if loggingObject is not None and sorted(["level", "stream", "format", "filename", "file"]) == sorted(
                 list(loggingObject.keys())):
             self.loggingEnabled = True
@@ -3496,8 +3525,9 @@ class Analytics:
         if self.loggingEnabled:
             self.logger.debug(f"starting getClassificationTemplate")
         path = f"/classifications/datasets/template/{datasetId}"
-        res = self.connector.getData(self.endpoint_company + path)
-        return res
+        res_text= self.connector.getData(self.endpoint_company + path, format='txt')
+        df = pd.read_csv(io.StringIO(res_text), sep="\t")
+        return df
 
     def getClassificationJobs(self, datasetId: str = None, n_results: int = 20) -> list:
         """
@@ -4828,11 +4858,13 @@ class Analytics:
         api_call_count = 0
         global_request = RequestCreator()
         global_request.setRSID(rsid)
+        if timeframe.count("/") == 1 and "T" not in timeframe:
+            timeframe = timeframe.replace("/", "T00:00:00.000/") + "T00:00:00.000"
         global_request.addGlobalFilter(timeframe)
         global_request.setDimension('variables/targetraw.activity')
         all_metrics = None
         for metric in metrics:
-            if metric.startswith("metrics/") or metric.startswith("cm_"):
+            if metric.startswith("metrics/") or metric.startswith("cm"):
                 global_request.addMetric(metric)
             else:
                 if all_metrics is None:
@@ -4884,6 +4916,7 @@ class Analytics:
                     raise ValueError(f"metric {metric} not found")
                 report_activities.addMetric(my_metric[0])
         report_activities.addGlobalFilter(timeframe)
+        activity_filter = f"variables/targetraw.activity:::{itemId}"
         report_activities.addMetricFilter(metricId="all", filterId=f"variables/targetraw.activity:::{itemId}")
         api_call_count += 1
         return self.getReport2(
@@ -4899,5 +4932,6 @@ class Analytics:
                 'evaluation': evaluation,
                 'method': method,
                 'apiCalls': api_call_count,
+                'activityFilter':activity_filter
             }
         )

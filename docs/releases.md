@@ -3,11 +3,19 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.6.0
+* adding new class `WorkspaceCreator` to create workspace projects from scratch with the API. [Documentation](./workspaceCreator.md)
+* adding new methods for `WorkspaceCreator` class:
+  * createProjectFromTemplate
+  * createProjectFromReport
+  * createProjectFromRequest
+  * createProjectFromDataFrame
+* Adding the `getTargetReport` method to be able to build confidence and significance report with calculated metrics from the API. [Documentation](./main.md#getTargetReport)
+
 ## version 0.5.0 
 * refactor of the connector.py file to better handle the token generation, refreshing token and retries.
 * refactor of the `getReport2` method to better handle the filters and breakdowns. Also being more robust on the parsing of the data returned by Adobe Analytics API 2.0. 
 * Allow a configObject to be generated from the `configure` method and use it to generate the token for better flexibility.
-
 
 ## version 0.4.4
 * adding the data feed API capabilities

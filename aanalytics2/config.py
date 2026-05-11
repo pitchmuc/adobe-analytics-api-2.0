@@ -2,12 +2,10 @@ config_object = {
     "org_id": "",
     "client_id": "",
     "tech_id": None,
-    "pathToKey": None,
     "secret": "",
     "scopes":None,
     "date_limit": 0,
     "token": "",
-    "jwtTokenEndpoint": "https://ims-na1.adobelogin.com/ims/exchange/jwt",
     "oauthTokenEndpointV2" : "https://ims-na1.adobelogin.com/ims/token/v3"
 }
 orga_admin = {'_org_admin', '_deployment_admin', '_support_admin'}

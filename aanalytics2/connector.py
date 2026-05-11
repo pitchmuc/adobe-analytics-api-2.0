@@ -49,7 +49,6 @@ class AdobeRequest:
         self.loggingEnabled = loggingEnabled
         self.logger = logger
         self.retry = retry
-
         if self.config['token'] == '' or time.time() > self.config['date_limit']:
             token_and_expiry = token_provider.get_oauth_token_and_expiry_for_config(
                 config=self.config, verbose=verbose)
@@ -133,6 +132,12 @@ class AdobeRequest:
             print(f"request URL : {res.request.url}")
             print(f"status_code : {res.status_code}")
         try:
+            if kwargs.get('format', False) == 'txt':
+                return res.text
+            elif kwargs.get('format', False) == 'content':
+                return res.content
+            elif kwargs.get('format', False) == 'raw':
+                return res
             res_json = res.json()
         except Exception:
             if self.loggingEnabled:
