@@ -94,6 +94,31 @@ myInstance
 }
 ```
 
+## Project Attributes
+
+
+The different attributes are:
+
+* "id" of the project
+* "name" of the project
+* "description" of the project
+* "rsid" attached to the project (can be a Virtual Report Suite ID)
+* "ownerName" of the project owner
+* "ownerId" of the project owner
+* "ownerEmail" of the project owner
+* "template" is a boolean if the project is a template or not
+* "curation" is a boolean if the project has been curated or not
+* "version" of the project
+* "nbPanels" gives the number of Panels there is in your projects
+* "nbSubPanels" gives the number of subPanels that exist in your project
+* "nbElementsUsed" gives you how many different dimensions, metrics, segments and calcuated are being used in your projects. Elements have been deduplicated.
+* "elementsUsed" is a dictionary to gives you the different elements used such as:
+  * rsids
+  * dimensions
+  * metrics
+  * segments
+  * calculatedMetrics
+
 The class as a method call `to_dict()` that will return this dictionary.
 
 ## Getting all projects details

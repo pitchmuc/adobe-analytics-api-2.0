@@ -6,19 +6,21 @@ You can find the swagger documentation [here](https://adobedocs.github.io/analyt
 
 The different section will quickly explain the methods available in the different part of this API.
 
-- [Core Component](#core-components)
+- [Core components](#core-components)
   - [Config File](#createconfigfile)
     - [Create a Config file](#createconfigfile)
     - [Import a Config file](#importconfigfile)
 - [Login Class](#login-class)
   - [Retry Parameter](#retry-parameter)
 - [Analytics Class](#analytics-class)
-  - [The get methods](#the-get-methods)
-  - [The create methods](#create-methods)
-  - [The update methods](#update-methods)
-  - [The delete methods](#delete-methods)
-  - [The Project class](#project-class)
-  - [The scan method](#the-scan-methods)
+  - [The Project class](#the-project-class)
+  - [The Analytics class](#the-analytics-class)
+    - [The get methods](#the-get-methods)
+    - [The create methods](#create-methods)
+    - [The update methods](#update-methods)
+    - [The delete methods](#delete-methods)
+    - [The Project class](#project-class)
+    - [The scan methods](#the-scan-methods)
   - [Decoding Adobe Analytics requests](#decode-aa-requests)
   - [Comparing Report Suite](#compare-reportsuite)
 - [The getReport](#getreport)
@@ -220,8 +222,8 @@ analytics1 = login1.createAnalyticsConnection('company_A')
 analytics2 = login2.createAnalyticsConnection('company_B')
 
 # Option B — directly to Analytics (when you already know the companyId)
-analytics1 = api2.Analytics(company_id='company_A', **cfg1)
-analytics2 = api2.Analytics(company_id='company_B', **cfg2)
+analytics1 = api2.Analytics(company_id='company_A', **cfg1) ### or analytics1 = api2.Analytics(company_id='company_A',config=cfg1.config, header=cfg1.header) or analytics1 = api2.Analytics(company_id='company_A',config=cfg1) 
+analytics2 = api2.Analytics(company_id='company_B', **cfg2) ### or analytics2 = api2.Analytics(company_id='company_A',config=cfg2.config, header=cfg2.header) or analytics2 = api2.Analytics(company_id='company_A',config=cfg2)
 
 # Each instance uses its own client_id for token acquisition and API calls.
 # They can safely be used in parallel threads:
@@ -279,29 +281,19 @@ The information returns is a dictionary (JSON) that may not be easy to decipher 
 Therefore, I have created a class that can ease the understanding of the data in the project dictionary.\
 The instance of that class will provide some information directly from class attributes.
 
-The different attributes are:
+More information on Project class can be found in the [Project class documentation](./projects.md)
 
-* "id" of the project
-* "name" of the project
-* "description" of the project
-* "rsid" attached to the project (can be a Virtual Report Suite ID)
-* "ownerName" of the project owner
-* "ownerId" of the project owner
-* "ownerEmail" of the project owner
-* "template" is a boolean if the project is a template or not
-* "curation" is a boolean if the project has been curated or not
-* "version" of the project
-* "nbPanels" gives the number of Panels there is in your projects
-* "nbSubPanels" gives the number of subPanels that exist in your project
-* "nbElementsUsed" gives you how many different dimensions, metrics, segments and calcuated are being used in your projects. Elements have been deduplicated.
-* "elementsUsed" is a dictionary to gives you the different elements used such as:
-  * rsids
-  * dimensions
-  * metrics
-  * segments
-  * calculatedMetrics
+## The Analytics class
 
-A method "to_dict()" also exists on this instance so you can flatten these information and later use them in a pandas dataframe if you wish.
+### Attributes of the Analytics class
+
+The Analytics class has several attributes that are useful for the different methods of the class.\
+* company_id : The company ID tied to the instance of the class. It is used for all the calls to the API.
+* header : The header that is used for the calls to the API. It is generated from the configuration file and updated with the token retrieved.
+* endpoint_company : The endpoint with the additional company ID. It is used for all the calls to the API.
+* retry : The retry parameter that is used for all the GET method of the class. It is set at the instanciation of the class but can be updated by the user.
+* JSON_CLASSIFICATION_IMPORT_JOB : The classification import job class that is used for the classification import job methods.
+* JSON_CLASSIFICATION_DATA : The classification data class that is used inside the classification import job definition.
 
 ### The get methods
 
