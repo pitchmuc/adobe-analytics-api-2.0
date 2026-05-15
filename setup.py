@@ -50,11 +50,10 @@ setup(
         'pathlib2',
         'pathlib',
         'requests',
-        'PyJWT[crypto]',
-        'PyJWT',
         "dicttoxml",
         "pytest",
-        "openpyxl>2.6.0"
+        "openpyxl>2.6.0",
+        "deprecation"
     ],
     classifiers=CLASSIFIERS,
     python_requires='>=3.6'
