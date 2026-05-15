@@ -16,6 +16,7 @@ from urllib import parse
 
 from aanalytics2 import config as config_module, connector
 from aanalytics2.projects import *
+from aanalytics2.configs import ConfigObj
 from aanalytics2.requestCreator import RequestCreator
 from aanalytics2.workspace import Workspace, TargetWorkspace
 
@@ -29,20 +30,27 @@ class Login:
     loggingEnabled = False
     logger = None
 
-    def __init__(self, config: dict = None, header: dict = None, retry: int = 0,
-                 loggingObject: dict = None) -> None:
+    def __init__(self, config: dict| ConfigObj |None = None, header: dict| None = None, retry: int = 0,
+                 loggingObject: dict| None = None) -> None:
         """
         Instantiate the Loggin class.
         Arguments:
-            config : REQUIRED : dictionary with your configuration information. Falls back to global config.
-            header : REQUIRED : dictionary of your header. Falls back to global header.
+            config : OPTIONAL : dictionary or ConfigObj with your configuration information. Falls back to global config.
+            header : OPTIONAL : dictionary of your header. Falls back to global header.
             retry : OPTIONAL : if you want to retry, the number of time to retry
             loggingObject : OPTIONAL : If you want to set logging capability for your actions.
         """
         if config is None:
-            config = config_module.config_object
+            config_data = config_module.config_object
+        elif config is not None and type(config) == ConfigObj:
+            config_data = config.config
+        elif config is not None and type(config) == dict:
+            config_data = config
         if header is None:
-            header = config_module.header
+            if type(config) == ConfigObj:
+                header = config.header
+            else:
+                header = config_module.header
         if loggingObject is not None and sorted(["level", "stream", "format", "filename", "file"]) == sorted(
                 list(loggingObject.keys())):
             self.loggingEnabled = True
@@ -61,7 +69,7 @@ class Login:
                 streamHandler.setFormatter(formatter)
                 self.logger.addHandler(streamHandler)
         self.connector = connector.AdobeRequest(
-            config_object=config, header=header, retry=retry, loggingEnabled=self.loggingEnabled, logger=self.logger)
+            config_object=config_data, header=header, retry=retry, loggingEnabled=self.loggingEnabled, logger=self.logger)
         self.header = self.connector.header
         self.COMPANY_IDS = {}
         self.retry = retry
@@ -3603,7 +3611,7 @@ class Analytics:
         if import_def is not None and type(import_def) == dict:
             res = self.connector.postData(self.endpoint_company+path,data=import_def)
             return res
-        data = {
+        dataPayload = {
             "dataFormat": dataFormat,
             "encoding": encoding,
             "jobName": jobName,
@@ -3614,9 +3622,9 @@ class Analytics:
                 "type": "string",
                 "overwrite": True
             },
-            data : data
+            "data": data
             }
-        res = self.connector.postData(self.endpoint_company+path,data=data)
+        res = self.connector.postData(self.endpoint_company+path,data=dataPayload)
         return res
 
     def commitImportClassificationJob(self,jobId:str=None)->dict:

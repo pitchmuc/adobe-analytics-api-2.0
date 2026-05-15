@@ -52,7 +52,7 @@ class LegacyAnalytics:
         self.header = {
             'Accept': 'application/json',
             'Authorization': f'Bearer {self.token}',
-            'x-api-key': config.get('client_id')
+            'X-ADOBE-DMA-COMPANY': company_name
         }
 
     

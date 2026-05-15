@@ -183,15 +183,19 @@ def configure(org_id: str = None,
     """
     if not org_id:
         raise ValueError("`org_id` must be specified in the configuration.")
+    config_object['org_id'] = org_id
     if not client_id:
         raise ValueError("`client_id` must be specified in the configuration.")
     config_object['client_id'] = client_id
+    header["x-api-key"] = client_id
     if not tech_id and oauth == False and not scopes:
         raise ValueError("`tech_id` must be specified in the configuration.")
     if not secret and oauth == False:
         raise ValueError("`secret` must be specified in the configuration.")
-    if not scopes:
+    config_object['secret'] = secret
+    if not scopes and oauth == False:
         raise ValueError("scopes must be specified if Oauth setup.")
+    config_object['scopes'] = scopes
     if return_object:
         local_config = {
             "org_id": org_id,
