@@ -4,13 +4,19 @@ This page will give you the change that are occuring when a new version has been
 The changes have been tracked starting version 0.1.0
 
 ## version 0.6.0
-* adding new class `WorkspaceCreator` to create workspace projects from scratch with the API. [Documentation](./workspaceCreator.md)
-* adding new methods for `WorkspaceCreator` class:
+* adding new class `WorkspaceManager` to create workspace projects from scratch with the API. [Documentation](./workspaceManager.md)
+* adding new methods for `WorkspaceManager` class:
   * createProjectFromTemplate
   * createProjectFromReport
   * createProjectFromRequest
   * createProjectFromDataFrame
 * Adding the `getTargetReport` method to be able to build confidence and significance report with calculated metrics from the API. [Documentation](./main.md#getTargetReport)
+* Fix issue related to `getClassificationTemplate` method that was not working with the new system.
+
+## version 0.5.3 
+* fix limitation regarding dateRanges
+* Replicate the configuration file to local storage when using the `return_object` paramater.
+* Fix issue on logging to `LegacyAnalytics`
 
 ## version 0.5.0 
 * refactor of the connector.py file to better handle the token generation, refreshing token and retries.

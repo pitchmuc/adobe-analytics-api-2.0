@@ -4,7 +4,7 @@ import json
 from typing import Union, IO
 import time
 from .requestCreator import RequestCreator
-from .workspaceCreator import WorkspaceCreator, TextBuilder
+from .workspaceManager import WorkspaceManager, TextBuilder
 from copy import deepcopy
 
 
@@ -668,7 +668,7 @@ class TargetWorkspace(Workspace):
         Link this Target activity to an Adobe Analytics Workspace project.
 
         If a project named `workspaceName` already exists, the method loads its
-        definition via WorkspaceCreator, prepends a new 'Target Results' panel
+        definition via WorkspaceManager, prepends a new 'Target Results' panel
         (containing a Text visualisation summarising confidence scores and
         significance per experience), and calls updateProject to save the change.
 
@@ -729,28 +729,68 @@ class TargetWorkspace(Workspace):
         tb.addNewline()
         tb.addNewline()
 
+        # Map internal metric column names to their display names
+        metric_display = dict(zip(self.metrics, resolved_metric_names))
+
         df = self.dataframe
+
+        # Control group block — raw counts only
+        ctrl_rows = df[df[self._experience_col] == self.controlGroup]
+        if not ctrl_rows.empty:
+            ctrl = ctrl_rows.iloc[0]
+            tb.addBold(f"Experience: {self.controlGroup} (Control)")
+            tb.addNewline()
+            for metric in self.metrics:
+                raw_val = ctrl.get(metric, float("nan"))
+                display_name = metric_display.get(metric, metric)
+                if pd.isna(raw_val):
+                    tb.addText(f"  {display_name}: N/A")
+                else:
+                    try:
+                        tb.addText(f"  {display_name}: {int(raw_val):,}")
+                    except (ValueError, OverflowError):
+                        tb.addText(f"  {display_name}: {raw_val}")
+                tb.addNewline()
+            tb.addNewline()
+
+        # Non-control experience blocks — counts + confidence + significance
         for _, row in df.iterrows():
             exp_name = row.get(self._experience_col, "")
             if exp_name == self.controlGroup:
                 continue
             tb.addBold(f"Experience: {exp_name}")
             tb.addNewline()
+            # Base metric (exposure count)
+            base_val = row.get(self.baseMetric, float("nan"))
+            base_display = metric_display.get(self.baseMetric, self.baseMetric)
+            if not pd.isna(base_val):
+                try:
+                    tb.addText(f"  {base_display}: {int(base_val):,}")
+                except (ValueError, OverflowError):
+                    tb.addText(f"  {base_display}: {base_val}")
+                tb.addNewline()
+            # Conversion metrics — count + confidence
             for metric in self.conversionMetrics:
                 conf_col = f"{metric}_confidence"
                 sig_col = f"{metric}_is_significant"
                 conf_val = row.get(conf_col, float("nan"))
                 is_sig = bool(row.get(sig_col, False))
+                raw_val = row.get(metric, float("nan"))
+                display_name = metric_display.get(metric, metric)
+                try:
+                    count_str = f"{int(raw_val):,}" if not pd.isna(raw_val) else "N/A"
+                except (ValueError, OverflowError):
+                    count_str = str(raw_val)
                 if pd.isna(conf_val):
-                    tb.addText(f"  {metric}: N/A")
+                    tb.addText(f"  {display_name}: {count_str} | confidence: N/A")
                 else:
                     conf_pct = f"{conf_val * 100:.1f}%"
                     if is_sig:
-                        tb.addText(f"  {metric}: confidence ")
+                        tb.addText(f"  {display_name}: {count_str} | confidence ")
                         tb.addColor(conf_pct, "var(--spectrum-celery-600)")
                         tb.addText(" \u2713 Significant")
                     else:
-                        tb.addText(f"  {metric}: confidence ")
+                        tb.addText(f"  {display_name}: {count_str} | confidence ")
                         tb.addColor(conf_pct, "var(--spectrum-red-800)")
                         tb.addText(" \u2717 Not significant")
                 tb.addNewline()
@@ -771,7 +811,7 @@ class TargetWorkspace(Workspace):
             and not str(f.get("segmentId", "")).startswith("Dynamic:")
         ]
 
-        def _apply_segments(wc: WorkspaceCreator) -> None:
+        def _apply_segments(wc: WorkspaceManager) -> None:
             for sf in segment_filters:
                 wc.addSegmentFilter(
                     sf.get("segmentId", ""),
@@ -792,7 +832,7 @@ class TargetWorkspace(Workspace):
             # ── Update path: load existing definition, prepend results panel ─
             self.apiCalls += 1
             project_dict = self.analyticsObject.getProject(existing["id"])
-            wc = WorkspaceCreator(data=project_dict)
+            wc = WorkspaceManager(data=project_dict)
             wc.addPanel(
                 name="Target Results",
                 date_range_id=date_range_id,
@@ -808,7 +848,7 @@ class TargetWorkspace(Workspace):
             )
         else:
             # ── Create path: two-panel workspace ─────────────────────────────
-            wc = WorkspaceCreator(rsid=rsid, name=workspaceName)
+            wc = WorkspaceManager(rsid=rsid, name=workspaceName)
             wc.setOwner(owner_dict) if owner_dict else None
 
             # Panel 1 – results text

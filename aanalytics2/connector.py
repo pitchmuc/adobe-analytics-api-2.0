@@ -62,7 +62,7 @@ class AdobeRequest:
             self.header.update({'Authorization': f'Bearer {token}'})
             self.header.update({'x-proxy-global-company-id': company_id})
             if self.loggingEnabled:
-                self.logger.info("OAuth v2 token retrieved")
+                self.logger.info("OAuth token retrieved")
 
         self.session = self._build_session(retry)
 
@@ -101,7 +101,7 @@ class AdobeRequest:
         """
         if time.time() > self.config['date_limit']:
             if self.loggingEnabled:
-                self.logger.warning("OAuth v2 token expired — retrieving a new one")
+                self.logger.warning("OAuth token expired — retrieving a new one")
             token_and_expiry = token_provider.get_oauth_token_and_expiry_for_config(
                 config=self.config)
             token = token_and_expiry['token']
@@ -112,7 +112,7 @@ class AdobeRequest:
             self.header.update(updated_auth)
             self.session.headers.update(updated_auth)
             if self.loggingEnabled:
-                self.logger.info("New OAuth v2 token applied")
+                self.logger.info("New OAuth token applied")
 
     # ------------------------------------------------------------------
     # HTTP verb abstractions
