@@ -3,20 +3,16 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
-## version 0.6.0
-* adding new class `WorkspaceManager` to create workspace projects from scratch with the API. [Documentation](./workspaceManager.md)
-* adding new methods for `WorkspaceManager` class:
-  * createProjectFromTemplate
-  * createProjectFromReport
-  * createProjectFromRequest
-  * createProjectFromDataFrame
-* Adding the `getTargetReport` method to be able to build confidence and significance report with calculated metrics from the API. [Documentation](./main.md#getTargetReport)
-* Fix issue related to `getClassificationTemplate` method that was not working with the new system.
 
 ## version 0.5.3 
 * fix limitation regarding dateRanges
 * Replicate the configuration file to local storage when using the `return_object` paramater.
-* Fix issue on logging to `LegacyAnalytics`
+* Fix issue on logging to `LegacyAnalytics`\
+Patches:
+* Fix issue related to `getClassificationTemplate` method that was not working with the new system.
+* Fix issue related to JWT import
+* remove the token_provider module and move the methods to connector.py for better handling of the token generation and refreshing.
+* Better handling of segments in RequestCreator class when using the `getReport2` method.
 
 ## version 0.5.0 
 * refactor of the connector.py file to better handle the token generation, refreshing token and retries.
