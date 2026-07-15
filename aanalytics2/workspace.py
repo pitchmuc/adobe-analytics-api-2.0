@@ -317,10 +317,11 @@ class TargetWorkspace(Workspace):
         self.conversionMetrics = self.metrics[1:] if len(self.metrics) > 1 else []
         self.confidenceLevel = confidenceLevel
         self.evaluation = evaluation
-        self.method = method
-        self.apiCalls = apiCalls
+        self.method:str = method
+        self.apiCalls:int = apiCalls
         self.analyticsObject = analyticsConnector
-        self.activityFilter = activityFilter
+        self.activityFilter:str = activityFilter
+        self.segments:list = self.analyticsObject.getSegments(format="raw")
 
         # Rename dimension column to 'Target Experience' and metric columns to targetMetrics
         if self.metrics:
@@ -367,7 +368,11 @@ class TargetWorkspace(Workspace):
         self.columns = list(self.raw_dataframe.columns)
 
         # Compute the second dataframe with confidence and significance columns
-        self.dataframe = self._compute_confidence(df.copy())
+        try:
+            self.dataframe = self._compute_confidence(df.copy())
+        except Exception as e:
+            print(f"Error computing confidence. The data returned may not be suitable for confidence computation: {e}")
+            self.dataframe = df.copy()
 
     def _betacf(self, a: float, b: float, x: float, max_iter: int = 200, eps: float = 3e-7) -> float:
         """Lentz continued-fraction evaluation of the incomplete beta function."""
@@ -663,35 +668,40 @@ class TargetWorkspace(Workspace):
     def linkToWorkspace(
         self,
         workspaceName: str,
+        globalFilters: list = None,
+        segmentsSplit: list = None,
     ) -> dict:
         """
         Link this Target activity to an Adobe Analytics Workspace project.
 
         If a project named `workspaceName` already exists, the method loads its
-        definition via WorkspaceManager, prepends a new 'Target Results' panel
+        definition via WorkspaceManager, prepends new 'Target Results' panels
         (containing a Text visualisation summarising confidence scores and
         significance per experience), and calls updateProject to save the change.
 
         If no such project exists, the method creates a brand-new Workspace with
-        two panels in order:
-          1. 'Target Results'  – Text panel summarising experiment results.
-          2. 'Target Data'     – Freeform table on 'variables/targetraw.experience'
-                                 with the same metrics used for this report.
+        one 'Target Results' panel per entry in `segments` (plus one unsegmented
+        panel), each containing a Text visualisation and a freeform data table.
 
-        Both panels are scoped to the same date range and segment filters as the
-        original report request.
+        All panels are scoped to the same date range as the original report.
+        Segments from the original request are always applied. Additional filters
+        from `globalFilters` are applied to every panel on top of those.
 
         Arguments:
             workspaceName : REQUIRED : Name of the Workspace project to find or create.
-            owner         : OPTIONAL : Owner for the newly created project.
-                            Accepts an int (IMS user ID) or a dict with keys
-                            'id', 'name', 'login'.  Defaults to an empty dict
-                            when not provided (required by the API).
+            globalFilters : OPTIONAL : List of segment IDs or names applied to every panel
+                            in addition to the segments from the original report request.
+            segmentsSplit : OPTIONAL : List of segment IDs or names. When provided, the
+                            'Target Results' panel is replicated once per entry plus one
+                            panel with no extra segment. E.g. passing ['Mobile', 'Desktop']
+                            creates 3 panels: one unsegmented, one for Mobile, one for Desktop.
+            
         Returns the raw API response dict from createProject or updateProject.
         """
         rsid = self.dataRequest.rsid
         metric_ids = self.dataRequest.getMetrics()
         owner = self.analyticsObject.getUserMe()
+        existing_segmentIds = [el['segmentId'] for el in self.globalFilters if el['type'] == 'segment']
         # Resolve display names for standard metrics (e.g. 'metrics/visits' → 'Visits')
         _std_metrics_cache = None
         resolved_metric_names = []
@@ -710,6 +720,12 @@ class TargetWorkspace(Workspace):
             {"id": mid, "name": mname}
             for mid, mname in zip(metric_ids, resolved_metric_names)
         ]
+        # Resolve Segment names for segmentsSplit
+        resolved_segments = {}
+        for seg in segmentsSplit or []:
+            tmp_seg = next((s for s in self.segments if s.get("id") == seg), None) or next((s for s in self.segments if s.get("name") == seg), None)
+            if tmp_seg:
+                resolved_segments[tmp_seg["id"]] = tmp_seg["name"]
 
         # ── Build text summary ──────────────────────────────────────────────
         start_display = (self.startDate or "").split("T")[0]
@@ -731,7 +747,6 @@ class TargetWorkspace(Workspace):
 
         # Map internal metric column names to their display names
         metric_display = dict(zip(self.metrics, resolved_metric_names))
-
         df = self.dataframe
 
         # Control group block — raw counts only
@@ -799,69 +814,22 @@ class TargetWorkspace(Workspace):
         # ── Date range for panels ───────────────────────────────────────────
         if self.startDate and self.endDate:
             date_range_id = f"{self.startDate}/{self.endDate}"
-            date_range_name = f"{start_display} \u2013 {end_display}"
         else:
             date_range_id = "thisMonth"
-            date_range_name = "This month"
 
-        # ── Segment filters from the original request ───────────────────────
-        segment_filters = [
-            f for f in self.globalFilters
-            if f.get("type") == "segment"
-            and not str(f.get("segmentId", "")).startswith("Dynamic:")
-        ]
+        # ── Activity freeform config ──────────────────────────────────────────
+        dim_item_id = self.activityFilter.replace(":::", "::") if self.activityFilter else None
 
-        def _apply_segments(wc: WorkspaceManager) -> None:
-            for sf in segment_filters:
-                wc.addSegmentFilter(
-                    sf.get("segmentId", ""),
-                    sf.get("segmentName", ""),
-                )
+        # ── Panel name helper ─────────────────────────────────────────────────
+        def _panel_name(extra_segment):
+            return f"Target Results ({extra_segment})" if extra_segment else "Target Results"
 
-        # ── Normalise owner for new projects ────────────────────────────────
-        owner_dict = {"id": owner['loginId'], "name": owner['fullName'], "login": owner['login']}
-
-        # ── Find existing workspace by name ─────────────────────────────────
-        self.apiCalls += 1
-        all_projects = self.analyticsObject.getProjects(format="raw")
-        existing = next(
-            (p for p in all_projects if p.get("name") == workspaceName), None
-        )
-
-        if existing is not None:
-            # ── Update path: load existing definition, prepend results panel ─
-            self.apiCalls += 1
-            project_dict = self.analyticsObject.getProject(existing["id"])
-            wc = WorkspaceManager(data=project_dict)
-            wc.addPanel(
-                name="Target Results",
-                date_range_id=date_range_id,
-                date_range_name=date_range_name,
-                position=0,
-            )
-            _apply_segments(wc)
-            wc.addTextFreeform("Experiment Results", tb)
-            updated_obj = wc.to_dict()
-            self.apiCalls += 1
-            return self.analyticsObject.updateProject(
-                projectId=existing["id"], projectObj=updated_obj
-            )
-        else:
-            # ── Create path: two-panel workspace ─────────────────────────────
-            wc = WorkspaceManager(rsid=rsid, name=workspaceName)
-            wc.setOwner(owner_dict) if owner_dict else None
-
-            # Panel 1 – results text
-            wc.addPanel(
-                name="Target Results",
-                date_range_id=date_range_id,
-                date_range_name=date_range_name,
-            )
-            _apply_segments(wc)
+        # ── Helper: add the text summary visualisation to the current panel ────
+        def _add_text_summary(wc):
             wc.addTextFreeform("Experiment Results", tb)
 
-            # Panel 2 – activity×experience breakdown freeform
-            dim_item_id = self.activityFilter.replace(":::", "::") if self.activityFilter else None
+        # ── Helper: add the freeform data table visualisation to the current panel ─
+        def _add_data_table(wc):
             if dim_item_id:
                 wc.addActivityBreakdownFreeform(
                     title=self.activityName or "Target Experiences",
@@ -876,12 +844,68 @@ class TargetWorkspace(Workspace):
             else:
                 wc.addSimpleFreeform(
                     title=self.activityName or "Target Experiences",
-                    dimension_id="variables/targetraw.experience",
-                    dimension_name="Target Experience",
+                    item_id="variables/targetraw.experience",
+                    item_name="Target Experience",
                     metrics=metrics_spec,
                     rows=50,
                 )
 
+        # ── Helper: create one full "Target Results" panel with all filters ────
+        def _add_results_panel(wc, extra_segment=None, position=None, include_text=True, include_freeform=True):
+            kwargs = {"name": _panel_name(extra_segment), "date_range": date_range_id}
+            if position is not None:
+                kwargs["position"] = position
+            wc.addPanel(**kwargs)
+            if globalFilters:
+                for gf in globalFilters:
+                    wc.addSegmentFilter(gf)
+            if extra_segment is not None:
+                wc.addSegmentFilter(extra_segment)
+            if include_text:
+                _add_text_summary(wc)
+            if include_freeform:
+                _add_data_table(wc)
+
+        # ── Normalise owner for new projects ────────────────────────────────
+        owner_dict = {"id": owner['loginId'], "name": owner['fullName'], "login": owner['login']}
+
+        # ── Find existing workspace by name ─────────────────────────────────
+        self.apiCalls += 1
+        all_projects = self.analyticsObject.getProjects(format="raw")
+        existing = next(
+            (p for p in all_projects if p.get("name") == workspaceName), None
+        )
+
+        if existing is not None:
+            # ── Update path: load existing definition, prepend results panels ─
+            self.apiCalls += 1
+            project_dict = self.analyticsObject.getProject(existing["id"])
+            wc = WorkspaceManager(data=project_dict, analytics=self.analyticsObject)
+            wc.addPanel(name=_panel_name(None), date_range=date_range_id, position=0)
+            _add_text_summary(wc, extra_segment=None, position=0, include_text=True, include_freeform=True)
+            for i, (segId, segName) in enumerate(resolved_segments.items() or []):
+                wc.addPanel(name=_panel_name(segName), date_range=date_range_id, position=i)
+                for sf in existing_segmentIds:
+                    wc.addSegmentFilter(sf)
+                wc.addSegmentFilter(segId)
+                _add_data_table(wc)
+            updated_obj = wc.to_dict()
+            self.apiCalls += 1
+            return self.analyticsObject.updateProject(
+                projectId=existing["id"], projectObj=updated_obj
+            )
+        else:
+            # ── Create path: one panel per segment (+1 unsegmented) ───────────
+            wc = WorkspaceManager(rsid=rsid, name=workspaceName)
+            wc.setOwner(owner_dict) if owner_dict else None
+            wc.addPanel(name=_panel_name(None), date_range=date_range_id, position=0)
+            _add_text_summary(wc, extra_segment=None, position=0, include_text=True, include_freeform=True)
+            for i, (segId, segName) in enumerate(resolved_segments.items() or []):
+                wc.addPanel(name=_panel_name(segName), date_range=date_range_id, position=i+1)
+                for sf in existing_segmentIds:
+                    wc.addSegmentFilter(sf)
+                wc.addSegmentFilter(segId)
+                _add_data_table(wc)
             project_obj = wc.to_dict()
             # Ensure owner key is always present (required by createProject)
             if "owner" not in project_obj:

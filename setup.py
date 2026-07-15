@@ -54,6 +54,7 @@ setup(
         "pytest",
         "openpyxl>2.6.0",
         "deprecation"
+        "httpx",
     ],
     classifiers=CLASSIFIERS,
     python_requires='>=3.6'

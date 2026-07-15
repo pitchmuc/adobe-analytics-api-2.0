@@ -336,7 +336,7 @@ class DataRepairJobCreator:
             value: REQUIRED if action is "set" : The value to be set for the variable.
             filterCondition: OPTIONAL : The filter condition to be applied. 
                 Choose from "inList", "isEmpty", "contains", "doesNotContain", "startsWith",doesNotStartWith", "endsWith", "doesNotEndWith", "isURL", "isNotURL","isNumeric","isNotNumeric".
-            matchValues: OPTIONAL : The list of values to be matched for the filter condition.
+            matchValues: OPTIONAL : The list of values to be matched for the filter condition. Single string can also be provided for certain operation, will then set "matchValue" instead.
             filterVariable: OPTIONAL : The variable to be used for the filtering of the original variable.
         """
         var = {"action":action}

@@ -172,7 +172,7 @@ class RequestCreator:
         if filterId is None:
             raise ValueError("Require a filter ID")
         filterIdCount = self.__metricFilterCount
-        if filterId.startswith("s") and "@AdobeOrg" in filterId:
+        if filterId.startswith("s") and filterId[1].isdigit():
             filterType = "segment"
             filter = {
                 "id": str(filterIdCount),
@@ -357,17 +357,17 @@ class RequestCreator:
                 "s2120430124uf03102jd8021" -> segment
                 "2020-01-01T00:00:00.000/2020-02-01T00:00:00.000" -> dateRange
         """
-        if filterId.startswith("s") and "@AdobeOrg" in filterId:
-            filterType = "segment"
-            filter = {
-                "type": filterType,
-                "segmentId": filterId,
-            }
-        elif filterId.startswith("20") and "/20" in filterId:
+        if filterId.startswith("20") and "/20" in filterId:
             filterType = "dateRange"
             filter = {
                 "type": filterType,
                 "dateRange": filterId,
+            }
+        elif filterId.startswith("s") and filterId[1].isdigit():
+            filterType = "segment"
+            filter = {
+                "type": filterType,
+                "segmentId": filterId,
             }
         elif ":::" in filterId:
             filterType = "breakdown"

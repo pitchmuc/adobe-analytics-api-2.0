@@ -5,3 +5,4 @@ dicttoxml>=1.7.4
 pathlib>=1.0.0
 openpyxl>=2.6.1
 deprecation
+httpx

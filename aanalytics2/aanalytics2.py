@@ -838,7 +838,7 @@ class Analytics:
             format : OPTIONAL : defined the format returned by the query. (Default df)
                 possibe values :
                     "df" : default value that return a dataframe
-                    "raw": return a list of value. More or less what is return from server.
+                    "raw": return a list of value.
             save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
             verbose : OPTIONAL : If set to True, print some information
 
@@ -4563,7 +4563,7 @@ class Analytics:
         staticRows = set(val for val in tableSegmentsRows.values())
         staticRowsNames = []
         for row in staticRows:
-            if row.startswith("s") and "@AdobeOrg" in row:
+            if row.startswith("s") in row and row[1].isdigit():
                 filter = self.Segment(row)
                 staticRowsNames.append(filter["name"])
             else:
@@ -4741,7 +4741,7 @@ class Analytics:
                     metricFilters[filterValue] = filterValue
                 elif filter["type"] == "segment":
                     filterValue = f"{filter['segmentId']}"
-                    if filterValue.startswith("s") and "@AdobeOrg" in filterValue:
+                    if filterValue.startswith("s") and filterValue[1].isdigit():
                         seg = self.getSegment(filterValue)
                         metricFilters[filterValue] = seg["name"]
                 else:
@@ -4784,7 +4784,7 @@ class Analytics:
                         segId: str = segmentApplied[element]
                         metricName += f":::{segId}"
                         metricFilters[segId] = segId
-                        if segId.startswith("s") and "@AdobeOrg" in segId:
+                        if segId.startswith("s") and segId[1].isdigit():
                             seg = self.getSegment(segId)
                             metricFilters[segId] = seg["name"]
                 metricColumns.append(metricName)
@@ -4885,8 +4885,10 @@ class Analytics:
                     raise ValueError(f"metric {metric} not found")
                 global_request.addMetric(my_metric[0])
         all_segments = None
+        segmentIds_requests = []
         for segment in segments or []:
-            if segment.startswith("s_") and "@AdobeOrg" in segment:
+            if segment.startswith("s") and segment[1].isnumeric():
+                segmentIds_requests.append(segment)
                 global_request.addGlobalFilter(segment)
             else:
                 if all_segments is None:
@@ -4896,6 +4898,7 @@ class Analytics:
                 my_segment = [seg['id'] for seg in all_segments if seg["name"] == segment]
                 if len(my_segment) == 0:
                     raise ValueError(f"segment {segment} not found")
+                segmentIds_requests.append(my_segment[0])
                 global_request.addGlobalFilter(my_segment[0])
         reportActivities = self.getReport2(global_request, returnClass=True)
         api_call_count += 1
@@ -4924,6 +4927,8 @@ class Analytics:
                     raise ValueError(f"metric {metric} not found")
                 report_activities.addMetric(my_metric[0])
         report_activities.addGlobalFilter(timeframe)
+        for seg in segmentIds_requests:
+            report_activities.addGlobalFilter(seg)
         activity_filter = f"variables/targetraw.activity:::{itemId}"
         report_activities.addMetricFilter(metricId="all", filterId=f"variables/targetraw.activity:::{itemId}")
         api_call_count += 1

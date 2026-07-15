@@ -7,8 +7,41 @@ import requests
 import io
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from aanalytics2 import config, token_provider
+from aanalytics2 import config
+from typing import Dict
 
+
+def get_oauth_token_and_expiry_for_config(config:dict,verbose:bool=False,save:bool=False)->Dict[str,str]:
+        """
+        Retrieve the access token by using the OAuth information provided by the user
+        during the import importConfigFile function.
+        Arguments :
+            config : REQUIRED : Configuration object.
+            verbose : OPTIONAL : Default False. If set to True, print information.
+            save : OPTIONAL : Default False. If set to True, save the toke in the .
+        """
+        if config is None:
+            raise ValueError("config dictionary is required")
+        oauth_payload = {
+            "grant_type": "client_credentials",
+            "client_id": config["client_id"],
+            "client_secret": config["secret"],
+            "scope": config["scopes"]
+        }
+        response = requests.post(
+            config["oauthTokenEndpointV2"], data=oauth_payload)
+        json_response = response.json()
+        if 'access_token' in json_response.keys():
+            token = json_response['access_token']
+            expiry = json_response["expires_in"]
+        else:
+            return json.dumps(json_response,indent=2)
+        if save:
+            with open('token.txt', 'w') as f:
+                f.write(token)
+        if verbose:
+            print('token valid till : ' + time.ctime(time.time() + expiry))
+        return {'token': token, 'expiry': expiry}
 
 class AdobeRequest:
     """
@@ -50,7 +83,7 @@ class AdobeRequest:
         self.logger = logger
         self.retry = retry
         if self.config['token'] == '' or time.time() > self.config['date_limit']:
-            token_and_expiry = token_provider.get_oauth_token_and_expiry_for_config(
+            token_and_expiry = get_oauth_token_and_expiry_for_config(
                 config=self.config, verbose=verbose)
             token = token_and_expiry['token']
             expiry = token_and_expiry['expiry']
@@ -102,7 +135,7 @@ class AdobeRequest:
         if time.time() > self.config['date_limit']:
             if self.loggingEnabled:
                 self.logger.warning("OAuth token expired — retrieving a new one")
-            token_and_expiry = token_provider.get_oauth_token_and_expiry_for_config(
+            token_and_expiry = get_oauth_token_and_expiry_for_config(
                 config=self.config)
             token = token_and_expiry['token']
             self.config['token'] = token

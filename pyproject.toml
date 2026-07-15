@@ -32,7 +32,8 @@ dependencies = [
     "dicttoxml",
     "pytest",
     "openpyxl>2.6.0",
-    "deprecation"
+    "deprecation",
+    "httpx",
 ]
 dynamic = ["version"]
 
