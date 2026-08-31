@@ -1,0 +1,9 @@
+{
+    "org_id": "B52D1CFE5330949C0A490D45@AdobeOrg",
+    "api_key": "136a33a81a3146399660048c7e9ed847",
+    "tech_id": "48F502F75D0CF9210A495E55@techacct.adobe.com",
+    "secret": "1abb7cf4-001f-4e09-9eac-f3b9cb34ad6c",
+    "pathToKey": "C:/Users/piccini/OneDrive - Adobe/Documents/Clients/BMW/BMW/Analytics API/bmw_analytics_api_decrypt.key",
+    "tech_email": "acf61ad6-71de-4bb4-871e-2402ecc4d294@techacct.adobe.com",
+    "scopes":"openid, AdobeID, read_organizations, additional_info.projectedProductContext"
+}
