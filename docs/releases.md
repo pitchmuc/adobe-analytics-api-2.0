@@ -3,6 +3,16 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.6.0
+* adding the `getMarketingChannels` method to retrieve the marketing channels for a specific report suite. [Documentation](./main.md#getMarketingChannels)
+* adding new class `WorkspaceManager` to create workspace projects from scratch with the API. [Documentation](./workspaceManager.md)
+* adding new methods for `WorkspaceManager` class:
+  * createProjectFromTemplate
+  * createProjectFromReport
+  * createProjectFromRequest
+  * createProjectFromDataFrame
+* Adding the `getTargetReport` method to be able to build confidence and significance report with calculated metrics from the API. [Documentation](./main.md#getTargetReport)
+
 
 ## version 0.5.3 
 * fix limitation regarding dateRanges

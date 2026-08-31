@@ -3,6 +3,8 @@
 On this page, a quick example on how to start with the wrapper.
 More details explanation are available in the [main file](./main.md) or one the [datanalyst.info website](https://www.datanalyst.info/category/python/adobe-analytics-api-2-0/)
 
+If you prefer to explore Adobe Analytics from a terminal without writing Python code, see the [CLI documentation](./cli.md).
+
 ## 1. Create an Adobe IO console account
 
 First you should create an Adobe IO account and connect to a Product Profile.
@@ -35,7 +37,6 @@ Starting with the wrapper, you can import it and create a template for the JSON 
 import aanalytics2 as api2
 api2.createConfigFile()
 ```
-
 
 This will create a JSON and you will need to fill it with the information available in your adobe io account.
 
