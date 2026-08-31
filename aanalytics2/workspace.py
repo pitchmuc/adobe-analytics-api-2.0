@@ -842,7 +842,7 @@ class TargetWorkspace(Workspace):
                     breakdown_rows=10,
                 )
             else:
-                wc.addSimpleFreeform(
+                wc.addFreeform(
                     title=self.activityName or "Target Experiences",
                     item_id="variables/targetraw.experience",
                     item_name="Target Experience",
@@ -881,8 +881,7 @@ class TargetWorkspace(Workspace):
             self.apiCalls += 1
             project_dict = self.analyticsObject.getProject(existing["id"])
             wc = WorkspaceManager(data=project_dict, analytics=self.analyticsObject)
-            wc.addPanel(name=_panel_name(None), date_range=date_range_id, position=0)
-            _add_text_summary(wc, extra_segment=None, position=0, include_text=True, include_freeform=True)
+            _add_results_panel(wc, extra_segment=None, position=0, include_text=True, include_freeform=True)
             for i, (segId, segName) in enumerate(resolved_segments.items() or []):
                 wc.addPanel(name=_panel_name(segName), date_range=date_range_id, position=i)
                 for sf in existing_segmentIds:
@@ -898,8 +897,7 @@ class TargetWorkspace(Workspace):
             # ── Create path: one panel per segment (+1 unsegmented) ───────────
             wc = WorkspaceManager(rsid=rsid, name=workspaceName)
             wc.setOwner(owner_dict) if owner_dict else None
-            wc.addPanel(name=_panel_name(None), date_range=date_range_id, position=0)
-            _add_text_summary(wc, extra_segment=None, position=0, include_text=True, include_freeform=True)
+            _add_results_panel(wc, extra_segment=None, position=0, include_text=True, include_freeform=True)
             for i, (segId, segName) in enumerate(resolved_segments.items() or []):
                 wc.addPanel(name=_panel_name(segName), date_range=date_range_id, position=i+1)
                 for sf in existing_segmentIds:
