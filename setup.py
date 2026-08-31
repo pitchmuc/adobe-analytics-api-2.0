@@ -53,9 +53,15 @@ setup(
         "dicttoxml",
         "pytest",
         "openpyxl>2.6.0",
-        "deprecation"
+        "deprecation",
         "httpx",
+        "rich>=13.0.0",
     ],
+    entry_points={
+        "console_scripts": [
+            "aanalytics2=aanalytics2.cli.__main__:main",
+        ],
+    },
     classifiers=CLASSIFIERS,
     python_requires='>=3.6'
 )
