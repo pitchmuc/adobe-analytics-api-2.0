@@ -195,7 +195,7 @@ class AdobeRequest:
             res_json = {'error': 'Request Error'}
         return res_json
 
-    def postData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, files: dict = None, *args, **kwargs):
+    def postData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, files: dict = None, json_data:dict|list = None, *args, **kwargs):
         """
         Abstraction for POST requests.
         """
@@ -203,19 +203,24 @@ class AdobeRequest:
         if params is None:
             params = {}
         request_headers = headers if headers is not None else self.header
-        if data is None and files is None:
+        if data is None and files is None and json_data is None:
             res = self.session.post(endpoint, headers=request_headers, params=params)
-        elif data is not None and files is None:
+        elif data is not None and files is None and json_data is None:
             res = self.session.post(endpoint, headers=request_headers, data=json.dumps(data), params=params)
-        elif data is None and files is not None:
+        elif data is None and files is not None and json_data is None:
             res = self.session.post(endpoint, headers=request_headers, params=params, files=files)
+        elif json_data is not None:
+            res = self.session.post(endpoint, headers=request_headers, params=params, json=json_data)
         else:
-            res = self.session.post(endpoint, headers=request_headers, params=params, data=json.dumps(data), files=files)
+            res = self.session.post(endpoint, headers=request_headers, params=params, data=json.dumps(data), json=json_data, files=files)
         try:
             res_json = res.json()
-            if res.status_code == 429 or res_json.get('error_code') == "429050":
+            if res.status_code == 429:
                 res_json['status_code'] = 429
-        except Exception:
+            if type(res_json) == dict:
+                if res_json.get('error_code') == "429050":
+                    res_json['status_code'] = 429
+        except Exception as e:
             if kwargs.get('legacy', False):  # handling Analytics 1.4
                 try:
                     return json.loads(res.text)
@@ -226,18 +231,20 @@ class AdobeRequest:
             res_json = {'error': 'Request Error'}
         return res_json
 
-    def patchData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, files: dict = None, *args, **kwargs):
+    def patchData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, files: dict = None, json_data:dict|list = None, *args, **kwargs):
         """
         Abstraction for PATCH requests.
         """
         self._checkingDate()
         request_headers = headers if headers is not None else self.header
-        if params is not None and data is None and files is None:
+        if params is not None and data is None and files is None and json_data is None:
             res = self.session.patch(endpoint, headers=request_headers, params=params)
         elif params is None and data is not None and files is None:
             res = self.session.patch(endpoint, headers=request_headers, data=json.dumps(data))
         elif params is not None and data is not None and files is None:
             res = self.session.patch(endpoint, headers=request_headers, params=params, data=json.dumps(data))
+        elif json_data is not None:
+            res = self.session.patch(endpoint, headers=request_headers, params=params, json=json_data)
         else:
             res = self.session.patch(endpoint, headers=request_headers, params=params, files=files)
         try:
@@ -248,18 +255,20 @@ class AdobeRequest:
             res_json = {'error': 'Request Error'}
         return res_json
 
-    def putData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, files: dict = None, *args, **kwargs):
+    def putData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, files: dict = None, json_data: dict|list = None, *args, **kwargs):
         """
         Abstraction for PUT requests.
         """
         self._checkingDate()
         request_headers = headers if headers is not None else self.header
-        if params is not None and data is None and files is None:
+        if params is not None and data is None and files is None and json_data is None:
             res = self.session.put(endpoint, headers=request_headers, params=params)
         elif params is None and data is not None and files is None:
             res = self.session.put(endpoint, headers=request_headers, data=json.dumps(data))
         elif params is not None and data is not None and files is None:
             res = self.session.put(endpoint, headers=request_headers, params=params, data=json.dumps(data))
+        elif json_data is not None:
+            res = self.session.put(endpoint, headers=request_headers, params=params, json=json_data)
         else:
             res = self.session.put(endpoint, headers=request_headers, params=params, files=files)
         try:

@@ -651,8 +651,8 @@ class Analytics:
             self.logger.debug(f"validateVirtualReportSuite response : {res}")
         return res
 
-    def getDimensions(self, rsid: str, tags: bool = False, description: bool = False, save=False,
-                      **kwargs) -> pd.DataFrame:
+    def getDimensions(self, rsid: str, tags: bool = False, description: bool = False, save=False,format='df',
+                      **kwargs) -> JsonListOrDataFrameType:
         """
         Retrieve the list of dimensions from a specific reportSuite. Shrink columns to simplify output.
         Returns the data frame of available dimensions.
@@ -661,6 +661,7 @@ class Analytics:
             tags : OPTIONAL : If you would like to have additional information, such as tags. (bool : default False)
             description : OPTIONAL : Trying to add the description column. It may break the method.
             save : OPTIONAL : If set to True, it will save the info in a csv file (bool : default False)
+            format : OPTIONAL : Specify the type of format to return, default "df" for dataframe, other options "raw" for a list.
         Possible kwargs:
             full : Boolean : Doesn't shrink the number of columns if set to true
             example : getDimensions(rsid,full=True)
@@ -671,8 +672,9 @@ class Analytics:
         if tags:
             params.update({'expansion': 'tags'})
         params.update({'rsid': rsid})
-        dims = self.connector.getData(self.endpoint_company +
-                                      self._getDimensions, params=params, headers=self.header)
+        dims = self.connector.getData(self.endpoint_company + self._getDimensions, params=params, headers=self.header)
+        if format == 'raw':
+            return dims
         df_dims = pd.DataFrame(dims)
         columns = ['id', 'name', 'category', 'type',
                    'parent', 'pathable']
@@ -695,7 +697,7 @@ class Analytics:
         return df_dims
 
     def getMetrics(self, rsid: str, tags: bool = False, save=False, description: bool = False, dataGroup: bool = False, format:str='df',
-                   **kwargs) -> pd.DataFrame:
+                   **kwargs) -> JsonListOrDataFrameType:
         """
         Retrieve the list of metrics from a specific reportSuite. Shrink columns to simplify output.
         Returns the data frame of available metrics.
@@ -744,7 +746,7 @@ class Analytics:
                     json.dump(metrics,f)
         return metrics
 
-    def getUsers(self, format:str='df',save: bool = False, **kwargs) -> pd.DataFrame:
+    def getUsers(self, format:str='df',save: bool = False, **kwargs) -> JsonListOrDataFrameType:
         """
         Retrieve the list of users for a login company.Returns a data frame.
         Arguments:
@@ -1240,9 +1242,12 @@ class Analytics:
         )
         return cm
 
-    def getDateRanges(self, extended_info: bool = False, save: bool = False, includeType: str = 'all',
+    def getDateRanges(self, extended_info: bool = False, 
+                      save: bool = False, 
+                      includeType: str = 'all',
+                      format:str='df', 
                       verbose: bool = False,
-                      **kwargs) -> pd.DataFrame:
+                      **kwargs) -> JsonListOrDataFrameType:
         """
         Get the list of date ranges available for the user.
         Arguments:
@@ -1251,6 +1256,7 @@ class Analytics:
             save : OPTIONAL : If set to True, it will save the info in a csv file (Default False)
             includeType : Include additional date ranges not owned by user. The "all" option takes precedence over "shared"
                 Possible values are all, shared, templates. You can add all of them as comma separated string.
+            format : OPTIONAL : By default "df" to return a dataframe. Possible option: "raw"
         Possible kwargs:
             limit : number of segments retrieved by request. default 500: Limited to 1000 by the AnalyticsAPI.
             full : Boolean : Doesn't shrink the number of columns if set to true
@@ -1277,7 +1283,8 @@ class Analytics:
             if dateRanges.get('lastPage', True):
                 break
             page += 1
-        
+        if format == 'raw':
+            return all_data
         df_dates = pd.DataFrame(all_data)
         if save:
             df_dates.to_csv('date_range.csv', index=False)
@@ -2123,6 +2130,29 @@ class Analytics:
         if type(projectObj['definition']) != dict:
             raise ValueError("Requires definition key to be a dictionary")
         res = self.connector.postData(self.endpoint_company + path, data=projectObj, headers=self.header)
+        return res
+
+    def getMarketingChannels(self, rsid: str|list[str] = None) -> list|dict:
+        """
+        Return the marketing channels for a given (list of) report suite ID.
+        If list of reportSuite provided, returns a list. 
+        If single reportSuite provided, returns a dict.
+        Arguments:
+            rsid : REQUIRED : The report suite ID or a list of reportSuite ID to retrieve the marketing channels for.
+        """
+        path = f"/marketingchannels"
+        if self.loggingEnabled:
+            self.logger.debug(f"starting getMarketingChannels for rsid: {rsid}")
+        if rsid is None:
+            raise ValueError("A report suite ID is required")
+        elif type(rsid) == str:
+            rsid = [rsid]
+        elif type(rsid) != list:
+            raise ValueError("rsid must be a string or a list of strings")
+        data = {"rsidList": rsid}
+        res = self.connector.postData(self.endpoint_company + path, json_data=data, headers=self.header)
+        if len(res) == 1:
+            return res[0]
         return res
     
     def getDataSourceAccounts(self,rsid:str=None)->list:
