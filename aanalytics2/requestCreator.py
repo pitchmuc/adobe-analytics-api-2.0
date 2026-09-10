@@ -238,11 +238,12 @@ class RequestCreator:
     
     def getGlobalTimeRange(self)->str:
         """
-        return the dateRange used in the globalFilter if any.
+        return the dateRange (or dateRangeId, if the filter references a saved Date Range
+        component) used in the globalFilter if any.
         """
         for filter in self.__request["globalFilters"]:
             if filter["type"] == "dateRange":
-                return filter["dateRange"]
+                return filter.get("dateRange") or filter.get("dateRangeId")
         return None
     
     def getFilters(self) -> list:
@@ -388,73 +389,85 @@ class RequestCreator:
         ### adding to the globalFilter list
         self.__request["globalFilters"].append(filter)
 
-    def updateDateRange(
+    def setDateRange(
         self,
         dateRange: str = None,
-        shiftingDays: int = None,
-        shiftingDaysEnd: int = None,
-        shiftingDaysStart: int = None,
+        last: int = None,
+        start: str = None,
+        end: str = None,
+        dateRangeId: str = None,
     ) -> None:
         """
-        Update the dateRange filter on the globalFilter list
-        One of the 3 elements specified below is required.
+        Set the dateRange global filter for the request, adding it if none exists yet or
+        replacing the existing one otherwise.
         Arguments:
-            dateRange : OPTIONAL : string representing the new dateRange string, such as: 2020-01-01T00:00:00.000/2020-02-01T00:00:00.000
-            shiftingDays : OPTIONAL : An integer, if you want to add or remove days from the current dateRange provided. Apply to end and beginning of dateRange.
-                So 2020-01-01T00:00:00.000/2020-02-01T00:00:00.000 with +2 will give 2020-01-03T00:00:00.000/2020-02-03T00:00:00.000
-            shiftingDaysEnd : : OPTIONAL : An integer, if you want to add or remove days from the last part of the current dateRange. Apply only to end of the dateRange.
-                So 2020-01-01T00:00:00.000/2020-02-01T00:00:00.000 with +2 will give 2020-01-01T00:00:00.000/2020-02-03T00:00:00.000
-            shiftingDaysStart : OPTIONAL : An integer, if you want to add or remove days from the last first part of the current dateRange. Apply only to beginning of the dateRange.
-                So 2020-01-01T00:00:00.000/2020-02-01T00:00:00.000 with +2 will give 2020-01-03T00:00:00.000/2020-02-01T00:00:00.000
+            dateRange : OPTIONAL : The date range to set. Accepts either the full timeframe
+                ("2026-03-01T00:00:00.000/2026-03-31T23:59:59.999") or a simplified date-only
+                version ("2026-03-01/2026-03-31"), which is automatically expanded to the full
+                timeframe (00:00:00.000 for the start date, 23:59:59.999 for the end date).
+                Cannot be combined with last, start, end or dateRangeId.
+            last : OPTIONAL : Number of days to set the range to. Ends today unless start or end
+                is also provided to anchor the window on a specific date instead.
+                e.g. last=7 alone sets the range to today and the 6 days before it.
+            start : OPTIONAL : Start date ("YYYY-MM-DD"). Combine with last to compute the end
+                date (start + last - 1 days). Cannot be combined with end and last together.
+            end : OPTIONAL : End date ("YYYY-MM-DD"). Combine with last to compute the start date
+                (end - last + 1 days). Cannot be combined with start and last together.
+            dateRangeId : OPTIONAL : The id of a saved/custom Date Range component (see
+                Analytics.getDateRanges / createDateRange) to reference instead of a literal date
+                range. Cannot be combined with dateRange, last, start or end.
+        One of dateRange, dateRangeId, last, or both start and end, is required.
         """
+        if dateRangeId is not None:
+            if dateRange is not None or last is not None or start is not None or end is not None:
+                raise ValueError("dateRangeId cannot be combined with dateRange, last, start or end")
+            newDef = {"type": "dateRange", "dateRangeId": dateRangeId}
+        else:
+            if dateRange is not None:
+                if last is not None or start is not None or end is not None:
+                    raise ValueError("dateRange cannot be combined with last, start or end")
+            elif last is not None:
+                if start is not None and end is not None:
+                    raise ValueError("Provide either start or end with last/-d, not both")
+                if start is not None:
+                    start_dt = datetime.datetime.strptime(start, "%Y-%m-%d")
+                    end_dt = start_dt + datetime.timedelta(days=last - 1)
+                elif end is not None:
+                    end_dt = datetime.datetime.strptime(end, "%Y-%m-%d")
+                    start_dt = end_dt - datetime.timedelta(days=last - 1)
+                else:
+                    end_dt = self.today
+                    start_dt = end_dt - datetime.timedelta(days=last - 1)
+                dateRange = f"{start_dt.strftime('%Y-%m-%d')}/{end_dt.strftime('%Y-%m-%d')}"
+            elif start is not None and end is not None:
+                dateRange = f"{start}/{end}"
+            else:
+                raise ValueError(
+                    "Either dateRange, dateRangeId, last, or both start and end, must be provided"
+                )
+
+            if "/" not in dateRange:
+                raise ValueError(
+                    "dateRange must be in the form 'start/end', e.g. '2026-03-01/2026-03-31'"
+                )
+            rangeStart, rangeEnd = dateRange.split("/")
+            if "T" not in rangeStart:
+                rangeStart = f"{rangeStart}T00:00:00.000"
+            if "T" not in rangeEnd:
+                rangeEnd = f"{rangeEnd}T23:59:59.999"
+            dateRange = f"{rangeStart}/{rangeEnd}"
+            newDef = {"type": "dateRange", "dateRange": dateRange}
+
         pos = -1
         for index, filter in enumerate(self.__request["globalFilters"]):
             if filter["type"] == "dateRange":
                 pos = index
-                curDateRange = filter["dateRange"]
-                start, end = curDateRange.split("/")
-                start = datetime.datetime.fromisoformat(start)
-                end = datetime.datetime.fromisoformat(end)
-        if dateRange is not None and type(dateRange) == str:
-            for index, filter in enumerate(self.__request["globalFilters"]):
-                if filter["type"] == "dateRange":
-                    pos = index
-                    curDateRange = filter["dateRange"]
-            newDef = {
-                "type": "dateRange",
-                "dateRange": dateRange,
-            }
-        if shiftingDays is not None and type(shiftingDays) == int:
-            newStart = (start + datetime.timedelta(shiftingDays)).isoformat(
-                timespec="milliseconds"
-            )
-            newEnd = (end + datetime.timedelta(shiftingDays)).isoformat(
-                timespec="milliseconds"
-            )
-            newDef = {
-                "type": "dateRange",
-                "dateRange": f"{newStart}/{newEnd}",
-            }
-        elif shiftingDaysEnd is not None and type(shiftingDaysEnd) == int:
-            newEnd = (end + datetime.timedelta(shiftingDaysEnd)).isoformat(
-                timespec="milliseconds"
-            )
-            newDef = {
-                "type": "dateRange",
-                "dateRange": f"{start}/{newEnd}",
-            }
-        elif shiftingDaysStart is not None and type(shiftingDaysStart) == int:
-            newStart = (start + datetime.timedelta(shiftingDaysStart)).isoformat(
-                timespec="milliseconds"
-            )
-            newDef = {
-                "type": "dateRange",
-                "dateRange": f"{newStart}/{end}",
-            }
+                break
         if pos > -1:
             self.__request["globalFilters"][pos] = newDef
-        else:  ## in case there is no dateRange already
-            self.__request["globalFilters"][pos].append(newDef)
+        else:
+            self.__globalFiltersCount += 1
+            self.__request["globalFilters"].append(newDef)
 
     def removeGlobalFilter(self, index: int = None, filterId: str = None) -> None:
         """

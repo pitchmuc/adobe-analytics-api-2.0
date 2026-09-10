@@ -957,12 +957,20 @@ class Analytics:
         metrics: list = re.findall("'(metrics/.+?)'", mydef)
         reportSuite = defSegment['rsid']
         scope = re.search("'context': '(.+)'}[^'context']+", mydef)
-        res = {
-            'dimensions': set(dimensions) if len(dimensions) > 0 else {},
-            'metrics': set(metrics) if len(metrics) > 0 else {},
-            'rsid': reportSuite,
-            'scope': scope.group(1)
-        }
+        try:
+            res = {
+                'dimensions': set(dimensions) if len(dimensions) > 0 else {},
+                'metrics': set(metrics) if len(metrics) > 0 else {},
+                'rsid': reportSuite,
+                'scope': scope.group(1)
+            }
+        except:
+            res = {
+                        'dimensions': set(dimensions) if len(dimensions) > 0 else {},
+                        'metrics': set(metrics) if len(metrics) > 0 else {},
+                        'rsid': reportSuite,
+                        'scope': 'unknown'
+                    }
         return res
 
     def createSegment(self, segmentJSON: dict = None) -> dict:

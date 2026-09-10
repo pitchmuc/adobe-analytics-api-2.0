@@ -50,6 +50,30 @@ aanalytics2.createConfigFile()
 
 Then add `companyId` and `rsid` manually before launching the CLI.
 
+### Configuring without a file
+
+If no config file is found (e.g. the default `config_analytics.json` does not exist), the CLI falls back to individual credential parameters, sourced from either the `config` command's flags or from environment variables — useful on servers where dropping a JSON file on disk isn't practical.
+
+Environment variables:
+
+* `AANALYTICS2_ORG_ID`
+* `AANALYTICS2_CLIENT_ID`
+* `AANALYTICS2_SECRET`
+* `AANALYTICS2_SCOPES`
+* `AANALYTICS2_TECH_ID` (optional)
+* `AANALYTICS2_COMPANY_ID` (optional — same role as `companyId` in the config file)
+* `AANALYTICS2_RSID` (optional — same role as `rsid` in the config file)
+
+```bash
+export AANALYTICS2_ORG_ID="<your IMS org ID>"
+export AANALYTICS2_CLIENT_ID="<your client ID>"
+export AANALYTICS2_SECRET="<your secret>"
+export AANALYTICS2_SCOPES="<your OAuth scopes>"
+aanalytics2
+```
+
+A config file, when present, still takes priority over environment variables — this is purely a fallback for when one isn't found. See [`config`](#config) for using individual parameters directly instead of environment variables.
+
 ---
 
 ## Starting the CLI
@@ -94,7 +118,7 @@ mycompanyid:myprodrsid>
   [request:myprodrsid]>
 ```
 
-Use `set_rsid` at any point to change the active report suite for the session.
+Use `set_rsid` at any point to change the active report suite for the session, and `set_company_id` to switch companies (this also reconnects Analytics for the new company).
 
 ---
 
@@ -113,7 +137,7 @@ Pass `-cmd` to run a single command and exit. This is useful for scripting and c
 
 ```bash
 # Export all segments to CSV
-aanalytics2 -cf config.json -cmd "get_segments -sv segments.csv"
+aanalytics2 -cf config.json -cmd "get_segments -fn segments.csv"
 
 # Filter dimensions for a given RSID
 aanalytics2 -cf config.json -rsid myprodrsid -cmd "get_dimensions -f prop"
@@ -126,8 +150,9 @@ aanalytics2 -cf config.json -rsid myprodrsid -cmd "get_dimensions -f prop"
 Most commands share the following optional arguments:
 
 * `-rsid` : OPTIONAL : Report suite ID for this command. When a session RSID is set with `set_rsid`, this argument is optional — the session value is used as the default. When no session RSID is set, `-rsid` is required.
-* `-f` / `--filter` : OPTIONAL : Case-insensitive substring filter applied locally after the API response is received.
-* `-sv` / `--save` : OPTIONAL : Save the command output to a CSV file. Pass the destination filename (e.g. `-sv output.csv`).
+* `-f` / `--filter` : OPTIONAL : Case-insensitive substring filter, matched against every column of each result row. Applied locally, after the data has already been retrieved from the API — it does not change what is requested from Adobe Analytics, it only narrows what is displayed/saved.
+* `-sv` / `--save` : OPTIONAL : Save the command output to a CSV file at the given path (e.g. `-sv output.csv`). If omitted, the result is only printed to the terminal and nothing is written to disk.
+* `-fn` / `--filename` : OPTIONAL : Used on `get_dimensions`, `get_metrics`, `get_calculated_metrics`, and `get_segments` — these commands always save their result to CSV, so there is no on/off switch for saving. `-fn` only overrides the default filename (e.g. `dimensions_<rsid>.csv`); omitting it just keeps the default name.
 * `-d` / `--definition` : OPTIONAL or REQUIRED : Path to a JSON file used as the object definition or request body for create/update commands.
 * `-n` : OPTIONAL : Limit the number of results returned. On `get_report` and `request_creator run`, `inf` (the default) retrieves all rows.
 
@@ -149,11 +174,20 @@ These commands manage the CLI session itself.
 
 ### `config`
 
-Reload the configuration and reconnect, optionally from a different config file.\
+Reload the configuration and reconnect.\
 Useful when you want to switch credentials without restarting the shell.
 
 ```
-config [-cf path/to/config.json]
+config [-cf path/to/config.json] [-org_id ID] [-client_id ID] [-secret SECRET] [-scopes SCOPES] [-tech_id ID]
+```
+
+By default this loads `-cf` (or the current config file). If `-org_id`, `-client_id`, `-secret`, or `-scopes` are passed, they take priority over the config file and are used to build the credentials directly — any of them left unset falls back to the matching `AANALYTICS2_*` environment variable (see [Configuring without a file](#configuring-without-a-file)).
+
+Example — switching to a different set of credentials without a file, e.g. sourced from a secrets manager into environment variables at deploy time:
+
+```
+mycompanyid> config -org_id 1234@AdobeOrg -client_id abcd1234 -secret ****** -scopes ent_analytics_bulk_ingest_sdk
+Connected to company: othercompanyid
 ```
 
 ### `get_company_id`
@@ -162,6 +196,23 @@ List all Adobe Analytics companies accessible with the current credentials.
 
 ```
 get_company_id [-sv file.csv]
+```
+
+### `set_company_id`
+
+Set or change the company ID for the session, and reconnect Analytics against it.\
+Useful after `get_company_id` reveals a company you want to switch to without restarting the shell.
+
+```
+set_company_id <company_id>
+```
+
+Example:
+
+```
+mycompanyid> set_company_id otherclientid
+Company ID set to otherclientid
+otherclientid>
 ```
 
 ### `set_rsid`
@@ -187,6 +238,14 @@ Display information about the currently authenticated user. Calls `getUserMe()`.
 
 ```
 whoami
+```
+
+### `clear`
+
+Clear the terminal screen. Also available inside the [RequestCreator sub-shell](#requestcreator-sub-shell).
+
+```
+clear
 ```
 
 ### `exit` / `quit`
@@ -270,32 +329,32 @@ Arguments:
 
 ### `get_dimensions`
 
-List all dimensions for a report suite.
+List all dimensions for a report suite. Always saved to CSV as `dimensions_<rsid>.csv` unless `-fn` overrides the filename.
 
 ```
-get_dimensions [-rsid id] [-f filter] [-sv file.csv]
+get_dimensions [-rsid id] [-f filter] [-fn file.csv]
 ```
 
 ### `get_metrics`
 
-List all metrics for a report suite.
+List all metrics for a report suite. Always saved to CSV as `metrics_<rsid>.csv` unless `-fn` overrides the filename.
 
 ```
-get_metrics [-rsid id] [-f filter] [-sv file.csv]
+get_metrics [-rsid id] [-f filter] [-fn file.csv]
 ```
 
 ### `get_calculated_metrics`
 
-List all calculated metrics.
+List all calculated metrics. Always saved to CSV as `calculated_metrics.csv` unless `-fn` overrides the filename.
 
 ```
-get_calculated_metrics [-n name] [-f filter] [-sv file.csv]
+get_calculated_metrics [-n name] [-f filter] [-fn file.csv]
 ```
 
 Arguments:
 * `-n` : OPTIONAL : Exact name filter passed to the API.
 * `-f` : OPTIONAL : Additional local substring filter.
-* `-sv` : OPTIONAL : Save to CSV.
+* `-fn` : OPTIONAL : Override the default output CSV filename (the result is always saved).
 
 ### `get_calculated_metric`
 
@@ -351,10 +410,10 @@ scan_calculated_metric <id> [-v]
 
 ### `get_segments`
 
-List segments.
+List segments. Always saved to CSV as `segments.csv` unless `-fn` overrides the filename.
 
 ```
-get_segments [-n name] [-rsid id] [-f filter] [-sv file.csv]
+get_segments [-n name] [-rsid id] [-f filter] [-fn file.csv]
 ```
 
 ### `get_segment`
@@ -631,8 +690,33 @@ The prompt shows the current RSID. Type `done` or press `Ctrl+D` to return to th
 * `set_dimension <dimension>`\
   Set the breakdown dimension, e.g. `variables/eVar1`.
 
-* `update_date_range <range>`\
-  Set the date range in `YYYY-MM-DD/YYYY-MM-DD` format.
+* `set_date_range <range>` or `set_date_range -d <days> [--start DATE | --end DATE]` or `set_date_range -id <dateRangeId>`\
+  Set (add or replace) the request's date range — the only command for this, replacing the old
+  `update_date_range`. `<range>` accepts either the full timeframe
+  (`2026-03-01T00:00:00.000/2026-03-31T23:59:59.999`) or a simplified date-only version
+  (`2026-03-01/2026-03-31`), which is automatically expanded to the full timeframe.
+
+  Use `-d <n>` instead to set the range to `n` days. Alone, it ends today (today and the `n-1` days
+  before it). Combine it with `--start DATE` to anchor the window's start and compute the end
+  (`start + n - 1` days), or with `--end DATE` to anchor the end and compute the start
+  (`end - n + 1` days). `--start` and `--end` can also be combined without `-d` for an explicit range.
+
+  Use `-id <dateRangeId>` instead to reference a saved/custom Date Range component (see
+  `get_date_ranges` in the main shell) rather than a literal range.
+
+  ```
+  [request:myprodrsid]> set_date_range 2026-03-01/2026-03-31
+  Date range set to: 2026-03-01T00:00:00.000/2026-03-31T23:59:59.999
+
+  [request:myprodrsid]> set_date_range -d 7
+  Date range set to: 2026-09-04T00:00:00.000/2026-09-10T23:59:59.999
+
+  [request:myprodrsid]> set_date_range -d 5 --start 2026-03-01
+  Date range set to: 2026-03-01T00:00:00.000/2026-03-05T23:59:59.999
+
+  [request:myprodrsid]> set_date_range -id 586ac3ec71ade31753dc35d0
+  Date range set to: 586ac3ec71ade31753dc35d0
+  ```
 
 * `set_limit <n>`\
   Set the number of result rows. Default is 100.
@@ -654,8 +738,29 @@ The prompt shows the current RSID. Type `done` or press `Ctrl+D` to return to th
 * `remove_metrics`\
   Remove all metrics from the request.
 
-* `get_metrics`\
+* `get_report_metrics`\
   List all metrics currently in the request.
+
+### Explore (read-only lookups against the Analytics API)
+
+Handy while building a request, to check what's actually available in the report suite before adding it.\
+Same behavior as their top-level counterparts: results are always saved to CSV (override the filename with `-fn`).
+
+* `get_dimensions [-rsid id] [-f filter] [-fn file.csv]`\
+  List dimensions available for a report suite. Uses the sub-shell's current RSID if `-rsid` is omitted.
+
+* `get_metrics [-rsid id] [-f filter] [-fn file.csv]`\
+  List metrics available for a report suite. Uses the sub-shell's current RSID if `-rsid` is omitted.\
+  Not to be confused with `get_report_metrics`, which lists the metrics already added to this request.
+
+* `get_calculated_metrics [-n name] [-f filter] [-fn file.csv]`\
+  List all calculated metrics.
+
+* `get_segments [-n name] [-rsid id] [-f filter] [-fn file.csv]`\
+  List segments.
+
+* `get_date_ranges [-f filter] [-fn file.csv]`\
+  List saved/custom date ranges. Grab an `id` from here to use with `set_date_range -id <id>`.
 
 ### Filters
 

@@ -5,4 +5,4 @@ from .aanalytics14 import *
 from .configs import *
 from .projects import *
 from .requestCreator import *
-from .workspaceManager import WorkspaceManager, TextBuilder
+from .workspaceManager import WorkspaceManager, TextBuilder, FreeForm, Panel

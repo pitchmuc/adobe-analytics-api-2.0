@@ -6,3 +6,4 @@ pathlib>=1.0.0
 openpyxl>=2.6.1
 deprecation
 httpx
+rdflib

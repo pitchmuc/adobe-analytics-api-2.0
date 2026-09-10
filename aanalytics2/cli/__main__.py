@@ -10,6 +10,7 @@ Usage:
 import argparse
 import cmd
 import json
+import os
 import shlex
 import sys
 import datetime
@@ -23,7 +24,7 @@ from rich.panel import Panel
 import aanalytics2
 from aanalytics2 import Analytics, Login
 from aanalytics2.requestCreator import RequestCreator
-from aanalytics2.configs import importConfigFile
+from aanalytics2.configs import importConfigFile, configure
 
 from ._helpers import (
     CLIError, SafeArgumentParser, login_required, str2bool,
@@ -32,11 +33,23 @@ from ._helpers import (
 )
 
 # ---------------------------------------------------------------------------
+# Environment variables used as a fallback for credentials when no config
+# file is found and no individual parameter was passed to `config`.
+# ---------------------------------------------------------------------------
+ENV_ORG_ID = "AANALYTICS2_ORG_ID"
+ENV_CLIENT_ID = "AANALYTICS2_CLIENT_ID"
+ENV_SECRET = "AANALYTICS2_SECRET"
+ENV_SCOPES = "AANALYTICS2_SCOPES"
+ENV_TECH_ID = "AANALYTICS2_TECH_ID"
+ENV_COMPANY_ID = "AANALYTICS2_COMPANY_ID"
+ENV_RSID = "AANALYTICS2_RSID"
+
+# ---------------------------------------------------------------------------
 # Command group metadata (used by the custom help display)
 # ---------------------------------------------------------------------------
 COMMAND_GROUPS = {
     "Session": [
-        "config", "get_company_id", "set_rsid", "whoami", "exit", "quit",
+        "config", "get_company_id", "set_company_id", "set_rsid", "whoami", "clear", "exit", "quit",
     ],
     "Report Suites": [
         "get_report_suites", "get_report_suite",
@@ -214,12 +227,14 @@ class RequestCreatorShell(cmd.Cmd):
 
     def do_add_metric_filter(self, args: Any):
         """add_metric_filter <metricId> <filterId>  — Add a filter to a specific metric."""
-        parts = args.strip().split()
-        if len(parts) < 2:
-            console.print("[red]Usage: add_metric_filter <metricId> <filterId>[/red]")
+        parser = SafeArgumentParser(prog="add_metric_filter")
+        parser.add_argument("metricId", metavar="metricId")
+        parser.add_argument("filterId", metavar="filterId")
+        args = self._parse(parser, args)
+        if args is None:
             return
-        self.rc.addMetricFilter(metricId=parts[0], filterId=parts[1])
-        console.print(f"[green]Metric filter added: {parts[1]} → {parts[0]}[/green]")
+        self.rc.addMetricFilter(metricId=args.metricId, filterId=args.filterId)
+        console.print(f"[green]Metric filter added: {args.filterId} → {args.metricId}[/green]")
 
     def do_set_limit(self, args: Any):
         """set_limit <n>  — Set the number of result rows (default 100)."""
@@ -265,17 +280,45 @@ class RequestCreatorShell(cmd.Cmd):
         self.rc.setNoneBehavior(val)
         console.print(f"[green]NoneBehavior set to {val}[/green]")
 
-    def do_update_date_range(self, args: Any):
-        """update_date_range <range>  — Set date range (e.g. 2024-01-01/2024-03-31)."""
-        dr = args.strip()
-        if not dr:
-            console.print("[red]Usage: update_date_range <YYYY-MM-DD/YYYY-MM-DD>[/red]")
+    def do_set_date_range(self, args: Any):
+        """set_date_range <range> | -d <days> [--start DATE | --end DATE] | -id <dateRangeId>
+        — Set (add or replace) the dateRange global filter. Accepts a full timeframe
+        (2026-03-01T00:00:00.000/2026-03-31T23:59:59.999) or a simplified date-only version
+        (2026-03-01/2026-03-31), automatically expanded to the full timeframe. Use -d <n> instead
+        to set the range to n days — ending today by default, or anchored on --start/--end. Use
+        -id <dateRangeId> to reference a saved/custom Date Range component instead."""
+        parser = SafeArgumentParser(prog="set_date_range")
+        parser.add_argument("daterange", nargs="?", default=None, metavar="RANGE")
+        parser.add_argument("-d", "--days", type=int, default=None, metavar="N",
+                             help="Set the range to N days. Ends today unless --start or --end "
+                                  "anchors it on a specific date instead.")
+        parser.add_argument("--start", default=None, metavar="YYYY-MM-DD",
+                             help="Anchor the range's start date. Combine with -d to compute the "
+                                  "end date (start + N - 1 days), or with --end for an explicit range.")
+        parser.add_argument("--end", default=None, metavar="YYYY-MM-DD",
+                             help="Anchor the range's end date. Combine with -d to compute the "
+                                  "start date (end - N + 1 days), or with --start for an explicit range.")
+        parser.add_argument("-id", "--dateRangeId", default=None, metavar="ID",
+                             help="Reference a saved/custom Date Range component by id "
+                                  "(see get_date_ranges) instead of a literal date range.")
+        args = self._parse(parser, args)
+        if args is None:
             return
-        self.rc.updateDateRange(dateRange=dr)
-        console.print(f"[green]Date range set to: {dr}[/green]")
+        if not args.daterange and args.days is None and not args.start and not args.end and not args.dateRangeId:
+            console.print("[red]Usage: set_date_range <YYYY-MM-DD/YYYY-MM-DD> or "
+                           "set_date_range -d <days> [--start DATE | --end DATE] or "
+                           "set_date_range -id <dateRangeId>[/red]")
+            return
+        try:
+            self.rc.setDateRange(dateRange=args.daterange, last=args.days,
+                                  start=args.start, end=args.end, dateRangeId=args.dateRangeId)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/red]")
+            return
+        console.print(f"[green]Date range set to: {self.rc.getGlobalTimeRange()}[/green]")
 
-    def do_get_metrics(self, _args: Any):
-        """get_metrics  — List all metrics currently in the request."""
+    def do_get_report_metrics(self, _args: Any):
+        """get_report_metrics  — List all metrics currently in the request."""
         metrics = self.rc.getMetrics()
         if metrics:
             for m in metrics:
@@ -290,6 +333,138 @@ class RequestCreatorShell(cmd.Cmd):
             console.print_json(json.dumps(filters, indent=2))
         else:
             console.print("[yellow]No global filters set.[/yellow]")
+
+    # ------------------------------------------------------------------
+    # Explore — read-only lookups against the Analytics API, useful while
+    # building a request to check what dimensions/metrics/segments exist.
+    # ------------------------------------------------------------------
+    def do_get_dimensions(self, args: Any):
+        """get_dimensions [-rsid id] [-f filter] [-fn file.csv]  — List dimensions available for a report suite. Always saved to CSV (default dimensions_<rsid>.csv, override with -fn)."""
+        parser = SafeArgumentParser(prog="get_dimensions")
+        parser.add_argument("-rsid", default=None)
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
+        parser.add_argument("-fn", "--filename", default=None, metavar="FILE",
+                             help="Override the default filename used to save the result to CSV. The result "
+                                  "is always saved (default: dimensions_<rsid>.csv) — this only renames the file.")
+        args = self._parse(parser, args)
+        if args is None:
+            return
+        rsid = resolve_rsid(args.rsid, getattr(self.rc, "rsid", None))
+        if rsid is None:
+            return
+        try:
+            df = self.analytics.getDimensions(rsid=rsid)
+            if args.filter and not df.empty:
+                mask = df.apply(lambda r: args.filter.lower() in str(r).lower(), axis=1)
+                df = df[mask]
+            print_dataframe(df, title=f"Dimensions — {rsid}")
+            save_df(df, args.filename or f"dimensions_{rsid}.csv")
+        except Exception as exc:
+            console.print(f"[red]Error: {exc}[/red]")
+
+    def do_get_metrics(self, args: Any):
+        """get_metrics [-rsid id] [-f filter] [-fn file.csv]  — List metrics available for a report suite. Always saved to CSV (default metrics_<rsid>.csv, override with -fn). For the metrics already added to this request, use get_report_metrics."""
+        parser = SafeArgumentParser(prog="get_metrics")
+        parser.add_argument("-rsid", default=None)
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
+        parser.add_argument("-fn", "--filename", default=None, metavar="FILE",
+                             help="Override the default filename used to save the result to CSV. The result "
+                                  "is always saved (default: metrics_<rsid>.csv) — this only renames the file.")
+        args = self._parse(parser, args)
+        if args is None:
+            return
+        rsid = resolve_rsid(args.rsid, getattr(self.rc, "rsid", None))
+        if rsid is None:
+            return
+        try:
+            df = self.analytics.getMetrics(rsid=rsid)
+            if args.filter and not df.empty:
+                mask = df.apply(lambda r: args.filter.lower() in str(r).lower(), axis=1)
+                df = df[mask]
+            print_dataframe(df, title=f"Metrics — {rsid}")
+            save_df(df, args.filename or f"metrics_{rsid}.csv")
+        except Exception as exc:
+            console.print(f"[red]Error: {exc}[/red]")
+
+    def do_get_calculated_metrics(self, args: Any):
+        """get_calculated_metrics [-n name] [-f filter] [-fn file.csv]  — List calculated metrics. Always saved to CSV (default calculated_metrics.csv, override with -fn)."""
+        parser = SafeArgumentParser(prog="get_calculated_metrics")
+        parser.add_argument("-n", "--name", default=None, metavar="NAME")
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
+        parser.add_argument("-fn", "--filename", default=None, metavar="FILE",
+                             help="Override the default filename used to save the result to CSV. The result "
+                                  "is always saved (default: calculated_metrics.csv) — this only renames the file.")
+        args = self._parse(parser, args)
+        if args is None:
+            return
+        try:
+            df = self.analytics.getCalculatedMetrics(name=args.name)
+            if args.filter and not df.empty:
+                mask = df.apply(lambda r: args.filter.lower() in str(r).lower(), axis=1)
+                df = df[mask]
+            print_dataframe(df, title="Calculated Metrics")
+            save_df(df, args.filename or "calculated_metrics.csv")
+        except Exception as exc:
+            console.print(f"[red]Error: {exc}[/red]")
+
+    def do_get_segments(self, args: Any):
+        """get_segments [-n name] [-rsid id] [-f filter] [-fn file.csv]  — List segments. Always saved to CSV (default segments.csv, override with -fn)."""
+        parser = SafeArgumentParser(prog="get_segments")
+        parser.add_argument("-n", "--name", default=None, metavar="NAME")
+        parser.add_argument("-rsid", default=None)
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
+        parser.add_argument("-fn", "--filename", default=None, metavar="FILE",
+                             help="Override the default filename used to save the result to CSV. The result "
+                                  "is always saved (default: segments.csv) — this only renames the file.")
+        args = self._parse(parser, args)
+        if args is None:
+            return
+        rsid_arg = args.rsid or getattr(self.rc, "rsid", None)
+        rsid_list = [rsid_arg] if rsid_arg else None
+        try:
+            df = self.analytics.getSegments(name=args.name, rsids_list=rsid_list)
+            if args.filter and not df.empty:
+                mask = df.apply(lambda r: args.filter.lower() in str(r).lower(), axis=1)
+                df = df[mask]
+            print_dataframe(df, title="Segments")
+            save_df(df, args.filename or "segments.csv")
+        except Exception as exc:
+            console.print(f"[red]Error: {exc}[/red]")
+
+    def do_get_date_ranges(self, args: Any):
+        """get_date_ranges [-f filter] [-fn file.csv]  — List date ranges. Always saved to CSV (default date_ranges.csv, override with -fn). Reference one in a request with 'set_date_range -id <id>'."""
+        parser = SafeArgumentParser(prog="get_date_ranges")
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
+        parser.add_argument("-fn", "--filename", default=None, metavar="FILE",
+                             help="Override the default filename used to save the result to CSV. The result "
+                                  "is always saved (default: date_ranges.csv) — this only renames the file.")
+        args = self._parse(parser, args)
+        if args is None:
+            return
+        try:
+            df = self.analytics.getDateRanges()
+            if args.filter and not df.empty:
+                mask = df.apply(lambda r: args.filter.lower() in str(r).lower(), axis=1)
+                df = df[mask]
+            print_dataframe(df, title="Date Ranges")
+            save_df(df, args.filename or "date_ranges.csv")
+        except Exception as exc:
+            console.print(f"[red]Error: {exc}[/red]")
 
     def do_show(self, _args: Any):
         """show  — Print the current request as formatted JSON."""
@@ -337,6 +512,10 @@ class RequestCreatorShell(cmd.Cmd):
         """done  — Exit RequestCreator mode and return to the main shell."""
         return True
 
+    def do_clear(self, _args: Any):
+        """clear  — Clear the terminal screen."""
+        console.clear()
+
     def do_EOF(self, _args: Any):
         console.print()
         return True
@@ -351,9 +530,14 @@ class RequestCreatorShell(cmd.Cmd):
 class AnalyticsShell(cmd.Cmd):
     """Interactive REPL for the Adobe Analytics API 2.0."""
 
-    intro = (
-        "\n[bold]aanalytics2 CLI[/bold]  —  type 'help' for grouped commands, 'exit' to quit.\n"
-    )
+    # cmd.Cmd prints `intro` with a raw stdout.write, which does not interpret rich
+    # markup — leaving literal "[bold]...[/bold]" on screen. Keep intro unset and
+    # print the styled banner ourselves in preloop() via the rich console instead.
+    intro = None
+    _banner = "\n[bold blue]aanalytics2[/bold blue] CLI  —  type 'help' for grouped commands, 'exit' to quit.\n"
+
+    def preloop(self) -> None:
+        console.print(self._banner)
 
     def __init__(
         self,
@@ -379,23 +563,19 @@ class AnalyticsShell(cmd.Cmd):
         cid = self.company_id or "not-connected"
         self.prompt = f"{cid}:{self.rsid}> " if self.rsid else f"{cid}> "
 
-    def _startup(self):
+    def _startup(
+        self,
+        org_id: Optional[str] = None,
+        client_id: Optional[str] = None,
+        secret: Optional[str] = None,
+        scopes: Optional[str] = None,
+        tech_id: Optional[str] = None,
+    ):
         """Load config, authenticate, and connect to Analytics."""
         try:
-            # Load raw JSON to extract CLI-specific fields (companyId, rsid)
-            raw = load_json(self.config_file)
-            if raw is None:
-                console.print(f"[red]Could not load config file: {self.config_file}[/red]")
+            cfg = self._resolve_config(org_id, client_id, secret, scopes, tech_id)
+            if cfg is None:
                 return
-
-            # Override company_id and rsid from the JSON only when not already set by flags
-            if self.company_id is None:
-                self.company_id = raw.get("companyId") or raw.get("company_id")
-            if self.rsid is None:
-                self.rsid = raw.get("rsid")
-
-            # Build ConfigObj via importConfigFile (handles OAuth token acquisition)
-            cfg = importConfigFile(self.config_file, return_object=True)
             self.login_obj = Login(config=cfg)
 
             # Resolve company_id interactively if still unknown
@@ -414,6 +594,65 @@ class AnalyticsShell(cmd.Cmd):
             console.print(f"[red]Config file not found: {exc}[/red]")
         except Exception as exc:
             console.print(f"[red]Startup error: {exc}[/red]")
+
+    def _resolve_config(
+        self,
+        org_id: Optional[str],
+        client_id: Optional[str],
+        secret: Optional[str],
+        scopes: Optional[str],
+        tech_id: Optional[str],
+    ):
+        """Resolve credentials into a ConfigObj, in order of priority:
+
+        1. Individual parameters passed explicitly to `config` (org_id/client_id/secret/scopes/tech_id).
+        2. The config file at ``self.config_file``, when no individual parameter was passed and the
+           file exists — unchanged default behaviour.
+        3. Environment variables (AANALYTICS2_ORG_ID, AANALYTICS2_CLIENT_ID, AANALYTICS2_SECRET,
+           AANALYTICS2_SCOPES, AANALYTICS2_TECH_ID), used to fill in whatever wasn't passed explicitly,
+           as a last resort when no config file is found.
+
+        Also resolves company_id/rsid, from the config file or from AANALYTICS2_COMPANY_ID /
+        AANALYTICS2_RSID, when not already set by flags.
+        """
+        explicit_params = any([org_id, client_id, secret, scopes, tech_id])
+
+        if not explicit_params and Path(self.config_file).exists():
+            # Load raw JSON to extract CLI-specific fields (companyId, rsid)
+            raw = load_json(self.config_file)
+            if raw is None:
+                return None
+            if self.company_id is None:
+                self.company_id = raw.get("companyId") or raw.get("company_id")
+            if self.rsid is None:
+                self.rsid = raw.get("rsid")
+            # Build ConfigObj via importConfigFile (handles OAuth token acquisition)
+            return importConfigFile(self.config_file, return_object=True)
+
+        org_id = org_id or os.environ.get(ENV_ORG_ID)
+        client_id = client_id or os.environ.get(ENV_CLIENT_ID)
+        secret = secret or os.environ.get(ENV_SECRET)
+        scopes = scopes or os.environ.get(ENV_SCOPES)
+        tech_id = tech_id or os.environ.get(ENV_TECH_ID)
+
+        if not (org_id and client_id and secret and scopes):
+            console.print(
+                f"[red]Could not load config file: {self.config_file}[/red]\n"
+                "[red]No config file found and credentials are incomplete. Provide -org_id, -client_id, "
+                "-secret and -scopes (or set the AANALYTICS2_ORG_ID, AANALYTICS2_CLIENT_ID, "
+                "AANALYTICS2_SECRET and AANALYTICS2_SCOPES environment variables).[/red]"
+            )
+            return None
+
+        if self.company_id is None:
+            self.company_id = os.environ.get(ENV_COMPANY_ID)
+        if self.rsid is None:
+            self.rsid = os.environ.get(ENV_RSID)
+
+        return configure(
+            org_id=org_id, client_id=client_id, secret=secret,
+            scopes=scopes, tech_id=tech_id, return_object=True,
+        )
 
     def _pick_company_id(self) -> Optional[str]:
         """Call getCompanyId and let the user pick interactively."""
@@ -468,9 +707,24 @@ class AnalyticsShell(cmd.Cmd):
     # Group 0 — Session / System
     # ------------------------------------------------------------------
     def do_config(self, args: Any):
-        """config [-cf path]  — Reload configuration (and reconnect) from a config file."""
+        """config [-cf path] [-org_id ID] [-client_id ID] [-secret SECRET] [-scopes SCOPES] [-tech_id ID]  — Reload configuration (and reconnect). Uses a config file by default; if none is found, falls back to these individual parameters or their AANALYTICS2_* environment variables."""
         parser = SafeArgumentParser(prog="config")
         parser.add_argument("-cf", "--config_file", default=None)
+        parser.add_argument("-org_id", "--org_id", default=None, metavar="ORG_ID",
+                             help=f"Organization ID. Falls back to the {ENV_ORG_ID} environment "
+                                  "variable when omitted.")
+        parser.add_argument("-client_id", "--client_id", default=None, metavar="CLIENT_ID",
+                             help=f"API/client ID. Falls back to the {ENV_CLIENT_ID} environment "
+                                  "variable when omitted.")
+        parser.add_argument("-secret", "--secret", default=None, metavar="SECRET",
+                             help=f"Client secret. Falls back to the {ENV_SECRET} environment "
+                                  "variable when omitted.")
+        parser.add_argument("-scopes", "--scopes", default=None, metavar="SCOPES",
+                             help=f"OAuth Server-to-Server scopes. Falls back to the {ENV_SCOPES} "
+                                  "environment variable when omitted.")
+        parser.add_argument("-tech_id", "--tech_id", default=None, metavar="TECH_ID",
+                             help=f"Technical account ID. Falls back to the {ENV_TECH_ID} environment "
+                                  "variable when omitted.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -478,12 +732,20 @@ class AnalyticsShell(cmd.Cmd):
             self.config_file = args.config_file
         self.analytics = None
         self.login_obj = None
-        self._startup()
+        self._startup(
+            org_id=args.org_id,
+            client_id=args.client_id,
+            secret=args.secret,
+            scopes=args.scopes,
+            tech_id=args.tech_id,
+        )
 
     def do_get_company_id(self, args: Any):
         """get_company_id [-sv file.csv]  — List all companies accessible with the current credentials."""
         parser = SafeArgumentParser(prog="get_company_id")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -502,6 +764,23 @@ class AnalyticsShell(cmd.Cmd):
             )
             if args.save:
                 save_list(companies, args.save)
+        except Exception as exc:
+            console.print(f"[red]Error: {exc}[/red]")
+
+    def do_set_company_id(self, args: Any):
+        """set_company_id <company_id>  — Set (or change) the company ID and reconnect for this session."""
+        company_id = args.strip()
+        if not company_id:
+            console.print("[red]Usage: set_company_id <company_id>[/red]")
+            return
+        if self.login_obj is None:
+            console.print("[red]Not connected. Run 'config' first.[/red]")
+            return
+        try:
+            self.analytics = self.login_obj.createAnalyticsConnection(companyId=company_id)
+            self.company_id = company_id
+            self._update_prompt()
+            console.print(f"[green]Company ID set to {company_id}[/green]")
         except Exception as exc:
             console.print(f"[red]Error: {exc}[/red]")
 
@@ -524,6 +803,10 @@ class AnalyticsShell(cmd.Cmd):
         except Exception as exc:
             console.print(f"[red]Error: {exc}[/red]")
 
+    def do_clear(self, _args: Any):
+        """clear  — Clear the terminal screen."""
+        console.clear()
+
     def do_exit(self, _args: Any):
         """exit  — Exit the CLI."""
         console.print("[bold]Goodbye![/bold]")
@@ -544,9 +827,14 @@ class AnalyticsShell(cmd.Cmd):
     def do_get_report_suites(self, args: Any):
         """get_report_suites [-f filter] [-ext] [-sv file.csv]  — List all report suites."""
         parser = SafeArgumentParser(prog="get_report_suites")
-        parser.add_argument("-f", "--filter", default=None, metavar="TEXT")
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
         parser.add_argument("-ext", "--extended", action="store_true")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -577,9 +865,14 @@ class AnalyticsShell(cmd.Cmd):
     def do_get_virtual_report_suites(self, args: Any):
         """get_virtual_report_suites [-f filter] [-ext] [-sv file.csv]  — List virtual report suites."""
         parser = SafeArgumentParser(prog="get_virtual_report_suites")
-        parser.add_argument("-f", "--filter", default=None, metavar="TEXT")
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
         parser.add_argument("-ext", "--extended", action="store_true")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -645,7 +938,9 @@ class AnalyticsShell(cmd.Cmd):
         parser = SafeArgumentParser(prog="compare_report_suites")
         parser.add_argument("-rsids", "--rsids", required=True, metavar="ID1,ID2,...")
         parser.add_argument("-el", "--element", default="dimensions", metavar="ELEMENT")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -663,11 +958,16 @@ class AnalyticsShell(cmd.Cmd):
     # ------------------------------------------------------------------
     @login_required
     def do_get_dimensions(self, args: Any):
-        """get_dimensions [-rsid id] [-f filter] [-sv file.csv]  — List dimensions for a report suite."""
+        """get_dimensions [-rsid id] [-f filter] [-fn file.csv]  — List dimensions for a report suite. Always saved to CSV (default dimensions_<rsid>.csv, override with -fn)."""
         parser = SafeArgumentParser(prog="get_dimensions")
         parser.add_argument("-rsid", default=None)
-        parser.add_argument("-f", "--filter", default=None, metavar="TEXT")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
+        parser.add_argument("-fn", "--filename", default=None, metavar="FILE",
+                             help="Override the default filename used to save the result to CSV. The result "
+                                  "is always saved (default: dimensions_<rsid>.csv) — this only renames the file.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -680,18 +980,22 @@ class AnalyticsShell(cmd.Cmd):
                 mask = df.apply(lambda r: args.filter.lower() in str(r).lower(), axis=1)
                 df = df[mask]
             print_dataframe(df, title=f"Dimensions — {rsid}")
-            if args.save:
-                save_df(df, args.save)
+            save_df(df, args.filename or f"dimensions_{rsid}.csv")
         except Exception as exc:
             console.print(f"[red]Error: {exc}[/red]")
 
     @login_required
     def do_get_metrics(self, args: Any):
-        """get_metrics [-rsid id] [-f filter] [-sv file.csv]  — List metrics for a report suite."""
+        """get_metrics [-rsid id] [-f filter] [-fn file.csv]  — List metrics for a report suite. Always saved to CSV (default metrics_<rsid>.csv, override with -fn)."""
         parser = SafeArgumentParser(prog="get_metrics")
         parser.add_argument("-rsid", default=None)
-        parser.add_argument("-f", "--filter", default=None, metavar="TEXT")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
+        parser.add_argument("-fn", "--filename", default=None, metavar="FILE",
+                             help="Override the default filename used to save the result to CSV. The result "
+                                  "is always saved (default: metrics_<rsid>.csv) — this only renames the file.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -704,18 +1008,22 @@ class AnalyticsShell(cmd.Cmd):
                 mask = df.apply(lambda r: args.filter.lower() in str(r).lower(), axis=1)
                 df = df[mask]
             print_dataframe(df, title=f"Metrics — {rsid}")
-            if args.save:
-                save_df(df, args.save)
+            save_df(df, args.filename or f"metrics_{rsid}.csv")
         except Exception as exc:
             console.print(f"[red]Error: {exc}[/red]")
 
     @login_required
     def do_get_calculated_metrics(self, args: Any):
-        """get_calculated_metrics [-n name] [-f filter] [-sv file.csv]  — List calculated metrics."""
+        """get_calculated_metrics [-n name] [-f filter] [-fn file.csv]  — List calculated metrics. Always saved to CSV (default calculated_metrics.csv, override with -fn)."""
         parser = SafeArgumentParser(prog="get_calculated_metrics")
         parser.add_argument("-n", "--name", default=None, metavar="NAME")
-        parser.add_argument("-f", "--filter", default=None, metavar="TEXT")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
+        parser.add_argument("-fn", "--filename", default=None, metavar="FILE",
+                             help="Override the default filename used to save the result to CSV. The result "
+                                  "is always saved (default: calculated_metrics.csv) — this only renames the file.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -725,8 +1033,7 @@ class AnalyticsShell(cmd.Cmd):
                 mask = df.apply(lambda r: args.filter.lower() in str(r).lower(), axis=1)
                 df = df[mask]
             print_dataframe(df, title="Calculated Metrics")
-            if args.save:
-                save_df(df, args.save)
+            save_df(df, args.filename or "calculated_metrics.csv")
         except Exception as exc:
             console.print(f"[red]Error: {exc}[/red]")
 
@@ -798,7 +1105,9 @@ class AnalyticsShell(cmd.Cmd):
     def do_get_calculated_functions(self, args: Any):
         """get_calculated_functions [-sv file.csv]  — List all functions available in the metric builder."""
         parser = SafeArgumentParser(prog="get_calculated_functions")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -831,12 +1140,17 @@ class AnalyticsShell(cmd.Cmd):
     # ------------------------------------------------------------------
     @login_required
     def do_get_segments(self, args: Any):
-        """get_segments [-n name] [-rsid id] [-f filter] [-sv file.csv]  — List segments."""
+        """get_segments [-n name] [-rsid id] [-f filter] [-fn file.csv]  — List segments. Always saved to CSV (default segments.csv, override with -fn)."""
         parser = SafeArgumentParser(prog="get_segments")
         parser.add_argument("-n", "--name", default=None, metavar="NAME")
         parser.add_argument("-rsid", default=None)
-        parser.add_argument("-f", "--filter", default=None, metavar="TEXT")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
+        parser.add_argument("-fn", "--filename", default=None, metavar="FILE",
+                             help="Override the default filename used to save the result to CSV. The result "
+                                  "is always saved (default: segments.csv) — this only renames the file.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -847,8 +1161,7 @@ class AnalyticsShell(cmd.Cmd):
                 mask = df.apply(lambda r: args.filter.lower() in str(r).lower(), axis=1)
                 df = df[mask]
             print_dataframe(df, title="Segments")
-            if args.save:
-                save_df(df, args.save)
+            save_df(df, args.filename or "segments.csv")
         except Exception as exc:
             console.print(f"[red]Error: {exc}[/red]")
 
@@ -941,8 +1254,13 @@ class AnalyticsShell(cmd.Cmd):
     def do_get_date_ranges(self, args: Any):
         """get_date_ranges [-f filter] [-sv file.csv]  — List all date ranges."""
         parser = SafeArgumentParser(prog="get_date_ranges")
-        parser.add_argument("-f", "--filter", default=None, metavar="TEXT")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1028,7 +1346,9 @@ class AnalyticsShell(cmd.Cmd):
     def do_get_tags(self, args: Any):
         """get_tags [-sv file.csv]  — List all tags."""
         parser = SafeArgumentParser(prog="get_tags")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1123,9 +1443,14 @@ class AnalyticsShell(cmd.Cmd):
     def do_get_projects(self, args: Any):
         """get_projects [-f filter] [-full] [-sv file.csv]  — List Workspace projects."""
         parser = SafeArgumentParser(prog="get_projects")
-        parser.add_argument("-f", "--filter", default=None, metavar="TEXT")
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
         parser.add_argument("-full", "--full", action="store_true")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1160,8 +1485,13 @@ class AnalyticsShell(cmd.Cmd):
     def do_get_all_project_details(self, args: Any):
         """get_all_project_details [-f filter] [-sv file.csv]  — Fetch full details for all projects."""
         parser = SafeArgumentParser(prog="get_all_project_details")
-        parser.add_argument("-f", "--filter", default=None, metavar="TEXT")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1238,7 +1568,9 @@ class AnalyticsShell(cmd.Cmd):
         parser.add_argument("-d", "--definition", required=True, metavar="FILE")
         parser.add_argument("-rsid", default=None)
         parser.add_argument("-n", "--n_results", default="inf", metavar="N")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1268,7 +1600,9 @@ class AnalyticsShell(cmd.Cmd):
         parser.add_argument("-rsid", default=None)
         parser.add_argument("-dr", "--date_range", default=None, metavar="RANGE")
         parser.add_argument("-n", "--limit", type=int, default=10)
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1293,7 +1627,9 @@ class AnalyticsShell(cmd.Cmd):
         """decode_aa_requests -d file [-sv output.csv]  — Decode Adobe Analytics image request URLs."""
         parser = SafeArgumentParser(prog="decode_aa_requests")
         parser.add_argument("-d", "--definition", required=True, metavar="FILE")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1324,8 +1660,13 @@ class AnalyticsShell(cmd.Cmd):
     def do_get_scheduled_jobs(self, args: Any):
         """get_scheduled_jobs [-f filter] [-sv file.csv]  — List all scheduled projects."""
         parser = SafeArgumentParser(prog="get_scheduled_jobs")
-        parser.add_argument("-f", "--filter", default=None, metavar="TEXT")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1412,7 +1753,9 @@ class AnalyticsShell(cmd.Cmd):
     def do_get_annotations(self, args: Any):
         """get_annotations [-sv file.csv]  — List all annotations."""
         parser = SafeArgumentParser(prog="get_annotations")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1495,7 +1838,9 @@ class AnalyticsShell(cmd.Cmd):
     def do_get_alerts(self, args: Any):
         """get_alerts [-sv file.csv]  — List all alerts."""
         parser = SafeArgumentParser(prog="get_alerts")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1584,8 +1929,13 @@ class AnalyticsShell(cmd.Cmd):
     def do_get_users(self, args: Any):
         """get_users [-f filter] [-sv file.csv]  — List all users."""
         parser = SafeArgumentParser(prog="get_users")
-        parser.add_argument("-f", "--filter", default=None, metavar="TEXT")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-f", "--filter", default=None, metavar="TEXT",
+                             help="Case-insensitive substring filter, matched against every column of each "
+                                  "result row. Applied locally after the data is retrieved from the API — "
+                                  "does not change what is requested from Adobe Analytics.")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1611,7 +1961,9 @@ class AnalyticsShell(cmd.Cmd):
         parser.add_argument("-end", "--end_date", required=True, metavar="YYYY-MM-DD")
         parser.add_argument("-login", "--login", default=None, metavar="LOGIN")
         parser.add_argument("-rsid", default=None)
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1637,7 +1989,9 @@ class AnalyticsShell(cmd.Cmd):
         """get_classification_datasets [-rsid id] [-sv file.csv]  — List classification datasets."""
         parser = SafeArgumentParser(prog="get_classification_datasets")
         parser.add_argument("-rsid", default=None)
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1685,7 +2039,9 @@ class AnalyticsShell(cmd.Cmd):
         """get_classification_template <datasetId> [-sv file.csv]  — Get a classification template."""
         parser = SafeArgumentParser(prog="get_classification_template")
         parser.add_argument("dataset_id", metavar="DATASET_ID")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1767,7 +2123,9 @@ class AnalyticsShell(cmd.Cmd):
         """get_data_feeds [-rsid id] [-sv file.csv]  — List data feeds."""
         parser = SafeArgumentParser(prog="get_data_feeds")
         parser.add_argument("-rsid", default=None)
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1801,7 +2159,9 @@ class AnalyticsShell(cmd.Cmd):
         parser = SafeArgumentParser(prog="get_data_feed_requests")
         parser.add_argument("-ids", "--feed_ids", default=None, metavar="ID1,ID2,...")
         parser.add_argument("-status", "--status", default=None, metavar="STATUS")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1843,7 +2203,9 @@ class AnalyticsShell(cmd.Cmd):
         """get_dw_requests [-rsid id] [-sv file.csv]  — List Data Warehouse scheduled requests."""
         parser = SafeArgumentParser(prog="get_dw_requests")
         parser.add_argument("-rsid", default=None)
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1874,7 +2236,9 @@ class AnalyticsShell(cmd.Cmd):
         """get_dw_reports [-status status] [-sv file.csv]  — List Data Warehouse report runs."""
         parser = SafeArgumentParser(prog="get_dw_reports")
         parser.add_argument("-status", "--status", default=None, metavar="STATUS")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1894,7 +2258,9 @@ class AnalyticsShell(cmd.Cmd):
         """get_data_source_accounts [-rsid id] [-sv file.csv]  — List data source accounts."""
         parser = SafeArgumentParser(prog="get_data_source_accounts")
         parser.add_argument("-rsid", default=None)
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1916,7 +2282,9 @@ class AnalyticsShell(cmd.Cmd):
         parser.add_argument("account_id", metavar="ACCOUNT_ID")
         parser.add_argument("-rsid", default=None)
         parser.add_argument("-status", "--status", default=None, metavar="STATUS")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1939,7 +2307,9 @@ class AnalyticsShell(cmd.Cmd):
         """get_cloud_accounts [-type accountType] [-sv file.csv]  — List cloud accounts."""
         parser = SafeArgumentParser(prog="get_cloud_accounts")
         parser.add_argument("-type", "--account_type", default=None, metavar="TYPE")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -1955,7 +2325,9 @@ class AnalyticsShell(cmd.Cmd):
     def do_get_cloud_locations(self, args: Any):
         """get_cloud_locations [-sv file.csv]  — List cloud locations."""
         parser = SafeArgumentParser(prog="get_cloud_locations")
-        parser.add_argument("-sv", "--save", default=None, metavar="FILE")
+        parser.add_argument("-sv", "--save", default=None, metavar="FILE",
+                             help="Save the result to a CSV file at this path. Optional — if omitted, "
+                                  "the result is only printed to the terminal and nothing is written to disk.")
         args = self._parse(parser, args)
         if args is None:
             return

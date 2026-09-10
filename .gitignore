@@ -120,3 +120,6 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 *.lnk
+
+# Downloaded Workspace project definitions (large, real customer data)
+/Workspaces/

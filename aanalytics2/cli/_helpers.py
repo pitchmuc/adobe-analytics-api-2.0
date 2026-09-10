@@ -21,8 +21,12 @@ class SafeArgumentParser(argparse.ArgumentParser):
         raise CLIError(f"{message}  (use -h for help)")
 
     def exit(self, status: int = 0, message: str = None):
+        # Called by argparse after -h/--help (status 0) and on parse errors (status != 0).
+        # Must always stop parsing here — otherwise -h just prints help and falls through
+        # to execute the command with default argument values.
         if status != 0 and message:
             raise CLIError(message)
+        raise SystemExit(status)
 
 
 def login_required(f):

@@ -90,12 +90,16 @@ def find_path(path: str) -> Optional[Path]:
         return None
    
 
-def createConfigFile(destination: str = 'config_analytics_template.json',auth_type: str = "oauthV2",verbose: bool = False) -> None:
+def createConfigFile(destination: str = 'config_analytics_template.json',auth_type: str = "oauthV2",verbose: bool = False, company_id: Optional[str] = None, rsid: Optional[str] = None) -> None:
     """Creates a `config_admin.json` file with the pre-defined configuration format
     to store the access data in under the specified `destination`.
     Arguments:
         destination : OPTIONAL : the name of the file + path if you want
         auth_type : OPTIONAL : The type of Oauth type you want to use for your config file. Possible value: "oauthV2"
+        company_id : OPTIONAL : The globalCompanyId to pre-fill in the file. Used by the CLI to skip the
+                        interactive company-selection prompt. Ignored by the Python library (Login / Analytics).
+        rsid : OPTIONAL : The default report suite ID to pre-fill in the file. Used by the CLI to pre-set the
+                        session RSID. Ignored by the Python library (Login / Analytics).
     """
     json_data = {
         'org_id': '<orgID>',
@@ -104,6 +108,10 @@ def createConfigFile(destination: str = 'config_analytics_template.json',auth_ty
     }
     if auth_type == 'oauthV2':
         json_data['scopes'] = "<scopes>"
+    if company_id is not None:
+        json_data['company_id'] = company_id
+    if rsid is not None:
+        json_data['rsid'] = rsid
     if '.json' not in destination:
         destination += '.json'
     with open(destination, 'w') as cf:

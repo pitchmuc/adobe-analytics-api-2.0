@@ -40,6 +40,12 @@ documentation on reporting [here](./docs/main.md)
 
 documentation on ingestion APIs [here](./docs/ingestion.md)
 
+## Command Line Interface (CLI)
+
+The `aanalytics2` package ships with an interactive command-line interface.\
+It gives you a terminal REPL to explore and manage your Adobe Analytics account without writing Python code, wrapping the `Analytics` and `RequestCreator` classes.
+More information on the [CLI documentation](./docs/cli.md)
+
 ## Legacy Analytics API 1.4
 
 This module provide limited support for the 1.4 API.
@@ -77,6 +83,11 @@ More information on the [data repair module](./docs/datarepair.md)
 
 There is a feature to retrieve the Workspace projects and the components used.\
 Refer to this [documentation on Project](./docs/projects.md) for more information.
+
+## Knowledge Graph
+
+You can build an RDF Knowledge Graph out of your Adobe Analytics implementation, connecting your dimensions, metrics, segments, calculated metrics, and Workspace projects, along with their usage and co-occurrence relationships.\
+More information on the [Knowledge Graph documentation](./docs/knowledgegraph.md)
 
 ## Logging capability
 

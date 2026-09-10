@@ -122,17 +122,26 @@ We will review the different methods available via the object.
   * filterId : REQUIRED : The filter to add.
         when breakdown, use the following format for the value "dimension:::itemId"
 
-* `updateDateRange()`
-  Update the dateRange filter on the globalFilter list
-  One of the 3 elements specified below is required.
+* `setDateRange()`
+  Set the dateRange global filter for the request, adding it if none exists yet or replacing the
+  existing one otherwise. This is the only method for this — it replaces the old `updateDateRange()`.
+  One of `dateRange`, `dateRangeId`, `last`, or both `start` and `end`, is required.
   Arguments:
-  * dateRange : OPTIONAL : string representing the new dateRange string, such as: 2020-01-01T00:00:00.000/2020-02-01T00:00:00.000
-  * shiftingDays : OPTIONAL : An integer, if you want to add or remove days from the current dateRange provided. Apply to end and beginning of dateRange.
-      So 2020-01-01T00:00:00.000/2020-02-01T00:00:00.000 with +2 will give 2020-01-03T00:00:00.000/2020-02-03T00:00:00.000
-  * shiftingDaysEnd : : OPTIONAL : An integer, if you want to add or remove days from the last part of the current dateRange. Apply only to end of the dateRange.
-      So 2020-01-01T00:00:00.000/2020-02-01T00:00:00.000 with +2 will give 2020-01-01T00:00:00.000/2020-02-03T00:00:00.000
-  * shiftingDaysStart : OPTIONAL : An integer, if you want to add or remove days from the last first part of the current dateRange. Apply only to beginning of the dateRange.
-      So 2020-01-01T00:00:00.000/2020-02-01T00:00:00.000 with +2 will give 2020-01-03T00:00:00.000/2020-02-01T00:00:00.000
+  * dateRange : OPTIONAL : The date range to set. Accepts either the full timeframe
+        ("2026-03-01T00:00:00.000/2026-03-31T23:59:59.999") or a simplified date-only version
+        ("2026-03-01/2026-03-31"), which is automatically expanded to the full timeframe
+        (00:00:00.000 for the start date, 23:59:59.999 for the end date). Cannot be combined with
+        last, start, end or dateRangeId.
+  * last : OPTIONAL : Number of days to set the range to. Ends today unless start or end is also
+        provided to anchor the window on a specific date instead (e.g. last=7 alone sets the range
+        to today and the 6 days before it).
+  * start : OPTIONAL : Start date ("YYYY-MM-DD"). Combine with last to compute the end date
+        (start + last - 1 days). Cannot be combined with end and last together.
+  * end : OPTIONAL : End date ("YYYY-MM-DD"). Combine with last to compute the start date
+        (end - last + 1 days). Cannot be combined with start and last together.
+  * dateRangeId : OPTIONAL : The id of a saved/custom Date Range component (see
+        `Analytics.getDateRanges` / `createDateRange`) to reference instead of a literal date
+        range. Cannot be combined with dateRange, last, start or end.
 
 ## Instance attributes
 

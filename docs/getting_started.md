@@ -47,6 +47,15 @@ Arguments for `createConfigFile`:
 
 * destination : OPTIONAL : the name of the file + path if you want
 * auth_type : OPTIONAL : The type of Oauth type you want to use for your config file. Possible value: "jwt" or "oauthV2"
+* company_id : OPTIONAL : Pre-fill the `company_id` (globalCompanyId) field in the generated file.
+* rsid : OPTIONAL : Pre-fill the `rsid` (default report suite ID) field in the generated file.
+
+```python
+import aanalytics2 as api2
+api2.createConfigFile(company_id='<globalCompanyId>', rsid='<defaultRsid>')
+```
+
+**Note**: `company_id` and `rsid` are only used by the [CLI](./cli.md) to skip the interactive company-selection prompt and pre-set the session's default report suite. The Python library (`Login` / `Analytics`) ignores these two keys, so adding them to your config file does not change or interfere with the normal loading flow described below (`importConfigFile` → `Login()` → `Analytics(cid)`).
 
 ## 4. Import the configuration file
 

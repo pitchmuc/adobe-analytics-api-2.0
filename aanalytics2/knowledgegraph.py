@@ -1,9 +1,10 @@
 import time, datetime
 from concurrent import futures
 from pathlib import Path
+from tkinter import NO
 from aanalytics2 import WorkspaceManager, Analytics, Login
 from rdflib.namespace import RDF, RDFS, XSD
-from rdflib import Graph, Namespace, Literal, URIRef
+from rdflib import Graph, Namespace, Literal, URIRef, BNode
 from collections import Counter
 import pandas as pd
 
@@ -41,7 +42,7 @@ class KnowledgeGraph:
             self.companyId = companyIds[0]['globalCompanyId']
         else:
             self.companyId = [c['globalCompanyId'] for c in companyIds if c['globalCompanyId'] == companyId][0]
-        self.analyticsAPI = Analytics(config=self.config, companyId=self.companyId)
+        self.analyticsAPI = Analytics(config=self.config, company_id=self.companyId)
         self.reportSuites:pd.DataFrame = self.analyticsAPI.getReportSuites(extended_info=True)
         if rsids is None:
             self.projects = self.analyticsAPI.getProjects(format='raw')
@@ -125,7 +126,7 @@ class KnowledgeGraph:
             results = executor.map(get_project_details, self.projects)
             self.project_details = list(results)
         
-    def buildGraph(self, save=False, filename='knowledge_graph.ttl',verbose:bool=False,**kwargs):
+    def buildGraph(self, save:bool=False, filename:str='knowledge_graph.ttl',verbose:bool=False,**kwargs):
         """
         Build the knowledge graph based on the dimensions, metrics, segments, and calculated metrics.
         Arguments:
@@ -146,6 +147,14 @@ class KnowledgeGraph:
         self.graph.bind("projects", self.namespaces["projects"])
         self.graph.bind("reportSuites",self.namespaces["reportSuites"])
         dict_entity_usage = {}
+        dim_metric_cooccurrence = {}
+        dim_segment_cooccurrence = {}
+        def bump_usage(ref, field):
+            entry = dict_entity_usage.setdefault(ref, {'segmentUsage': 0, 'projectUsage': 0, 'metricUsage': 0})
+            entry[field] += 1
+        def bump_cooccurrence(store, ref_a, ref_b, rsid):
+            entry = store.setdefault((ref_a, ref_b), {'count': 0, 'rsid': rsid})
+            entry['count'] += 1
         def build_dimension_graph(dimension,rsid):
             dimension_uri = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/dimension/{dimension['id']}")
             self.graph.add((dimension_uri, RDF.type, Literal("Dimension")))
@@ -172,7 +181,7 @@ class KnowledgeGraph:
             self.graph.add((metric_uri, RDFS.label, Literal(metric['name'])))
             self.graph.add((metric_uri, self.namespaces['metrics'].id, Literal(metric['id'])))
             self.graph.add((metric_uri, self.namespaces['metrics'].type, Literal(metric['type'])))
-            for reportable in metric['reportable']:
+            for reportable in metric['support']:
                 self.graph.add((metric_uri, self.namespaces['metrics'].reportable, Literal(reportable)))
             if 'description' in metric:
                 self.graph.add((metric_uri, RDFS.comment, Literal(metric['description'])))
@@ -220,7 +229,8 @@ class KnowledgeGraph:
             self.graph.add((segment_uri, self.namespaces['segments'].definition, Literal(segment['definition'])))
             self.graph.add((segment_uri, self.namespaces['segments'].rsid, self.namespaces['reportSuites'][segment['rsid']]))
             self.graph.add((self.namespaces['reportSuites'][segment['rsid']], self.namespaces['reportSuites'].segments,segment_uri))
-            self.graph.add((segment_uri, self.namespaces['segments'].lastAccess, Literal(datetime.datetime.fromtimestamp(segment['lastRecordedAccess']/1000).isoformat().split(".")[0],datatype=XSD.dateTime)))
+            if segment.get('lastRecordedAccess') is not None and segment.get('lastRecordedAccess') != "":
+                self.graph.add((segment_uri, self.namespaces['segments'].lastAccess, Literal(datetime.datetime.fromtimestamp(segment['lastRecordedAccess']/1000).isoformat().split(".")[0],datatype=XSD.dateTime)))
             for tag in segment['tags']:
                 self.graph.add((segment_uri, self.namespaces['segments'].tag, Literal(tag['name'])))
             self.graph.add((segment_uri, self.namespaces['segments'].shares, Literal(len(segment.get('shares',[])),datatype=XSD.integer)))
@@ -268,7 +278,8 @@ class KnowledgeGraph:
             self.graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].definition, Literal(calculated_metric['definition'])))
             self.graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].rsid, self.namespaces['reportSuites'][calculated_metric['rsid']]))
             self.graph.add((self.namespaces['reportSuites'][calculated_metric['rsid']], self.namespaces['reportSuites'].calculatedMetrics,calculated_metric_uri))
-            self.graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].lastAccess, Literal(datetime.datetime.fromtimestamp(calculated_metric['lastRecordedAccess']/1000).isoformat().split(".")[0],datatype=XSD.dateTime)))
+            if calculated_metric.get('lastRecordedAccess') is not None and calculated_metric.get('lastRecordedAccess') != "":
+                self.graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].lastAccess, Literal(datetime.datetime.fromtimestamp(calculated_metric['lastRecordedAccess']/1000).isoformat().split(".")[0],datatype=XSD.dateTime)))
             self.graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].shares, Literal(len(calculated_metric.get('shares',[])),datatype=XSD.integer)))
             self.graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].polarity, Literal(calculated_metric.get('polarity','positive'),datatype=XSD.string)))
             for tag in calculated_metric.get('tags',[]):
@@ -305,10 +316,36 @@ class KnowledgeGraph:
             self.graph.add((drRef,self.namespaces['dateRange'].id,Literal(daterange['id'])))
             self.graph.add((drRef,self.namespaces['dateRange'].description,Literal(daterange['description'])))
             self.graph.add((drRef,self.namespaces['dateRange'].definition,Literal(daterange['definition'])))
+        def register_element_components(element, project_ref, rsid):
+            dimRefs, metricRefs, segRefs = [], [], []
+            for dimension in element.dimensions:
+                dimRef = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/dimension/{dimension['id']}")
+                self.graph.add((dimRef, self.namespaces['projects'].dimension_ref,project_ref))
+                bump_usage(dimRef, 'projectUsage')
+                dimRefs.append(dimRef)
+            for metric in element.metrics:
+                metRef = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/metric/{metric['id']}")
+                self.graph.add((metRef, self.namespaces['projects'].metric_ref,project_ref))
+                bump_usage(metRef, 'projectUsage')
+                metricRefs.append(metRef)
+            for calc in element.calculatedMetrics:
+                calcRef = URIRef(f"http://analytics.com/{self.companyId}/calculatedMetric/{calc['id']}")
+                self.graph.add((calcRef, self.namespaces['projects'].calculated_ref,project_ref))
+                bump_usage(calcRef, 'projectUsage')
+                metricRefs.append(calcRef)
+            for segment in element.segments:
+                segRef = URIRef(f"http://analytics.com/{self.companyId}/segment/{segment['id']}")
+                bump_usage(segRef, 'projectUsage')
+                segRefs.append(segRef)
+            for dimRef in dimRefs:
+                for metRef in metricRefs:
+                    bump_cooccurrence(dim_metric_cooccurrence, dimRef, metRef, rsid)
+                for segRef in segRefs:
+                    bump_cooccurrence(dim_segment_cooccurrence, dimRef, segRef, rsid)
         def build_project_graph(project_detail):
             Wproject = project_detail
             project_ref = URIRef(f"http://analytics.com/{self.companyId}/projects/{Wproject.id}")
-            self.graph.add((self.namespaces['projects'], self.namespaces['projects'].contains,project_ref))
+            self.graph.add((URIRef(self.namespaces['projects']), self.namespaces['projects'].contains,project_ref))
             rsidRef = self.namespaces['reportSuites'][Wproject.rsid]
             self.graph.add((project_ref, self.namespaces['projects'].rsid,rsidRef))
             if rsidRef in dict_entity_usage.keys():
@@ -331,84 +368,67 @@ class KnowledgeGraph:
                             self.graph.add((project_ref, self.namespaces['projects'].text,Literal(element.text,datatype=XSD.string)))
                     elif element.type == "Visualization":
                         self.graph.add((project_ref, self.namespaces['projects'].visualition,Literal(element.name,datatype=XSD.string)))
-                        for dimension in element.dimensions:
-                            dimRef = URIRef(f"http://analytics.com/{self.companyId}/{Wproject.rsid}/dimension/{dimension['id']}")
-                            self.graph.add((dimRef, self.namespaces['projects'].dimension_ref,project_ref))
-                            if dimRef in dict_entity_usage.keys():
-                                dict_entity_usage[dimRef]['projectUsage'] += 1
-                            else:
-                                dict_entity_usage[dimRef] = {
-                                                        'segmentUsage' : 0,
-                                                        'projectUsage' : 1,
-                                                        'metricUsage': 0
-                                                }
-                        for metric in element.metrics:
-                            metRef = URIRef(f"http://analytics.com/{self.companyId}/{Wproject.rsid}/metric/{metric['id']}")
-                            self.graph.add((metRef, self.namespaces['projects'].metric_ref,project_ref))
-                            if metRef in dict_entity_usage.keys():
-                                dict_entity_usage[metRef]['projectUsage'] += 1
-                            else:
-                                dict_entity_usage[metRef] = {
-                                                        'segmentUsage' : 0,
-                                                        'projectUsage' : 1,
-                                                        'metricUsage': 0
-                                                }
-                        for calc in element.calculatedMetrics:
-                            calcRef = URIRef(f"http://analytics.com/{self.companyId}/calculatedMetric/{calc['id']}")
-                            self.graph.add((calcRef, self.namespaces['projects'].calculated_ref,project_ref))
-                            if calcRef in dict_entity_usage.keys():
-                                dict_entity_usage[calcRef]['projectUsage'] += 1
-                            else:
-                                dict_entity_usage[calcRef] = {
-                                                        'segmentUsage' : 0,
-                                                        'projectUsage' : 1,
-                                                        'metricUsage': 0
-                                                }
+                        register_element_components(element, project_ref, Wproject.rsid)
                     elif element.type == "FreeForm":
                         freeformText = f"{element.name}"
                         if element.description != "":
                             freeformText += f": {element.description}"
                         self.graph.add((project_ref, self.namespaces['projects'].panelFreeForm,Literal(freeformText,datatype=XSD.string)))
-                        for dimension in element.dimensions:
-                            dimRef = URIRef(f"http://analytics.com/{self.companyId}/{Wproject.rsid}/dimension/{dimension['id']}")
-                            self.graph.add((dimRef, self.namespaces['projects'].dimension_ref,project_ref))
-                            if dimRef in dict_entity_usage.keys():
-                                dict_entity_usage[dimRef]['projectUsage'] += 1
-                            else:
-                                dict_entity_usage[dimRef] = {
-                                                        'segmentUsage' : 0,
-                                                        'projectUsage' : 1,
-                                                        'metricUsage': 0
-                                                }
-                        for metric in element.metrics:
-                            metRef = URIRef(f"http://analytics.com/{self.companyId}/{Wproject.rsid}/metric/{metric['id']}")
-                            self.graph.add((metRef, self.namespaces['projects'].metric_ref,project_ref))
-                            if metRef in dict_entity_usage.keys():
-                                dict_entity_usage[metRef]['projectUsage'] += 1
-                            else:
-                                dict_entity_usage[metRef] = {
-                                                        'segmentUsage' : 0,
-                                                        'projectUsage' : 1,
-                                                        'metricUsage': 0
-                                                }
-                        for calc in element.calculatedMetrics:
-                            calcRef = URIRef(f"http://analytics.com/{self.companyId}/calculatedMetric/{calc['id']}")
-                            self.graph.add((calcRef, self.namespaces['projects'].calculated_ref,project_ref))
-                            if calcRef in dict_entity_usage.keys():
-                                dict_entity_usage[calcRef]['projectUsage'] += 1
-                            else:
-                                dict_entity_usage[calcRef] = {
-                                                        'segmentUsage' : 0,
-                                                        'projectUsage' : 1,
-                                                        'metricUsage': 0
-                                                }
+                        register_element_components(element, project_ref, Wproject.rsid)
         for proj in self.project_details:
             build_project_graph(proj)
         for ref, usage in dict_entity_usage.items():
             for key, value in usage.items():
                 self.graph.add((ref, self.namespaces['usage'][key],Literal(value,datatype=XSD.integer)))
+        for (dimRef, metRef), data in dim_metric_cooccurrence.items():
+            self.graph.add((dimRef, self.namespaces['usage'].usedWithMetric, metRef))
+            self.graph.add((metRef, self.namespaces['usage'].usedWithDimension, dimRef))
+            node = BNode()
+            self.graph.add((node, RDF.type, Literal("MetricCooccurrence")))
+            self.graph.add((node, self.namespaces['usage'].dimension, dimRef))
+            self.graph.add((node, self.namespaces['usage'].metric, metRef))
+            self.graph.add((node, self.namespaces['usage'].cooccurrenceCount, Literal(data['count'],datatype=XSD.integer)))
+            self.graph.add((node, self.namespaces['usage'].rsid, self.namespaces['reportSuites'][data['rsid']]))
+        for (dimRef, segRef), data in dim_segment_cooccurrence.items():
+            self.graph.add((dimRef, self.namespaces['usage'].usedWithSegment, segRef))
+            self.graph.add((segRef, self.namespaces['usage'].usedWithDimension, dimRef))
+            node = BNode()
+            self.graph.add((node, RDF.type, Literal("SegmentCooccurrence")))
+            self.graph.add((node, self.namespaces['usage'].dimension, dimRef))
+            self.graph.add((node, self.namespaces['usage'].segment, segRef))
+            self.graph.add((node, self.namespaces['usage'].cooccurrenceCount, Literal(data['count'],datatype=XSD.integer)))
+            self.graph.add((node, self.namespaces['usage'].rsid, self.namespaces['reportSuites'][data['rsid']]))
         if save:
             turtle = self.graph.serialize(format="turtle")
             if filename is not None:
+                if filename.endswith('.ttl') == False:
+                    filename += '.ttl'
                 Path(filename).write_text(turtle, encoding="utf-8")
         return self.graph
+
+    def exportGraph(self,filename:str = "knowledge_graph.ttl")->None:
+        """
+        Export the Knowledge Graph in a turtle format. 
+        Arguments:
+            filename : REQUIRED : The name of the turtle file
+        """
+        if filename is not None:
+            if filename.endswith('.ttl') == False:
+                filename += '.ttl'
+            turtle = self.graph.serialize(format="turtle")
+            Path(filename).write_text(turtle, encoding="utf-8")
+        else:
+            raise Exception("Require at least a filename")
+
+    def query(self, sparql_string: str) -> list:
+        """
+        Run a SPARQL query against the graph built by buildGraph() and return the results
+        as a list of dictionaries (one per row) instead of raw rdflib Result objects.
+        Arguments:
+            sparql_string : REQUIRED : The SPARQL query to execute.
+        """
+        results = self.graph.query(sparql_string)
+        return [
+            {str(var): (row[var].toPython() if row[var] is not None else None) for var in results.vars}
+            for row in results
+        ]
