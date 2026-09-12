@@ -69,6 +69,7 @@ class KnowledgeGraph:
                 self.metrics[rsid] = metrics
                 self.marketingChannels[rsid] = marketingChannels
         self.segments = self.analyticsAPI.getSegments(extended_info=True,format='raw')
+        self._segmentsById = {segment['id']: segment for segment in self.segments}
         self.calculatedMetrics = self.analyticsAPI.getCalculatedMetrics(extended_info=True,format='raw')
         self.dateRanges = self.analyticsAPI.getDateRanges(extended_info=True,format='raw')
         if len(self.projects) == 0:
@@ -129,10 +130,16 @@ class KnowledgeGraph:
     def buildGraph(self, save:bool=False, filename:str='knowledge_graph.ttl',verbose:bool=False,**kwargs):
         """
         Build the knowledge graph based on the dimensions, metrics, segments, and calculated metrics.
+        The dimensions, metrics, segments, calculated metrics and projects are each built into their own
+        sub-graph concurrently (threads, since the work is I/O-bound on Adobe Analytics API calls rather
+        than CPU-bound) and then merged together at the end.
         Arguments:
             save : OPTIONAL : If set to True, it will save the knowledge graph in a ttl file (bool : default False)
             filename : OPTIONAL : The filename to save the knowledge graph (str : default 'knowledge_graph.ttl')
             verbose : OPTIONAL : Adding print statement during the building of the graph.
+        Possible kwargs:
+            calculatedMetricWorkers : number of threads used to concurrently scan calculated metrics for their
+                    referenced segments/metrics, which involves live API calls (int : default 10)
         """
         self.graph = Graph()
         self.graph.bind("companyId", Namespace(f"http://analytics.com/{self.companyId}/"))
@@ -149,166 +156,239 @@ class KnowledgeGraph:
         dict_entity_usage = {}
         dim_metric_cooccurrence = {}
         dim_segment_cooccurrence = {}
-        def bump_usage(ref, field):
-            entry = dict_entity_usage.setdefault(ref, {'segmentUsage': 0, 'projectUsage': 0, 'metricUsage': 0})
+        def bump_usage(store, ref, field):
+            entry = store.setdefault(ref, {'segmentUsage': 0, 'projectUsage': 0, 'metricUsage': 0})
             entry[field] += 1
         def bump_cooccurrence(store, ref_a, ref_b, rsid):
             entry = store.setdefault((ref_a, ref_b), {'count': 0, 'rsid': rsid})
             entry['count'] += 1
-        def build_dimension_graph(dimension,rsid):
+        def merge_usage(target, source):
+            for ref, usage in source.items():
+                entry = target.setdefault(ref, {'segmentUsage': 0, 'projectUsage': 0, 'metricUsage': 0})
+                for key, value in usage.items():
+                    entry[key] += value
+        def add_reportsuite_base(graph, rsid):
+            if rsid in self.reportSuites.rsid.tolist():
+                row = self.reportSuites[self.reportSuites.rsid == rsid].iloc[0]
+                graph.add((self.namespaces['reportSuites'][rsid], RDF.type, Literal("ReportSuite")))
+                graph.add((self.namespaces['reportSuites'][rsid], RDFS.label, Literal(row['name'],datatype=XSD.string)))
+                graph.add((self.namespaces['reportSuites'][rsid], self.namespaces['reportSuites'].id, Literal(row['rsid'],datatype=XSD.string)))
+                graph.add((self.namespaces['reportSuites'][rsid], self.namespaces['reportSuites'].currency, Literal(row['currency'])))
+        def build_dimension_graph(graph, dimension,rsid):
             dimension_uri = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/dimension/{dimension['id']}")
-            self.graph.add((dimension_uri, RDF.type, Literal("Dimension")))
-            self.graph.add((dimension_uri, self.namespaces['dimensions'].dataType, Literal(dimension['type'])))
-            self.graph.add((dimension_uri, RDFS.label, Literal(dimension['name'])))
+            graph.add((dimension_uri, RDF.type, Literal("Dimension")))
+            graph.add((dimension_uri, self.namespaces['dimensions'].dataType, Literal(dimension['type'])))
+            graph.add((dimension_uri, RDFS.label, Literal(dimension['name'])))
             if '.' in dimension['id']:
-                self.graph.add((dimension_uri, self.namespaces['dimensions'].classification, Literal(True,datatype=XSD.boolean)))
+                graph.add((dimension_uri, self.namespaces['dimensions'].classification, Literal(True,datatype=XSD.boolean)))
                 parentRef = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/dimension/{dimension['id'].split('.')[0]}")
-                self.graph.add((dimension_uri, self.namespaces['dimensions'].parent_dimension, parentRef))
-                self.graph.add((parentRef, self.namespaces['dimensions'].children_dimension, dimension_uri))
+                graph.add((dimension_uri, self.namespaces['dimensions'].parent_dimension, parentRef))
+                graph.add((parentRef, self.namespaces['dimensions'].children_dimension, dimension_uri))
             else:
-                self.graph.add((dimension_uri, self.namespaces['dimensions'].classification, Literal(False,datatype=XSD.boolean)))
-            self.graph.add((dimension_uri, self.namespaces['dimensions'].id, Literal(dimension['id'])))
+                graph.add((dimension_uri, self.namespaces['dimensions'].classification, Literal(False,datatype=XSD.boolean)))
+            graph.add((dimension_uri, self.namespaces['dimensions'].id, Literal(dimension['id'])))
             if 'description' in dimension:
-                self.graph.add((dimension_uri, RDFS.comment, Literal(dimension['description'])))
+                graph.add((dimension_uri, RDFS.comment, Literal(dimension['description'])))
             for reportable in dimension['reportable']:
-                self.graph.add((dimension_uri, self.namespaces['dimensions'].reportable, Literal(reportable)))
-            self.graph.add((dimension_uri, self.namespaces['dimensions'].segmentable,Literal(dimension['segmentable'],datatype=XSD.boolean)))
-            self.graph.add((dimension_uri, self.namespaces['dimensions'].rsid, self.namespaces['reportSuites'][rsid]))
-            self.graph.add((self.namespaces['reportSuites'][rsid], self.namespaces['reportSuites'].dimensions,dimension_uri))
-        def build_metric_graph(metric,rsid):
+                graph.add((dimension_uri, self.namespaces['dimensions'].reportable, Literal(reportable)))
+            graph.add((dimension_uri, self.namespaces['dimensions'].segmentable,Literal(dimension['segmentable'],datatype=XSD.boolean)))
+            graph.add((dimension_uri, self.namespaces['dimensions'].rsid, self.namespaces['reportSuites'][rsid]))
+            graph.add((self.namespaces['reportSuites'][rsid], self.namespaces['reportSuites'].dimensions,dimension_uri))
+        def build_metric_graph(graph, metric,rsid):
             metric_uri = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/metric/{metric['id']}")
-            self.graph.add((metric_uri, RDF.type, Literal("Metric")))
-            self.graph.add((metric_uri, RDFS.label, Literal(metric['name'])))
-            self.graph.add((metric_uri, self.namespaces['metrics'].id, Literal(metric['id'])))
-            self.graph.add((metric_uri, self.namespaces['metrics'].type, Literal(metric['type'])))
+            graph.add((metric_uri, RDF.type, Literal("Metric")))
+            graph.add((metric_uri, RDFS.label, Literal(metric['name'])))
+            graph.add((metric_uri, self.namespaces['metrics'].id, Literal(metric['id'])))
+            graph.add((metric_uri, self.namespaces['metrics'].type, Literal(metric['type'])))
             for reportable in metric['support']:
-                self.graph.add((metric_uri, self.namespaces['metrics'].reportable, Literal(reportable)))
+                graph.add((metric_uri, self.namespaces['metrics'].reportable, Literal(reportable)))
             if 'description' in metric:
-                self.graph.add((metric_uri, RDFS.comment, Literal(metric['description'])))
-            self.graph.add((metric_uri, self.namespaces['metrics'].segmentable,Literal(metric['segmentable'],datatype=XSD.boolean)))
-            self.graph.add((metric_uri, self.namespaces['metrics'].polarity,Literal(metric['polarity'],datatype=XSD.string)))
-            self.graph.add((metric_uri, self.namespaces['metrics'].rsid, self.namespaces['reportSuites'][rsid]))
-            self.graph.add((self.namespaces['reportSuites'][rsid], self.namespaces['reportSuites'].metrics,metric_uri))
-        def build_marketing_channel_graph(rsid):
+                graph.add((metric_uri, RDFS.comment, Literal(metric['description'])))
+            graph.add((metric_uri, self.namespaces['metrics'].segmentable,Literal(metric['segmentable'],datatype=XSD.boolean)))
+            graph.add((metric_uri, self.namespaces['metrics'].polarity,Literal(metric['polarity'],datatype=XSD.string)))
+            graph.add((metric_uri, self.namespaces['metrics'].rsid, self.namespaces['reportSuites'][rsid]))
+            graph.add((self.namespaces['reportSuites'][rsid], self.namespaces['reportSuites'].metrics,metric_uri))
+        def build_marketing_channel_graph(graph, rsid):
             marketing_channel = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/marketingChannel/")
-            self.graph.add((marketing_channel, RDF.type, Literal("MarketingChannels")))
+            graph.add((marketing_channel, RDF.type, Literal("MarketingChannels")))
             mymarketingchannel = self.marketingChannels[rsid]
             for channel in mymarketingchannel['marketingChannels']:
                 marketing_channel_uri = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/marketingChannel/{channel['channelId']}")
-                self.graph.add((marketing_channel_uri, RDF.type, Literal("MarketingChannel")))
-                self.graph.add((marketing_channel_uri, RDFS.label, Literal(channel['name'])))
-                self.graph.add((marketing_channel_uri, self.namespaces['marketingChannels'].id, Literal(channel['channelId'])))
-                self.graph.add((marketing_channel_uri, self.namespaces['marketingChannels'].rsid, self.namespaces['reportSuites'][rsid]))
-                self.graph.add((self.namespaces['reportSuites'][rsid], self.namespaces['reportSuites'].marketingChannels,marketing_channel_uri))
-                self.graph.add((marketing_channel, self.namespaces['marketingChannels'].defines,marketing_channel_uri ))
+                graph.add((marketing_channel_uri, RDF.type, Literal("MarketingChannel")))
+                graph.add((marketing_channel_uri, RDFS.label, Literal(channel['name'])))
+                graph.add((marketing_channel_uri, self.namespaces['marketingChannels'].id, Literal(channel['channelId'])))
+                graph.add((marketing_channel_uri, self.namespaces['marketingChannels'].rsid, self.namespaces['reportSuites'][rsid]))
+                graph.add((self.namespaces['reportSuites'][rsid], self.namespaces['reportSuites'].marketingChannels,marketing_channel_uri))
+                graph.add((marketing_channel, self.namespaces['marketingChannels'].defines,marketing_channel_uri ))
                 if channel.get('position') is not None:
-                    self.graph.add((marketing_channel_uri, self.namespaces['marketingChannels'].position, Literal(channel['position'],datatype=XSD.integer)))
-                self.graph.add((marketing_channel_uri, self.namespaces['marketingChannels'].override, Literal(channel['overrideLastTouchChannel'],datatype=XSD.boolean)))
-                self.graph.add((marketing_channel_uri, self.namespaces['marketingChannels'].enabled, Literal(channel['enabled'],datatype=XSD.boolean)))
-        if verbose:
-            print("building dimensions, metrics, marketing channels")
-        for rsid in self.rsids:
-            if rsid in self.reportSuites.rsid.tolist():
-                row = self.reportSuites[self.reportSuites.rsid == rsid].iloc[0]
-                self.graph.add((self.namespaces['reportSuites'][rsid], RDF.type, Literal("ReportSuite")))
-                self.graph.add((self.namespaces['reportSuites'][rsid], RDFS.label, Literal(row['name'],datatype=XSD.string)))
-                self.graph.add((self.namespaces['reportSuites'][rsid], self.namespaces['reportSuites'].id, Literal(row['rsid'],datatype=XSD.string)))
-                self.graph.add((self.namespaces['reportSuites'][rsid], self.namespaces['reportSuites'].currency, Literal(row['currency'])))
-            for dimension in self.dimensions[rsid]:
-                build_dimension_graph(dimension, rsid)
-            for metric in self.metrics[rsid]:
-                build_metric_graph(metric, rsid)
-            build_marketing_channel_graph(rsid)
-        def build_segment_graph(segment):
+                    graph.add((marketing_channel_uri, self.namespaces['marketingChannels'].position, Literal(channel['position'],datatype=XSD.integer)))
+                graph.add((marketing_channel_uri, self.namespaces['marketingChannels'].override, Literal(channel['overrideLastTouchChannel'],datatype=XSD.boolean)))
+                graph.add((marketing_channel_uri, self.namespaces['marketingChannels'].enabled, Literal(channel['enabled'],datatype=XSD.boolean)))
+        def build_dimensions_task():
+            graph = Graph()
+            for rsid in self.rsids:
+                add_reportsuite_base(graph, rsid)
+                for dimension in self.dimensions[rsid]:
+                    build_dimension_graph(graph, dimension, rsid)
+            return graph
+        def build_metrics_task():
+            graph = Graph()
+            for rsid in self.rsids:
+                add_reportsuite_base(graph, rsid)
+                for metric in self.metrics[rsid]:
+                    build_metric_graph(graph, metric, rsid)
+                build_marketing_channel_graph(graph, rsid)
+            return graph
+        def build_segment_graph(graph, usage, segment):
             segment_uri = URIRef(f"http://analytics.com/{self.companyId}/segment/{segment['id']}")
-            self.graph.add((segment_uri, RDF.type, Literal("Segment")))
-            self.graph.add((segment_uri, RDFS.label, Literal(segment['name'])))
+            graph.add((segment_uri, RDF.type, Literal("Segment")))
+            graph.add((segment_uri, RDFS.label, Literal(segment['name'])))
             if 'description' in segment:
-                self.graph.add((segment_uri, RDFS.comment, Literal(segment['description'])))
-            self.graph.add((segment_uri, self.namespaces['segments'].id, Literal(segment['id'])))
-            self.graph.add((segment_uri, self.namespaces['segments'].definition, Literal(segment['definition'])))
-            self.graph.add((segment_uri, self.namespaces['segments'].rsid, self.namespaces['reportSuites'][segment['rsid']]))
-            self.graph.add((self.namespaces['reportSuites'][segment['rsid']], self.namespaces['reportSuites'].segments,segment_uri))
+                graph.add((segment_uri, RDFS.comment, Literal(segment['description'])))
+            graph.add((segment_uri, self.namespaces['segments'].id, Literal(segment['id'])))
+            graph.add((segment_uri, self.namespaces['segments'].definition, Literal(segment['definition'])))
+            graph.add((segment_uri, self.namespaces['segments'].rsid, self.namespaces['reportSuites'][segment['rsid']]))
+            graph.add((self.namespaces['reportSuites'][segment['rsid']], self.namespaces['reportSuites'].segments,segment_uri))
             if segment.get('lastRecordedAccess') is not None and segment.get('lastRecordedAccess') != "":
-                self.graph.add((segment_uri, self.namespaces['segments'].lastAccess, Literal(datetime.datetime.fromtimestamp(segment['lastRecordedAccess']/1000).isoformat().split(".")[0],datatype=XSD.dateTime)))
+                graph.add((segment_uri, self.namespaces['segments'].lastAccess, Literal(datetime.datetime.fromtimestamp(segment['lastRecordedAccess']/1000).isoformat().split(".")[0],datatype=XSD.dateTime)))
             for tag in segment['tags']:
-                self.graph.add((segment_uri, self.namespaces['segments'].tag, Literal(tag['name'])))
-            self.graph.add((segment_uri, self.namespaces['segments'].shares, Literal(len(segment.get('shares',[])),datatype=XSD.integer)))
+                graph.add((segment_uri, self.namespaces['segments'].tag, Literal(tag['name'])))
+            graph.add((segment_uri, self.namespaces['segments'].shares, Literal(len(segment.get('shares',[])),datatype=XSD.integer)))
             scannedSegment = self.analyticsAPI.scanSegment(segment)
             segRsid = scannedSegment['rsid']
             for dim in scannedSegment['dimensions']:
                 dimRef = URIRef(f"http://analytics.com/{self.companyId}/{segRsid}/dimension/{dim}")
-                if dimRef in dict_entity_usage.keys():
-                    dict_entity_usage[dimRef]['segmentUsage'] += 1
-                else:
-                    dict_entity_usage[dimRef] = {
-                        'segmentUsage' : 1,
-                        'projectUsage' : 0,
-                        'metricUsage':0
-                    }
+                bump_usage(usage, dimRef, 'segmentUsage')
             for met in scannedSegment['metrics']:
                 metRef = URIRef(f"http://analytics.com/{self.companyId}/{segRsid}/metric/{met}")
-                if metRef in dict_entity_usage.keys():
-                    dict_entity_usage[metRef]['segmentUsage'] += 1
-                else:
-                    dict_entity_usage[metRef] = {
-                        'segmentUsage' : 1,
-                        'projectUsage' : 0,
-                        'metricUsage':0
-                    }
+                bump_usage(usage, metRef, 'segmentUsage')
             rsidRef = self.namespaces['reportSuites'][segRsid]
-            if rsidRef in dict_entity_usage.keys():
-                dict_entity_usage[rsidRef]['segmentUsage'] +=1
-            else:
-                dict_entity_usage[rsidRef] = {
-                    'segmentUsage' : 1,
-                    'projectUsage' : 0,
-                    'metricUsage':0
-                }
-        for segment in self.segments:
-            build_segment_graph(segment)
-        def build_calculated_graph(calculated_metric):
+            bump_usage(usage, rsidRef, 'segmentUsage')
+        def build_segments_task():
+            graph = Graph()
+            usage = {}
+            for segment in self.segments:
+                build_segment_graph(graph, usage, segment)
+            return graph, usage
+        def build_calculated_graph(graph, usage, calculated_metric, scannedMetric):
             calculated_metric_uri = URIRef(f"http://analytics.com/{self.companyId}/calculatedMetric/{calculated_metric['id']}")
-            self.graph.add((calculated_metric_uri, RDF.type, Literal("CalculatedMetric")))
-            self.graph.add((calculated_metric_uri, RDFS.label, Literal(calculated_metric['name'])))
+            graph.add((calculated_metric_uri, RDF.type, Literal("CalculatedMetric")))
+            graph.add((calculated_metric_uri, RDFS.label, Literal(calculated_metric['name'])))
             if 'description' in calculated_metric:
-                self.graph.add((calculated_metric_uri, RDFS.comment, Literal(calculated_metric['description'])))
-            self.graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].type, Literal(calculated_metric['type'])))
-            self.graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].id, Literal(calculated_metric['id'])))
-            self.graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].definition, Literal(calculated_metric['definition'])))
-            self.graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].rsid, self.namespaces['reportSuites'][calculated_metric['rsid']]))
-            self.graph.add((self.namespaces['reportSuites'][calculated_metric['rsid']], self.namespaces['reportSuites'].calculatedMetrics,calculated_metric_uri))
+                graph.add((calculated_metric_uri, RDFS.comment, Literal(calculated_metric['description'])))
+            graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].type, Literal(calculated_metric['type'])))
+            graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].id, Literal(calculated_metric['id'])))
+            graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].definition, Literal(calculated_metric['definition'])))
+            graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].rsid, self.namespaces['reportSuites'][calculated_metric['rsid']]))
+            graph.add((self.namespaces['reportSuites'][calculated_metric['rsid']], self.namespaces['reportSuites'].calculatedMetrics,calculated_metric_uri))
             if calculated_metric.get('lastRecordedAccess') is not None and calculated_metric.get('lastRecordedAccess') != "":
-                self.graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].lastAccess, Literal(datetime.datetime.fromtimestamp(calculated_metric['lastRecordedAccess']/1000).isoformat().split(".")[0],datatype=XSD.dateTime)))
-            self.graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].shares, Literal(len(calculated_metric.get('shares',[])),datatype=XSD.integer)))
-            self.graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].polarity, Literal(calculated_metric.get('polarity','positive'),datatype=XSD.string)))
+                graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].lastAccess, Literal(datetime.datetime.fromtimestamp(calculated_metric['lastRecordedAccess']/1000).isoformat().split(".")[0],datatype=XSD.dateTime)))
+            graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].shares, Literal(len(calculated_metric.get('shares',[])),datatype=XSD.integer)))
+            graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].polarity, Literal(calculated_metric.get('polarity','positive'),datatype=XSD.string)))
             for tag in calculated_metric.get('tags',[]):
-                self.graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].tag, Literal(tag['name'])))
+                graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].tag, Literal(tag['name'])))
             for reportable in calculated_metric['compatibility'].get('supported_products',[]):
-                self.graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].reportable, Literal(reportable)))
-            scannedMetric = self.analyticsAPI.scanCalculatedMetric(calculated_metric)
+                graph.add((calculated_metric_uri, self.namespaces['calculatedMetrics'].reportable, Literal(reportable)))
             metRsid = scannedMetric['rsid']
             for metric in scannedMetric['metrics']:
                 metRef = URIRef(f"http://analytics.com/{self.companyId}/{metRsid}/metric/{metric}")
-                if metRef in dict_entity_usage.keys():
-                    dict_entity_usage[metRef]['metricUsage'] += 1
-                else:
-                    dict_entity_usage[metRef] = {
-                                'segmentUsage' : 0,
-                                'projectUsage' : 0,
-                                'metricUsage':1
-                        }
+                bump_usage(usage, metRef, 'metricUsage')
             rsidRef = self.namespaces['reportSuites'][metRsid]
-            if rsidRef in dict_entity_usage.keys():
-                dict_entity_usage[rsidRef]['metricUsage'] += 1
-            else:
-                dict_entity_usage[rsidRef] = {
-                                                'segmentUsage' : 0,
-                                                'projectUsage' : 0,
-                                                'metricUsage':1
-                                        }
-        for calculated_metric in self.calculatedMetrics:
-            build_calculated_graph(calculated_metric)
+            bump_usage(usage, rsidRef, 'metricUsage')
+        def build_calculated_metrics_task():
+            graph = Graph()
+            usage = {}
+            workers = int(kwargs.get('calculatedMetricWorkers', 10))
+            def scan(calculated_metric):
+                return calculated_metric, self.analyticsAPI.scanCalculatedMetric(calculated_metric, knownSegments=self._segmentsById)
+            # passing knownSegments lets scanCalculatedMetric resolve referenced segments from data
+            # already fetched in __init__, avoiding a getSegment API call per reference; the thread
+            # pool remains as a safety net for any referenced segment not present in self._segmentsById.
+            with futures.ThreadPoolExecutor(max_workers=workers) as executor:
+                scanned_results = list(executor.map(scan, self.calculatedMetrics))
+            for calculated_metric, scannedMetric in scanned_results:
+                build_calculated_graph(graph, usage, calculated_metric, scannedMetric)
+            return graph, usage
+        def register_element_components(graph, usage, dim_metric_cooc, dim_segment_cooc, element, project_ref, rsid):
+            dimRefs, metricRefs, segRefs = [], [], []
+            for dimension in element.dimensions:
+                dimRef = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/dimension/{dimension['id']}")
+                graph.add((dimRef, self.namespaces['projects'].dimension_ref,project_ref))
+                bump_usage(usage, dimRef, 'projectUsage')
+                dimRefs.append(dimRef)
+            for metric in element.metrics:
+                metRef = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/metric/{metric['id']}")
+                graph.add((metRef, self.namespaces['projects'].metric_ref,project_ref))
+                bump_usage(usage, metRef, 'projectUsage')
+                metricRefs.append(metRef)
+            for calc in element.calculatedMetrics:
+                calcRef = URIRef(f"http://analytics.com/{self.companyId}/calculatedMetric/{calc['id']}")
+                graph.add((calcRef, self.namespaces['projects'].calculated_ref,project_ref))
+                bump_usage(usage, calcRef, 'projectUsage')
+                metricRefs.append(calcRef)
+            for segment in element.segments:
+                segRef = URIRef(f"http://analytics.com/{self.companyId}/segment/{segment['id']}")
+                bump_usage(usage, segRef, 'projectUsage')
+                segRefs.append(segRef)
+            for dimRef in dimRefs:
+                for metRef in metricRefs:
+                    bump_cooccurrence(dim_metric_cooc, dimRef, metRef, rsid)
+                for segRef in segRefs:
+                    bump_cooccurrence(dim_segment_cooc, dimRef, segRef, rsid)
+        def build_project_graph(graph, usage, dim_metric_cooc, dim_segment_cooc, project_detail):
+            Wproject = project_detail
+            project_ref = URIRef(f"http://analytics.com/{self.companyId}/projects/{Wproject.id}")
+            graph.add((URIRef(self.namespaces['projects']), self.namespaces['projects'].contains,project_ref))
+            rsidRef = self.namespaces['reportSuites'][Wproject.rsid]
+            graph.add((project_ref, self.namespaces['projects'].rsid,rsidRef))
+            bump_usage(usage, rsidRef, 'projectUsage')
+            graph.add((project_ref, RDFS.label,Literal(Wproject.name)))
+            graph.add((project_ref, RDF.type,Literal("Workspace")))
+            graph.add((project_ref, self.namespaces['projects'].description,Literal(Wproject.description)))
+            if Wproject.created is not None and Wproject.created != "":
+                graph.add((project_ref, self.namespaces['projects'].created,Literal(Wproject.created,datatype=XSD.dateTime)))
+            for panel in Wproject.panels:
+                for element in panel.elements:
+                    if element.type == "Text":
+                        graph.add((project_ref, self.namespaces['projects'].text,Literal(element.name,datatype=XSD.string)))
+                        if element.text is not None and element.text != "":
+                            graph.add((project_ref, self.namespaces['projects'].text,Literal(element.text,datatype=XSD.string)))
+                    elif element.type == "Visualization":
+                        graph.add((project_ref, self.namespaces['projects'].visualition,Literal(element.name,datatype=XSD.string)))
+                        register_element_components(graph, usage, dim_metric_cooc, dim_segment_cooc, element, project_ref, Wproject.rsid)
+                    elif element.type == "FreeForm":
+                        freeformText = f"{element.name}"
+                        if element.description != "":
+                            freeformText += f": {element.description}"
+                        graph.add((project_ref, self.namespaces['projects'].panelFreeForm,Literal(freeformText,datatype=XSD.string)))
+                        register_element_components(graph, usage, dim_metric_cooc, dim_segment_cooc, element, project_ref, Wproject.rsid)
+        def build_projects_task():
+            graph = Graph()
+            usage = {}
+            local_dim_metric_cooc = {}
+            local_dim_segment_cooc = {}
+            for proj in self.project_details:
+                build_project_graph(graph, usage, local_dim_metric_cooc, local_dim_segment_cooc, proj)
+            return graph, usage, local_dim_metric_cooc, local_dim_segment_cooc
+        if verbose:
+            print("building dimensions, metrics, segments, calculated metrics and projects concurrently")
+        with futures.ThreadPoolExecutor(max_workers=5) as executor:
+            future_dimensions = executor.submit(build_dimensions_task)
+            future_metrics = executor.submit(build_metrics_task)
+            future_segments = executor.submit(build_segments_task)
+            future_calculated = executor.submit(build_calculated_metrics_task)
+            future_projects = executor.submit(build_projects_task)
+            dimensions_graph = future_dimensions.result()
+            metrics_graph = future_metrics.result()
+            segments_graph, segments_usage = future_segments.result()
+            calculated_graph, calculated_usage = future_calculated.result()
+            projects_graph, projects_usage, dim_metric_cooccurrence, dim_segment_cooccurrence = future_projects.result()
+        if verbose:
+            print("merging sub-graphs")
+        for subgraph in (dimensions_graph, metrics_graph, segments_graph, calculated_graph, projects_graph):
+            self.graph += subgraph
+        for usage_source in (segments_usage, calculated_usage, projects_usage):
+            merge_usage(dict_entity_usage, usage_source)
         for daterange in self.dateRanges:
             drRef = URIRef(f"http://analytics.com/{self.companyId}/dateRange/{daterange['id']}")
             self.graph.add((drRef,RDF.type,Literal("DateRange")))
@@ -316,67 +396,6 @@ class KnowledgeGraph:
             self.graph.add((drRef,self.namespaces['dateRange'].id,Literal(daterange['id'])))
             self.graph.add((drRef,self.namespaces['dateRange'].description,Literal(daterange['description'])))
             self.graph.add((drRef,self.namespaces['dateRange'].definition,Literal(daterange['definition'])))
-        def register_element_components(element, project_ref, rsid):
-            dimRefs, metricRefs, segRefs = [], [], []
-            for dimension in element.dimensions:
-                dimRef = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/dimension/{dimension['id']}")
-                self.graph.add((dimRef, self.namespaces['projects'].dimension_ref,project_ref))
-                bump_usage(dimRef, 'projectUsage')
-                dimRefs.append(dimRef)
-            for metric in element.metrics:
-                metRef = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/metric/{metric['id']}")
-                self.graph.add((metRef, self.namespaces['projects'].metric_ref,project_ref))
-                bump_usage(metRef, 'projectUsage')
-                metricRefs.append(metRef)
-            for calc in element.calculatedMetrics:
-                calcRef = URIRef(f"http://analytics.com/{self.companyId}/calculatedMetric/{calc['id']}")
-                self.graph.add((calcRef, self.namespaces['projects'].calculated_ref,project_ref))
-                bump_usage(calcRef, 'projectUsage')
-                metricRefs.append(calcRef)
-            for segment in element.segments:
-                segRef = URIRef(f"http://analytics.com/{self.companyId}/segment/{segment['id']}")
-                bump_usage(segRef, 'projectUsage')
-                segRefs.append(segRef)
-            for dimRef in dimRefs:
-                for metRef in metricRefs:
-                    bump_cooccurrence(dim_metric_cooccurrence, dimRef, metRef, rsid)
-                for segRef in segRefs:
-                    bump_cooccurrence(dim_segment_cooccurrence, dimRef, segRef, rsid)
-        def build_project_graph(project_detail):
-            Wproject = project_detail
-            project_ref = URIRef(f"http://analytics.com/{self.companyId}/projects/{Wproject.id}")
-            self.graph.add((URIRef(self.namespaces['projects']), self.namespaces['projects'].contains,project_ref))
-            rsidRef = self.namespaces['reportSuites'][Wproject.rsid]
-            self.graph.add((project_ref, self.namespaces['projects'].rsid,rsidRef))
-            if rsidRef in dict_entity_usage.keys():
-                dict_entity_usage[rsidRef]['projectUsage'] += 1
-            else:
-                dict_entity_usage[rsidRef] = {
-                        'segmentUsage' : 0,
-                        'projectUsage' : 1,
-                        'metricUsage': 0
-                }
-            self.graph.add((project_ref, RDFS.label,Literal(Wproject.name)))
-            self.graph.add((project_ref, RDF.type,Literal("Workspace")))
-            self.graph.add((project_ref, self.namespaces['projects'].description,Literal(Wproject.description)))
-            self.graph.add((project_ref, self.namespaces['projects'].created,Literal(Wproject.created,datatype=XSD.dateTime)))
-            for panel in Wproject.panels:
-                for element in panel.elements:
-                    if element.type == "Text":
-                        self.graph.add((project_ref, self.namespaces['projects'].text,Literal(element.name,datatype=XSD.string)))
-                        if element.text is not None and element.text != "":
-                            self.graph.add((project_ref, self.namespaces['projects'].text,Literal(element.text,datatype=XSD.string)))
-                    elif element.type == "Visualization":
-                        self.graph.add((project_ref, self.namespaces['projects'].visualition,Literal(element.name,datatype=XSD.string)))
-                        register_element_components(element, project_ref, Wproject.rsid)
-                    elif element.type == "FreeForm":
-                        freeformText = f"{element.name}"
-                        if element.description != "":
-                            freeformText += f": {element.description}"
-                        self.graph.add((project_ref, self.namespaces['projects'].panelFreeForm,Literal(freeformText,datatype=XSD.string)))
-                        register_element_components(element, project_ref, Wproject.rsid)
-        for proj in self.project_details:
-            build_project_graph(proj)
         for ref, usage in dict_entity_usage.items():
             for key, value in usage.items():
                 self.graph.add((ref, self.namespaces['usage'][key],Literal(value,datatype=XSD.integer)))

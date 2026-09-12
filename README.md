@@ -89,6 +89,11 @@ Refer to this [documentation on Project](./docs/projects.md) for more informatio
 You can build an RDF Knowledge Graph out of your Adobe Analytics implementation, connecting your dimensions, metrics, segments, calculated metrics, and Workspace projects, along with their usage and co-occurrence relationships.\
 More information on the [Knowledge Graph documentation](./docs/knowledgegraph.md)
 
+## MCP Server
+
+The `aanalytics2` package ships with an MCP server, exposing Adobe Analytics — and, optionally, the Knowledge Graph above — as tools for MCP-compatible LLM clients such as Claude Desktop or VS Code.\
+More information on the [MCP Server documentation](./docs/mcp_server.md)
+
 ## Logging capability
 
 In case you want to use the logging capability for your script.\

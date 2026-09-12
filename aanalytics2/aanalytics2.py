@@ -1137,9 +1137,15 @@ class Analytics:
         res = self.connector.getData(self.endpoint_company + path, params=params)
         return res
 
-    def scanCalculatedMetric(self, calculatedMetric: Union[str, dict], verbose: bool = False) -> dict:
+    def scanCalculatedMetric(self, calculatedMetric: Union[str, dict], verbose: bool = False, knownSegments: dict = None) -> dict:
         """
         Return a dictionary of metrics and dimensions used in the calculated metrics.
+        Arguments:
+            calculatedMetric : REQUIRED : either the ID of the calculated metric or the full definition.
+            verbose : OPTIONAL : print some comments.
+            knownSegments : OPTIONAL : a dict mapping segment ID to its full segment definition (as returned by
+                    getSegments with extended_info=True). When a referenced segment is found in this dict, it is
+                    scanned locally instead of triggering a getSegment API call for it.
         """
         if self.loggingEnabled:
             self.logger.debug(f"starting scanCalculatedMetric")
@@ -1159,7 +1165,17 @@ class Analytics:
         for segment in segments:
             if verbose:
                 print(f"retrieving segment {segment} definition")
-            tmp: dict = self.scanSegment(segment)
+            segmentRef = knownSegments.get(segment) if knownSegments is not None else None
+            if segmentRef is None or 'definition' not in segmentRef:
+                if verbose:
+                    print(f"segment {segment} not found in knownSegments (or missing definition), retrieving it via API")
+                segmentRef = self.getSegment(segment, full=True)
+            try:
+                tmp: dict = self.scanSegment(segmentRef)
+            except KeyError:
+                if verbose:
+                    print(f"could not retrieve definition for segment {segment}, skipping it")
+                continue
             res['dimensions'] += [dim for dim in tmp['dimensions']]
             res['metrics'] += [met for met in tmp['metrics']]
         metrics: list = re.findall("'(metrics/.+?)'", mydef)

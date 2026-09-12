@@ -36,11 +36,13 @@ dependencies = [
     "httpx",
     "rich>=13.0.0",
     "rdflib",
+    "mcp>=1.0",
 ]
 dynamic = ["version"]
 
 [project.scripts]
 aanalytics2 = "aanalytics2.cli.__main__:main"
+aanalytics2-mcp = "aanalytics2.mcp_server:main"
 
 [project.urls]
 homepage = "https://github.com/pitchmuc/adobe-analytics-api-2.0"
