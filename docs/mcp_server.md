@@ -212,10 +212,12 @@ into `.mcp.json` (project scope) or your user-level Claude config (`claude mcp a
 | -- | -- |
 | Discovery | `list_report_suites`, `list_dimensions`, `list_metrics`, `list_segments`, `list_calculated_metrics`, `list_date_ranges`, `list_projects`, `get_segment`, `get_project` |
 | Reporting | `build_report_request`, `run_report`, `get_top_items` |
-| Workspace building | `create_workspace`, `add_panel`, `add_segment_filter`, `add_dropdown_filter`, `add_text`, `add_freeform`, `add_breakdown`, `add_chart`, `add_segment_comparison_table`, `publish_workspace` |
+| Workspace building | `create_workspace`, `add_panel`, `add_segment_filter`, `add_dropdown_filter`, `add_text`, `add_freeform`, `add_breakdown`, `add_chart`, `add_segment_comparison_table`, `publish_workspace`, `update_workspace` |
 | Knowledge Graph *(needs `-kg`)* | `sparql_query`, `get_related_metrics`, `get_related_dimensions`, `get_related_segments`, `get_popular_combinations`, `get_component_context` |
 
 Workspace-building tools are stateless: each one takes the project dict returned by the previous call and returns an updated one, so a typical session chains `create_workspace` → `add_panel` → `add_freeform` → `add_chart` → `publish_workspace`. Each tool's full parameter list is in its own docstring, visible to the client when it inspects the tool.
+
+To edit an **existing** project instead of building a new one, start from `get_project` instead of `create_workspace`, chain the same `add_*` tools on the returned dict, then call `update_workspace` instead of `publish_workspace` — `update_workspace` requires the project dict to still carry its original `"id"` (present on anything returned by `get_project`) and saves in place rather than creating a duplicate.
 
 | Resource | Description |
 | -- | -- |

@@ -14,7 +14,7 @@ import json
 import sys
 from importlib import resources as importlib_resources
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, Union
 
 from rdflib import Graph, Literal, URIRef
 
@@ -70,12 +70,38 @@ def _find_freeform_subpanel(wm: WorkspaceManager, table_title: str) -> dict:
     # WorkspaceManager.panels), so mutating it would never reach wm.to_dict(). The raw
     # sub-panel dicts in wm._panels are what to_dict() actually serialises, so a table
     # has to be located and patched there directly to make add_breakdown stick.
+    available = []
     for panel in wm._panels:
         for sp in panel.get("subPanels", []):
             reportlet = sp.get("reportlet", {})
-            if reportlet.get("type") == "FreeformReportlet" and sp.get("name") == table_title:
-                return sp
-    raise ValueError(f"No FreeForm table named {table_title!r} found in this project.")
+            if reportlet.get("type") == "FreeformReportlet":
+                available.append(sp.get("name"))
+                if sp.get("name") == table_title:
+                    return sp
+    raise ValueError(
+        f"No FreeForm table named {table_title!r} found in this project "
+        f"(title match is case-sensitive and exact). Available FreeForm tables: {available!r}"
+    )
+
+
+# Accepted shape for a metric/dimension-item/segment/component reference: either a bare
+# ID string or the full {"id": ..., "name"?: ..., "type"?: ...} dict. Declaring the Union
+# (rather than bare `list`/`dict`) both documents the shorthand in the tool's JSON schema
+# and — importantly — is required for it to work at all: FastMCP validates arguments
+# against the annotation via pydantic before the tool body runs, so a plain `List[dict]`
+# would reject a bare string with a validation error before _coerce_component_list ever saw it.
+ComponentSpec = Union[str, dict]
+
+
+def _coerce_component_list(components: Optional[List[ComponentSpec]]) -> Optional[List[dict]]:
+    """Turn any bare ID strings in `components` into {"id": ...} dicts. build_report_request
+    already accepted bare metric ID strings for its own `metrics` list; without this, the
+    same shorthand crashes the WorkspaceManager builder tools (add_freeform, add_breakdown,
+    add_dropdown_filter, add_segment_comparison_table) with a raw `'str' object has no
+    attribute 'get'` instead of resolving or failing clearly."""
+    if not components:
+        return components
+    return [{"id": c} if isinstance(c, str) else c for c in components]
 
 
 def build_server(
@@ -213,10 +239,10 @@ def build_server(
     @mcp.tool()
     def build_report_request(
         dimension_id: str,
-        metrics: list,
+        metrics: List[ComponentSpec],
         date_range: str,
         rsid: str = None,
-        segment_ids: list = None,
+        segment_ids: Optional[List[str]] = None,
         limit: int = 100,
     ) -> dict:
         """Build a report request dict (compatible with run_report) from high-level
@@ -307,12 +333,12 @@ def build_server(
         return wm.to_dict()
 
     @mcp.tool()
-    def add_dropdown_filter(project: dict, group_name: str, components: list, has_no_filter: bool = True) -> dict:
+    def add_dropdown_filter(project: dict, group_name: str, components: List[ComponentSpec], has_no_filter: bool = True) -> dict:
         """Add a dropdown filter group to the current panel. Each item in `components`
-        needs "id"/"name", optional "type" ("Segment" default, or "DimensionItem") and
-        "isActive"."""
+        needs "id"/"name" (or is a bare ID string — the name is then auto-resolved),
+        optional "type" ("Segment" default, or "DimensionItem") and "isActive"."""
         wm = WorkspaceManager(data=project, analytics=analytics)
-        wm.addDropdownFilter(group_name=group_name, components=components, has_no_filter=has_no_filter)
+        wm.addDropdownFilter(group_name=group_name, components=_coerce_component_list(components), has_no_filter=has_no_filter)
         return wm.to_dict()
 
     @mcp.tool()
@@ -326,20 +352,23 @@ def build_server(
     def add_freeform(
         project: dict,
         title: str,
-        metrics: list,
+        metrics: List[ComponentSpec],
         item_id: str = None,
         item_name: str = "",
-        items: list = None,
+        items: Optional[List[ComponentSpec]] = None,
         rows: int = 10,
     ) -> dict:
         """Add a freeform table to the current panel. Provide either a single dynamic
         row dimension (`item_id` + optional `item_name`) or static rows (`items`, a list
         of {"id", "name", "type"?} dicts — "type" is "Segment" or "DimensionItem").
         `metrics` is a list of {"id", "name"} dicts; each may include a "filters" list
-        for column-level splitting."""
+        for column-level splitting. Both `metrics` and `items` also accept bare ID
+        strings instead of dicts (e.g. "metrics/visits") — the display name is then
+        auto-resolved from the report suite."""
         wm = WorkspaceManager(data=project, analytics=analytics)
-        wm.addFreeform(title=title, item_id=item_id, item_name=item_name, items=items,
-                        metrics=metrics, rows=rows)
+        wm.addFreeform(title=title, item_id=item_id, item_name=item_name,
+                        items=_coerce_component_list(items),
+                        metrics=_coerce_component_list(metrics), rows=rows)
         return wm.to_dict()
 
     @mcp.tool()
@@ -348,16 +377,24 @@ def build_server(
         table_title: str,
         dimension_id: str = None,
         dimension_name: str = None,
-        items: list = None,
+        items: Optional[List[ComponentSpec]] = None,
         rows: int = 5,
     ) -> dict:
-        """Nest a breakdown under an existing freeform table (matched by its title).
-        Provide either `dimension_id` (+ optional `dimension_name`) for a dynamic
-        breakdown, or `items` (list of {"id", "name", "type"?} dicts) for static rows."""
+        """Nest a breakdown under an existing freeform table (matched by its title,
+        case-sensitive and exact). Provide either `dimension_id` (+ optional
+        `dimension_name`) for a dynamic breakdown, or `items` (list of {"id", "name",
+        "type"?} dicts, or bare ID strings — the display name is then auto-resolved)
+        for static rows."""
         wm = WorkspaceManager(data=project, analytics=analytics)
         subpanel = _find_freeform_subpanel(wm, table_title)
         ff = FreeForm.from_dict(subpanel["reportlet"])
-        ff.addBreakdown(dimension_id=dimension_id, dimension_name=dimension_name, items=items, rows=rows)
+        # Unlike WorkspaceManager.addFreeform, FreeForm.addBreakdown does not resolve
+        # missing id/name pairs itself — reuse wm's already-loaded company lookup
+        # tables so an items entry with only "id" (or only "name") still resolves,
+        # same as it would if passed to add_freeform instead.
+        ff.addBreakdown(dimension_id=dimension_id, dimension_name=dimension_name,
+                         items=wm._normalize_items(_coerce_component_list(items)) if items else items,
+                         rows=rows)
         subpanel["reportlet"] = ff.to_dict()
         return wm.to_dict()
 
@@ -375,21 +412,23 @@ def build_server(
     def add_segment_comparison_table(
         project: dict,
         title: str,
-        segments: list,
-        metrics: list,
+        segments: List[ComponentSpec],
+        metrics: List[ComponentSpec],
         breakdown_dim_id: str = None,
         breakdown_dim_name: str = "",
-        breakdown_segments: list = None,
+        breakdown_segments: Optional[List[ComponentSpec]] = None,
         rows: int = 50,
         breakdown_rows: int = 5,
     ) -> dict:
         """Add a freeform table where each row is a segment (side-by-side segment
-        comparison), optionally broken down further by a dimension or nested segments."""
+        comparison), optionally broken down further by a dimension or nested segments.
+        `segments`, `metrics` and `breakdown_segments` each accept {"id", "name"} dicts
+        or bare ID strings — the display name is then auto-resolved."""
         wm = WorkspaceManager(data=project, analytics=analytics)
         wm.addSegmentAsDimensionFreeform(
-            title=title, segments=segments, metrics=metrics,
+            title=title, segments=_coerce_component_list(segments), metrics=_coerce_component_list(metrics),
             breakdown_dim_id=breakdown_dim_id, breakdown_dim_name=breakdown_dim_name,
-            breakdown_segments=breakdown_segments, breakdown_rows=breakdown_rows, rows=rows,
+            breakdown_segments=_coerce_component_list(breakdown_segments), breakdown_rows=breakdown_rows, rows=rows,
         )
         return wm.to_dict()
 
@@ -397,6 +436,22 @@ def build_server(
     def publish_workspace(project: dict) -> dict:
         """Save a project dict as a new Workspace project via the Analytics API."""
         return analytics.createProject(project)
+
+    @mcp.tool()
+    def update_workspace(project: dict) -> dict:
+        """Save changes to an EXISTING Workspace project (matched by its "id"). Use this
+        instead of publish_workspace when `project` originated from get_project — possibly
+        then modified via add_panel/add_freeform/add_chart/etc. — rather than from
+        create_workspace; publish_workspace would create a duplicate instead of updating
+        the original."""
+        project_id = project.get("id")
+        if not project_id:
+            raise ValueError(
+                "project has no \"id\" — it must come from get_project (a project created "
+                "with create_workspace has no id until it is first published). Use "
+                "publish_workspace to create a new project instead."
+            )
+        return analytics.updateProject(project_id, project)
 
     # ── Group 4 — Knowledge Graph (read-only; local .ttl only, no remote endpoint yet) ──
 

@@ -201,3 +201,40 @@ def test_build_path_round_trip():
     assert len(reparsed.breakdowns[0].breakdowns) == 1
     assert reparsed.breakdowns[0].dimensions == [{"id": "variables/evar8", "name": "Market Code"}]
     assert reparsed.breakdowns[0].breakdowns[0].dimensions == [{"id": "variables/evar3", "name": "Browser"}]
+
+
+def test_dynamic_row_dimension_serializes_as_dimensionSettings():
+    """A table's own dynamic row dimension (built via item_id, not static `items`) must be
+    written as `freeformTable.dimensionSettings[0].dimension`, not a bare `freeformTable.dimension`
+    key. Adobe migrated the wire format around 2025 and rejects the old bare-key form outright
+    with a schema-validation error on createProject/updateProject (real 2020-2026 exports in
+    Workspaces/ confirm the cutover — see _to_freeform_table's comment)."""
+    wm = api2.WorkspaceManager(data=_sample_project())
+    wm.addPanel("Built Panel 2", date_range="thisMonth")
+    wm.addFreeform(
+        "Model Range",
+        item_id="variables/evar10.vehicle-marketing-model-range-",
+        item_name="Vehicle Marketing Model Range",
+        metrics=[{"id": "metrics/visits", "name": "Visits"}],
+    )
+
+    d = wm.to_dict()
+    json.dumps(d)  # must be JSON-serializable
+
+    table_dict = d["definition"]["workspaces"][0]["panels"][-1]["subPanels"][0]["reportlet"]["freeformTable"]
+    assert "dimension" not in table_dict
+    assert table_dict["dimensionSettings"] == [{
+        "id": table_dict["dimensionSettings"][0]["id"],  # opaque, only needs to be a string
+        "dimension": {
+            "id": "variables/evar10.vehicle-marketing-model-range-",
+            "__entity__": True, "type": "Dimension",
+            "__metaData__": {"name": "Vehicle Marketing Model Range"},
+        },
+        "search": {"alwaysExcludedItems": [], "operator": "AND", "rules": []},
+    }]
+
+    # Write/read symmetry: parsing the built project back must recover the same dimension.
+    wm2 = api2.WorkspaceManager(data=d)
+    reparsed = wm2.panels[-1].elements[0].freeform
+    assert reparsed.dimensions == [{"id": "variables/evar10.vehicle-marketing-model-range-",
+                                     "name": "Vehicle Marketing Model Range"}]

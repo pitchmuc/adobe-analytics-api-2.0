@@ -642,7 +642,17 @@ class FreeForm:
             "statistics": {"functions": [], "ignoreZeros": True},
         }
         if use_dimension:
-            table["dimension"] = deepcopy(self.dimension)
+            # Adobe migrated the wire format for a table's dynamic row dimension from a bare
+            # `dimension` key to a `dimensionSettings` array sometime around 2025 — real 2026
+            # exports never contain `dimension` any more (verified against the local Workspaces/
+            # corpus by file-timestamp), and `createProject`/`updateProject` reject it outright
+            # with an "unwanted" schema-validation error. `_parse_table_rows` already reads
+            # `dimensionSettings` first for exactly this reason; this is its write-path counterpart.
+            table["dimensionSettings"] = [{
+                "id": _short_hex_id(),
+                "dimension": deepcopy(self.dimension),
+                "search": _default_search(),
+            }]
         return table
 
     def _to_breakdown_entry(self) -> dict:
