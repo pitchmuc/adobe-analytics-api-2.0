@@ -87,15 +87,15 @@ class AdobeRequest:
                 config=self.config, verbose=verbose)
             token = token_and_expiry['token']
             expiry = token_and_expiry['expiry']
-            self.token = token
             if self.loggingEnabled:
-                self.logger.info(f"token retrieved : {self.token}")
+                self.logger.info(f"token retrieved : {token}")
             self.config['token'] = token
             self.config['date_limit'] = time.time() + expiry - 500
             self.header.update({'Authorization': f'Bearer {token}'})
-            self.header.update({'x-proxy-global-company-id': company_id})
             if self.loggingEnabled:
                 self.logger.info("OAuth token retrieved")
+        self.token = self.config['token']
+        self.header.update({'x-proxy-global-company-id': company_id})
 
         self.session = self._build_session(retry)
 

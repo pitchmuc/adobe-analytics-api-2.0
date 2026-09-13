@@ -599,7 +599,7 @@ def main():
             print("No company IDs found for this config file.", file=sys.stderr)
             sys.exit(1)
         company_id = companies[0]["globalCompanyId"]
-    analytics = login.createAnalyticsConnection(companyId=company_id)
+    analytics = Analytics(company_id=company_id, config=cfg)
 
     kg_graph = None
     if args.knowledge_graph:

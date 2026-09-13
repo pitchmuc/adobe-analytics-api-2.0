@@ -10,8 +10,7 @@ If you prefer to explore Adobe Analytics from a terminal without writing Python 
 First you should create an Adobe IO account and connect to a Product Profile.
 You can also create an Adobe IO account and then go to the product Profile in Adobe Admin Console to contect to your Adobe IO account.
 
-When you create your Adobe IO account, you need to set a certificate, keep the key nearby because you will need it.
-You can follow this [tutorial](https://www.datanalyst.info/python/adobe-io-user-management/adobe-io-jwt-authentication-with-python/)
+When you create your Adobe IO account, set up an OAuth Server-to-Server credential and keep the client ID and client secret nearby because you will need them.
 
 ## 2. Download the library
 
@@ -46,7 +45,7 @@ You can always use the argument to change the behavior.
 Arguments for `createConfigFile`:
 
 * destination : OPTIONAL : the name of the file + path if you want
-* auth_type : OPTIONAL : The type of Oauth type you want to use for your config file. Possible value: "jwt" or "oauthV2"
+* auth_type : OPTIONAL : The type of Oauth type you want to use for your config file. Possible value: "oauthV2"
 * company_id : OPTIONAL : Pre-fill the `company_id` (globalCompanyId) field in the generated file.
 * rsid : OPTIONAL : Pre-fill the `rsid` (default report suite ID) field in the generated file.
 
@@ -67,7 +66,7 @@ import aanalytics2 as api2
 api2.importConfigFile('myconfig.json')
 ```
 
-**Note**: starting version 0.4.0 the `importConfigFile` will check dynamically for the keys used to define the type of Auth. The check is Oauth V2 and then JWT. You can force the usage of a specific setup by passing the type of auth you want to priorize.
+**Note**: starting version 0.4.0 the `importConfigFile` will check dynamically for the keys used to define the type of Auth (Oauth Server-to-Server). You can force the usage of a specific setup by passing the type of auth you want to priorize.
 
 ### Alternative 1 : Using the configure method
 
