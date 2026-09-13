@@ -11,6 +11,8 @@ console script once installed.
 """
 import argparse
 import sys
+from importlib import resources as importlib_resources
+from pathlib import Path
 from typing import Optional
 
 from rdflib import Graph, Literal, URIRef
@@ -21,6 +23,18 @@ from aanalytics2.requestCreator import RequestCreator
 from aanalytics2.workspaceManager import WorkspaceManager, FreeForm
 
 from mcp.server.fastmcp import FastMCP
+
+
+def _default_ontology_md() -> str:
+    """The ontology reference bundled with the package (docs/knowledgegraph.md's Ontology
+    section, kept in sync by hand): entity types, predicates and namespace patterns produced
+    by KnowledgeGraph.buildGraph(). Overridable at the CLI with -kg-ontology for graphs that
+    add custom predicates/literals on top of this base schema."""
+    return (
+        importlib_resources.files("aanalytics2")
+        .joinpath("resources", "kg_ontology.md")
+        .read_text(encoding="utf-8")
+    )
 
 
 def _resolve_date_range(rc: RequestCreator, date_range: str) -> str:
@@ -56,8 +70,19 @@ def build_server(
     company_id: str,
     default_rsid: Optional[str] = None,
     kg_graph: Optional[Graph] = None,
+    ontology_md: Optional[str] = None,
 ) -> FastMCP:
-    mcp = FastMCP("aanalytics2")
+    mcp = FastMCP(
+        "aanalytics2",
+        instructions=(
+            "Adobe Analytics tools (Discovery, Reporting, Workspace building) plus, when a "
+            "Knowledge Graph is connected (server started with -kg), read-only access to usage "
+            "and co-occurrence relationships between components. Before calling sparql_query or "
+            "the get_related_*/get_popular_combinations/get_component_context tools, read the "
+            "'ontology://knowledge-graph' resource for the entity types, predicates and namespace "
+            "patterns the graph uses."
+        ),
+    )
 
     ns = {
         "dim": f"http://analytics.com/{company_id}/dimension#",
@@ -362,6 +387,18 @@ def build_server(
 
     # ── Group 4 — Knowledge Graph (read-only; local .ttl only, no remote endpoint yet) ──
 
+    @mcp.resource(
+        "ontology://knowledge-graph",
+        name="kg_ontology",
+        description="Knowledge Graph ontology reference: entity types, predicates and namespace "
+                    "patterns used by the KG tools and sparql_query. Defaults to the schema produced "
+                    "by KnowledgeGraph.buildGraph(); a server started with -kg-ontology <file.md> "
+                    "serves a custom ontology here instead (e.g. one extended with extra predicates).",
+        mime_type="text/markdown",
+    )
+    def kg_ontology() -> str:
+        return ontology_md or "No Knowledge Graph ontology available."
+
     @mcp.tool()
     def get_related_metrics(dimension_id: str, rsid: str = None, limit: int = 10) -> list:
         """Metrics most frequently used with this dimension across loaded projects,
@@ -538,6 +575,12 @@ def main():
                          help="Path to a local Knowledge Graph .ttl file, enabling Group 4 KG tools")
     parser.add_argument("-kg-endpoint", "--kg_endpoint", default=None, metavar="URL",
                          help="Remote SPARQL endpoint URL (not yet implemented — Phase 3)")
+    parser.add_argument("-kg-ontology", "--kg_ontology", default=None, metavar="FILE.md",
+                         help="Path to a markdown file describing a custom Knowledge Graph ontology, "
+                              "served to the LLM client via the 'ontology://knowledge-graph' resource. "
+                              "Defaults to the ontology produced by KnowledgeGraph.buildGraph() (see "
+                              "docs/knowledgegraph.md). Use this to document extra predicates/literals "
+                              "added on top of that base schema.")
     args = parser.parse_args()
 
     if args.knowledge_graph and args.kg_endpoint:
@@ -565,11 +608,17 @@ def main():
         kg_graph.parse(args.knowledge_graph, format="turtle")
         print(f"Knowledge Graph loaded: {len(kg_graph)} triples.", file=sys.stderr)
 
+    if args.kg_ontology:
+        ontology_md = Path(args.kg_ontology).read_text(encoding="utf-8")
+    else:
+        ontology_md = _default_ontology_md()
+
     server = build_server(
         analytics=analytics,
         company_id=company_id,
         default_rsid=args.report_suite_id,
         kg_graph=kg_graph,
+        ontology_md=ontology_md,
     )
     server.run(transport="stdio")
 

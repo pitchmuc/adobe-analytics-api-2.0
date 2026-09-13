@@ -242,6 +242,8 @@ kg.exportGraph(filename='analytics_knowledge_graph_backup.ttl')
 
 ## Ontology
 
+> This section is also shipped as a standalone file, [`aanalytics2/resources/kg_ontology.md`](../aanalytics2/resources/kg_ontology.md), which the [MCP server](./mcp_server.md#knowledge-graph-ontology-resource) serves to LLM clients as the `ontology://knowledge-graph` resource. Keep the two in sync when the schema changes.
+
 ### Namespaces
 
 For a company with ID `{companyId}`, the following namespaces are minted at instantiation and stored in `kg.namespaces`:

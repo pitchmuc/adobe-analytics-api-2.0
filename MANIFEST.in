@@ -1,1 +1,2 @@
 include *.pickle
+recursive-include aanalytics2/resources *.md

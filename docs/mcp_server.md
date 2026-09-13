@@ -7,17 +7,20 @@ It is a companion to the CLI: same config file, same `Analytics` connection, sam
 > For the underlying design/architecture, see [docs/mcp_plan.md](./mcp_plan.md). This page is about **running** it.
 
 ## Menu
-- [Overview](#overview)
-- [Prerequisites](#prerequisites)
-- [Installing](#installing)
-- [Command-line flags](#command-line-flags)
-- [Running it manually (smoke test)](#running-it-manually-smoke-test)
-- [Claude Desktop setup](#claude-desktop-setup)
-- [VS Code setup](#vs-code-setup)
-  - [GitHub Copilot Chat (Agent Mode)](#github-copilot-chat-agent-mode)
-  - [Claude Code extension](#claude-code-extension)
-- [Available tools](#available-tools)
-- [Troubleshooting](#troubleshooting)
+- [MCP Server](#mcp-server)
+  - [Menu](#menu)
+  - [Overview](#overview)
+  - [Prerequisites](#prerequisites)
+  - [Installing](#installing)
+  - [Command-line flags](#command-line-flags)
+  - [Knowledge Graph ontology (resource)](#knowledge-graph-ontology-resource)
+  - [Running it manually (smoke test)](#running-it-manually-smoke-test)
+  - [Claude Desktop setup](#claude-desktop-setup)
+  - [VS Code setup](#vs-code-setup)
+    - [GitHub Copilot Chat (Agent Mode)](#github-copilot-chat-agent-mode)
+    - [Claude Code extension](#claude-code-extension)
+  - [Available tools](#available-tools)
+  - [Troubleshooting](#troubleshooting)
 
 ## Overview
 
@@ -36,7 +39,11 @@ The Knowledge Graph tools only appear if you start the server with a `.ttl` file
 * A working Adobe Analytics config file — the same one used by the CLI. See [Getting Started](./getting_started.md) if you don't have one yet.
 * *(Optional, for Knowledge Graph tools)* A `.ttl` file built with the [`KnowledgeGraph`](./knowledgegraph.md) class:
   ```py
+  import aanalytics2 
   from aanalytics2.knowledgegraph import KnowledgeGraph
+
+  cfg = aanalytics2.importConfigFile('myconfig.json',return_object=True)
+
   kg = KnowledgeGraph(config=cfg, rsids="all")
   kg.loadProjects(50)
   kg.buildGraph(save=True, filename="analytics_knowledge_graph.ttl")
@@ -67,10 +74,34 @@ If `aanalytics2-mcp` isn't found (e.g. it's installed in a virtual environment y
 | `-rsid`, `--report_suite_id` | Default report suite ID used by any tool call that omits `rsid`. Optional, but recommended — most Discovery/Reporting/KG tools need an rsid, and a session default lets the LLM skip re-specifying it every call. |
 | `-kg`, `--knowledge_graph` | Path to a local Knowledge Graph `.ttl` file. Enables the KG tool group. |
 | `-kg-endpoint`, `--kg_endpoint` | Remote SPARQL endpoint URL. **Not implemented yet** — the server exits with an error if you pass this today. |
+| `-kg-ontology`, `--kg_ontology` | Path to a markdown file describing a custom Knowledge Graph ontology. Overrides the built-in default (see [below](#knowledge-graph-ontology-resource)). |
 
 `-kg` and `-kg-endpoint` are mutually exclusive.
 
 Because your MCP client (Claude Desktop, VS Code, …) launches the server itself and does not run it from your project directory, **always pass an absolute path** to `-cf` and `-kg` in the client configs below — a relative path resolves against whatever the client's own working directory happens to be, not your project folder.
+
+## Knowledge Graph ontology (resource)
+
+Beyond tools, the server exposes an MCP **resource** at `ontology://knowledge-graph` — a markdown
+reference describing the graph's entity types, predicates, and namespace patterns (the same
+content as the [Ontology section](./knowledgegraph.md#ontology) of the Knowledge Graph docs). MCP
+clients that support resources (Claude Desktop, Claude Code, …) can read it to understand how to
+call `sparql_query` and the other KG tools correctly, without you having to explain the schema in
+the chat every time.
+
+The server also sets MCP server `instructions` pointing the client at this resource, so most
+clients pick it up automatically on connect.
+
+By default the resource serves the ontology produced by `KnowledgeGraph.buildGraph()`. If you
+extend the graph yourself — adding custom predicates or literals on top of the base schema — pass
+`-kg-ontology "C:\path\to\my_ontology.md"` with a markdown file documenting your additions, and the
+server serves that file's content instead:
+
+```bash
+aanalytics2-mcp -cf "C:\path\to\config_analytics.json" -rsid your_rsid \
+  -kg "C:\path\to\analytics_knowledge_graph.ttl" \
+  -kg-ontology "C:\path\to\my_ontology.md"
+```
 
 ## Running it manually (smoke test)
 
@@ -180,6 +211,10 @@ into `.mcp.json` (project scope) or your user-level Claude config (`claude mcp a
 | Knowledge Graph *(needs `-kg`)* | `sparql_query`, `get_related_metrics`, `get_related_dimensions`, `get_related_segments`, `get_popular_combinations`, `get_component_context` |
 
 Workspace-building tools are stateless: each one takes the project dict returned by the previous call and returns an updated one, so a typical session chains `create_workspace` → `add_panel` → `add_freeform` → `add_chart` → `publish_workspace`. Each tool's full parameter list is in its own docstring, visible to the client when it inspects the tool.
+
+| Resource | Description |
+| -- | -- |
+| `ontology://knowledge-graph` | Markdown reference of KG entity types, predicates and namespace patterns. See [Knowledge Graph ontology](#knowledge-graph-ontology-resource). |
 
 ## Troubleshooting
 

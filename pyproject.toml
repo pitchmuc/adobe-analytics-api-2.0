@@ -53,6 +53,7 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 mypkg = ["*.pickle"]
+aanalytics2 = ["resources/*.md"]
 
 [project.optional-dependencies]
 dynamic = ["version"]
