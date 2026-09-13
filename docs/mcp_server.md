@@ -70,7 +70,7 @@ If `aanalytics2-mcp` isn't found (e.g. it's installed in a virtual environment y
 | Flag | Description |
 | -- | -- |
 | `-cf`, `--config_file` | Path to the JSON config file. Default: `config_analytics.json` in the current directory. |
-| `-cid`, `--company_id` | Adobe Analytics `globalCompanyId`. Overrides the config file. Optional — auto-detected from the config if omitted. |
+| `-cid`, `--company_id` | Adobe Analytics `globalCompanyId`. Overrides the config file. Optional — resolved from the config file's `companyId`/`company_id` field if omitted (same field the CLI reads — see [cli.md](./cli.md)), or from the first company returned by the API if that field isn't set either. |
 | `-rsid`, `--report_suite_id` | Default report suite ID used by any tool call that omits `rsid`. Optional, but recommended — most Discovery/Reporting/KG tools need an rsid, and a session default lets the LLM skip re-specifying it every call. |
 | `-kg`, `--knowledge_graph` | Path to a local Knowledge Graph `.ttl` file. Enables the KG tool group. |
 | `-kg-endpoint`, `--kg_endpoint` | Remote SPARQL endpoint URL. **Not implemented yet** — the server exits with an error if you pass this today. |
@@ -133,6 +133,7 @@ Edit Claude Desktop's config file:
       "command": "aanalytics2-mcp",
       "args": [
         "-cf", "C:\\path\\to\\config_analytics.json",
+        "-cid", "your_globalCompanyId",
         "-rsid", "your_rsid",
         "-kg", "C:\\path\\to\\analytics_knowledge_graph.ttl"
       ]
@@ -141,7 +142,7 @@ Edit Claude Desktop's config file:
 }
 ```
 
-Omit the `-kg` line entirely if you don't have a Knowledge Graph file yet — the server starts fine without it, just without the KG tools.
+Omit the `-kg` line entirely if you don't have a Knowledge Graph file yet — the server starts fine without it, just without the KG tools. Omit `-cid` only if your credential has access to a single Adobe Analytics company, or if `companyId` is already set in the config file — see the [Command-line flags](#command-line-flags) note and [Troubleshooting](#troubleshooting) below on why pinning it explicitly matters when a credential has access to more than one.
 
 Fully quit and reopen Claude Desktop (not just close the window) for it to pick up the change. A hammer/tools icon showing `aanalytics2` tools should then appear in the chat composer.
 
@@ -162,6 +163,7 @@ VS Code can talk to MCP servers two ways: through **GitHub Copilot Chat's** buil
       "command": "aanalytics2-mcp",
       "args": [
         "-cf", "C:\\path\\to\\config_analytics.json",
+        "-cid", "your_globalCompanyId",
         "-rsid", "your_rsid",
         "-kg", "C:\\path\\to\\analytics_knowledge_graph.ttl"
       ]
@@ -169,6 +171,8 @@ VS Code can talk to MCP servers two ways: through **GitHub Copilot Chat's** buil
   }
 }
 ```
+
+`-cid` pins the Adobe Analytics `globalCompanyId` this server connects to. It's important to set explicitly here: without it (and without a `companyId` field in the config file), the server defaults to the first company your credential has access to, which may not be the one you expect if the credential can see more than one — see [Troubleshooting](#troubleshooting).
 
 3. Reload the window (`Developer: Reload Window`). In Copilot Chat, switch to **Agent** mode and open the tools picker (wrench icon) — `aanalytics2` tools should be listed and toggleable.
 
@@ -179,7 +183,7 @@ If you'd rather not commit connection details to the repo, add the same server u
 The Claude Code extension for VS Code shares its MCP configuration with the Claude Code CLI. From the VS Code integrated terminal (or any terminal), register the server once:
 
 ```bash
-claude mcp add aanalytics2 -- aanalytics2-mcp -cf "C:\path\to\config_analytics.json" -rsid your_rsid -kg "C:\path\to\analytics_knowledge_graph.ttl"
+claude mcp add aanalytics2 -- aanalytics2-mcp -cf "C:\path\to\config_analytics.json" -cid your_globalCompanyId -rsid your_rsid -kg "C:\path\to\analytics_knowledge_graph.ttl"
 ```
 
 This writes an entry equivalent to:
@@ -191,6 +195,7 @@ This writes an entry equivalent to:
       "command": "aanalytics2-mcp",
       "args": [
         "-cf", "C:\\path\\to\\config_analytics.json",
+        "-cid", "your_globalCompanyId",
         "-rsid", "your_rsid",
         "-kg", "C:\\path\\to\\analytics_knowledge_graph.ttl"
       ]
@@ -218,6 +223,7 @@ Workspace-building tools are stateless: each one takes the project dict returned
 
 ## Troubleshooting
 
+* **`list_report_suites` (or other Discovery tools) return the wrong companies' data** — the server connected using the wrong `globalCompanyId`. This happens when your credential has access to more than one Adobe Analytics company and neither `-cid` nor a `companyId`/`company_id` field in the config file pins one, so the server falls back to the first company the API returns — which isn't guaranteed to be the one the CLI or another session picked for you. Check the server's stderr log at startup: if multiple companies were found it prints the full list it's choosing from. Fix by passing `-cid <globalCompanyId>` explicitly or adding `"companyId": "<globalCompanyId>"` to the config file (same field the CLI honors, see [cli.md](./cli.md)).
 * **"No company IDs found for this config file."** — the config file's credentials don't have access to any Adobe Analytics company, or the path is wrong (see the absolute-path note above).
 * **Server appears to hang** — this is normal for `-cf`/`-kg`/normal invocation without a client attached (see [Running it manually](#running-it-manually-smoke-test)); it's waiting on stdio.
 * **Tools don't show up in the client** — most clients only load MCP servers at startup; fully restart the client (not just reload the chat) after editing its config.

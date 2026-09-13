@@ -10,6 +10,7 @@ Run directly with `python -m aanalytics2.mcp_server`, or via the `aanalytics2-mc
 console script once installed.
 """
 import argparse
+import json
 import sys
 from importlib import resources as importlib_resources
 from pathlib import Path
@@ -18,7 +19,7 @@ from typing import Optional
 from rdflib import Graph, Literal, URIRef
 
 from aanalytics2 import Analytics, Login
-from aanalytics2.configs import importConfigFile
+from aanalytics2.configs import importConfigFile, find_path
 from aanalytics2.requestCreator import RequestCreator
 from aanalytics2.workspaceManager import WorkspaceManager, FreeForm
 
@@ -46,10 +47,22 @@ def _resolve_date_range(rc: RequestCreator, date_range: str) -> str:
 
 def _df_to_records(df) -> list:
     """Convert a pandas DataFrame to plain JSON-safe dicts (NaN -> None) via pandas' own JSON codec."""
-    import json
     if df is None or len(df) == 0:
         return []
     return json.loads(df.to_json(orient="records", date_format="iso"))
+
+
+def _company_id_from_config_file(path: str) -> Optional[str]:
+    """The `companyId`/`company_id` field the CLI also honors (see cli/__main__.py
+    _resolve_config). importConfigFile/ConfigObj drop it since it plays no part in
+    authentication, so it has to be read straight from the raw JSON here too, instead
+    of always falling back to the first company the credential happens to have access to."""
+    config_file_path = find_path(path)
+    if config_file_path is None:
+        return None
+    with open(config_file_path, "r", encoding="utf-8") as fh:
+        raw = json.load(fh)
+    return raw.get("companyId") or raw.get("company_id")
 
 
 def _find_freeform_subpanel(wm: WorkspaceManager, table_title: str) -> dict:
@@ -592,12 +605,22 @@ def main():
 
     cfg = importConfigFile(args.config_file, return_object=True)
     login = Login(config=cfg)
-    company_id = args.company_id
+    company_id = args.company_id or _company_id_from_config_file(args.config_file)
     if company_id is None:
         companies = login.getCompanyId()
         if not companies:
             print("No company IDs found for this config file.", file=sys.stderr)
             sys.exit(1)
+        if len(companies) > 1:
+            print(
+                "Multiple companies available for this credential; no -cid was passed and no "
+                "\"companyId\" was set in the config file, so defaulting to the first one below. "
+                "This may not be the report suite scope you expect — pass -cid <globalCompanyId>, "
+                "or add \"companyId\" to the config file, to pin one explicitly:",
+                file=sys.stderr,
+            )
+            for c in companies:
+                print(f"  {c.get('globalCompanyId')}  ({c.get('companyName')})", file=sys.stderr)
         company_id = companies[0]["globalCompanyId"]
     analytics = Analytics(company_id=company_id, config=cfg)
 
