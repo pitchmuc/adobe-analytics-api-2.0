@@ -29,6 +29,7 @@ Once connected, the client gets tools grouped into four areas:
 * **Discovery** — list report suites, dimensions, metrics, segments, calculated metrics, date ranges, projects.
 * **Reporting** — build a report request and run it (`getReport2`).
 * **Workspace building** — compose a Workspace project (panels, freeform tables, breakdowns, charts, segment filters, …) and publish it.
+* **Classifications** — look up classification dataset(s) linked to a dimension in a report suite, and a dataset's full metadata.
 * **Knowledge Graph** *(optional)* — query co-occurrence and usage relationships between components from a pre-built `.ttl` file, via SPARQL or convenience lookups.
 
 The Knowledge Graph tools only appear if you start the server with a `.ttl` file (`-kg`). Everything else is always available.
@@ -213,6 +214,7 @@ into `.mcp.json` (project scope) or your user-level Claude config (`claude mcp a
 | Discovery | `list_report_suites`, `list_dimensions`, `list_metrics`, `list_segments`, `list_calculated_metrics`, `list_date_ranges`, `list_projects`, `get_segment`, `get_project` |
 | Reporting | `build_report_request`, `run_report`, `get_top_items` |
 | Workspace building | `create_workspace`, `add_panel`, `add_segment_filter`, `add_dropdown_filter`, `add_text`, `add_freeform`, `add_breakdown`, `add_chart`, `add_segment_comparison_table`, `publish_workspace`, `update_workspace` |
+| Classifications | `list_classification_datasets`, `get_classification_dataset_id`, `get_classification_dataset` |
 | Knowledge Graph *(needs `-kg`)* | `sparql_query`, `get_related_metrics`, `get_related_dimensions`, `get_related_segments`, `get_popular_combinations`, `get_component_context` |
 
 Workspace-building tools are stateless: each one takes the project dict returned by the previous call and returns an updated one, so a typical session chains `create_workspace` → `add_panel` → `add_freeform` → `add_chart` → `publish_workspace`. Each tool's full parameter list is in its own docstring, visible to the client when it inspects the tool.

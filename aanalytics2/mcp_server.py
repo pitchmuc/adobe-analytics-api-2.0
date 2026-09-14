@@ -2,9 +2,9 @@
 MCP server exposing Adobe Analytics (via aanalytics2) as tools for an LLM client.
 
 See docs/mcp_plan.md for the design this implements. Covers Phase 1 + Phase 2:
-Discovery, Reporting, WorkspaceManager and Knowledge Graph (local .ttl only) tool
-groups. Remote SPARQL endpoints (-kg-endpoint) and KG-enhanced suggestions are
-Phase 3 and not implemented here.
+Discovery, Reporting, WorkspaceManager, Classifications and Knowledge Graph (local
+.ttl only) tool groups. Remote SPARQL endpoints (-kg-endpoint) and KG-enhanced
+suggestions are Phase 3 and not implemented here.
 
 Run directly with `python -m aanalytics2.mcp_server`, or via the `aanalytics2-mcp`
 console script once installed.
@@ -93,6 +93,13 @@ def _find_freeform_subpanel(wm: WorkspaceManager, table_title: str) -> dict:
 ComponentSpec = Union[str, dict]
 
 
+def _dimension_key(dimension_id: str) -> str:
+    """Normalize a dimension ID for comparison against the classification compatibility
+    endpoint, which returns bare names (e.g. "evar5") regardless of whether the caller
+    used the "variables/evar5" form used elsewhere in this server's tools."""
+    return dimension_id.rsplit("/", 1)[-1].lower()
+
+
 def _coerce_component_list(components: Optional[List[ComponentSpec]]) -> Optional[List[dict]]:
     """Turn any bare ID strings in `components` into {"id": ...} dicts. build_report_request
     already accepted bare metric ID strings for its own `metrics` list; without this, the
@@ -114,7 +121,7 @@ def build_server(
     mcp = FastMCP(
         "aanalytics2",
         instructions=(
-            "Adobe Analytics tools (Discovery, Reporting, Workspace building) plus, when a "
+            "Adobe Analytics tools (Discovery, Reporting, Workspace building, Classifications) plus, when a "
             "Knowledge Graph is connected (server started with -kg), read-only access to usage "
             "and co-occurrence relationships between components. Before calling sparql_query or "
             "the get_related_*/get_popular_combinations/get_component_context tools, read the "
@@ -453,7 +460,43 @@ def build_server(
             )
         return analytics.updateProject(project_id, project)
 
-    # ── Group 4 — Knowledge Graph (read-only; local .ttl only, no remote endpoint yet) ──
+    # ── Group 4 — Classifications ────────────────────────────────────────
+
+    @mcp.tool()
+    def list_classification_datasets(rsid: str = None) -> list:
+        """List classification dataset associations for a report suite: one entry per
+        dimension that has at least one classification dataset attached, each with the
+        linked dataset ID(s). Use get_classification_dataset_id to look up a single
+        dimension, or get_classification_dataset for a dataset's full metadata."""
+        rsid = _require_rsid(rsid)
+        data = analytics.getClassificationDatasets(rsid=rsid)
+        return [
+            {"dimension_id": dim_id, "dataset_ids": entry.get("datasets", [])}
+            for entry in data.get("metrics", [])
+            for dim_id in entry.get("id", [])
+        ]
+
+    @mcp.tool()
+    def get_classification_dataset_id(dimension_id: str, rsid: str = None) -> list:
+        """Return the classification dataset ID(s) linked to a dimension in a report
+        suite (dimension_id accepts either "evar5" or "variables/evar5"). Empty list if
+        that dimension has no classification dataset attached."""
+        rsid = _require_rsid(rsid)
+        data = analytics.getClassificationDatasets(rsid=rsid)
+        target = _dimension_key(dimension_id)
+        dataset_ids: list = []
+        for entry in data.get("metrics", []):
+            if target in (_dimension_key(i) for i in entry.get("id", [])):
+                dataset_ids.extend(entry.get("datasets", []))
+        return dataset_ids
+
+    @mcp.tool()
+    def get_classification_dataset(dataset_id: str) -> dict:
+        """Return the full metadata (name, description, columns, report suite
+        subscriptions) for a single classification dataset by ID."""
+        return analytics.getClassificationDataset(datasetId=dataset_id)
+
+    # ── Group 5 — Knowledge Graph (read-only; local .ttl only, no remote endpoint yet) ──
 
     @mcp.resource(
         "ontology://knowledge-graph",
