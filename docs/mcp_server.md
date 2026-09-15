@@ -28,6 +28,7 @@ Once connected, the client gets tools grouped into four areas:
 
 * **Discovery** — list report suites, dimensions, metrics, segments, calculated metrics, date ranges, projects.
 * **Reporting** — build a report request and run it (`getReport2`).
+* **Segment / Calculated Metric / Date Range authoring** — validate and create new segments, calculated metrics, and saved date ranges.
 * **Workspace building** — compose a Workspace project (panels, freeform tables, breakdowns, charts, segment filters, …) and publish it.
 * **Classifications** — look up classification dataset(s) linked to a dimension in a report suite, and a dataset's full metadata.
 * **Knowledge Graph** *(optional)* — query co-occurrence and usage relationships between components from a pre-built `.ttl` file, via SPARQL or convenience lookups.
@@ -213,6 +214,7 @@ into `.mcp.json` (project scope) or your user-level Claude config (`claude mcp a
 | -- | -- |
 | Discovery | `list_report_suites`, `list_dimensions`, `list_metrics`, `list_segments`, `list_calculated_metrics`, `list_date_ranges`, `list_projects`, `get_segment`, `get_project` |
 | Reporting | `build_report_request`, `run_report`, `get_top_items` |
+| Segment / Calculated Metric / Date Range authoring | `validate_segment`, `create_segment`, `validate_calculated_metric`, `create_calculated_metric`, `create_date_range` |
 | Workspace building | `create_workspace`, `add_panel`, `add_segment_filter`, `add_dropdown_filter`, `add_text`, `add_freeform`, `add_breakdown`, `add_chart`, `add_segment_comparison_table`, `publish_workspace`, `update_workspace` |
 | Classifications | `list_classification_datasets`, `get_classification_dataset_id`, `get_classification_dataset` |
 | Knowledge Graph *(needs `-kg`)* | `sparql_query`, `get_related_metrics`, `get_related_dimensions`, `get_related_segments`, `get_popular_combinations`, `get_component_context` |
@@ -220,6 +222,8 @@ into `.mcp.json` (project scope) or your user-level Claude config (`claude mcp a
 Workspace-building tools are stateless: each one takes the project dict returned by the previous call and returns an updated one, so a typical session chains `create_workspace` → `add_panel` → `add_freeform` → `add_chart` → `publish_workspace`. Each tool's full parameter list is in its own docstring, visible to the client when it inspects the tool.
 
 To edit an **existing** project instead of building a new one, start from `get_project` instead of `create_workspace`, chain the same `add_*` tools on the returned dict, then call `update_workspace` instead of `publish_workspace` — `update_workspace` requires the project dict to still carry its original `"id"` (present on anything returned by `get_project`) and saves in place rather than creating a duplicate.
+
+There is no builder class for segment/calculated metric/date range definitions (unlike `build_report_request` or `WorkspaceManager`), so `validate_segment`/`create_segment`/`validate_calculated_metric`/`create_calculated_metric`/`create_date_range` take and submit the raw API dict shape directly. The most reliable way for an LLM client to produce that shape is to first fetch a similar existing component's full definition — `get_segment(segment_id)`, or `list_calculated_metrics`/`list_date_ranges` (both already return full metadata, including `"definition"`) — and adapt it rather than constructing one from scratch. Always call `validate_segment`/`validate_calculated_metric` before the corresponding `create_*` call to catch definition errors without creating a bad component; there is no validate endpoint for date ranges. See the [segment](https://developer.adobe.com/analytics-apis/docs/2.0/guides/endpoints/segments/definition/) and [calculated metric](https://developer.adobe.com/analytics-apis/docs/2.0/guides/endpoints/calculatedmetrics/) definition references for the full syntax.
 
 | Resource | Description |
 | -- | -- |

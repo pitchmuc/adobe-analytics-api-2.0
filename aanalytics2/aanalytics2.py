@@ -916,9 +916,10 @@ class Analytics:
             - "publishingStatus" : string : status for the segment
             - "definitionLastModified" : string : last definition of the segment
             - "categories" : string : categories of the segment
+            - "shares" : string : shares of the segment
         """
         ValidArgs = ["reportSuiteName", "ownerFullName", "modified", "tags", "compatibility",
-                     "definition", "publishingStatus", "publishingStatus", "definitionLastModified", "categories"]
+                     "definition", "publishingStatus", "publishingStatus", "definitionLastModified", "categories", "shares"]
         if segment_id is None:
             raise Exception("Expected a segment id")
         if self.loggingEnabled:

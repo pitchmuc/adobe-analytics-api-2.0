@@ -2,9 +2,10 @@
 MCP server exposing Adobe Analytics (via aanalytics2) as tools for an LLM client.
 
 See docs/mcp_plan.md for the design this implements. Covers Phase 1 + Phase 2:
-Discovery, Reporting, WorkspaceManager, Classifications and Knowledge Graph (local
-.ttl only) tool groups. Remote SPARQL endpoints (-kg-endpoint) and KG-enhanced
-suggestions are Phase 3 and not implemented here.
+Discovery, Reporting, Segment/CalculatedMetric/DateRange authoring, WorkspaceManager,
+Classifications and Knowledge Graph (local .ttl only) tool groups. Remote SPARQL
+endpoints (-kg-endpoint) and KG-enhanced suggestions are Phase 3 and not implemented
+here.
 
 Run directly with `python -m aanalytics2.mcp_server`, or via the `aanalytics2-mcp`
 console script once installed.
@@ -121,7 +122,8 @@ def build_server(
     mcp = FastMCP(
         "aanalytics2",
         instructions=(
-            "Adobe Analytics tools (Discovery, Reporting, Workspace building, Classifications) plus, when a "
+            "Adobe Analytics tools (Discovery, Reporting, Segment/CalculatedMetric/DateRange "
+            "authoring, Workspace building, Classifications) plus, when a "
             "Knowledge Graph is connected (server started with -kg), read-only access to usage "
             "and co-occurrence relationships between components. Before calling sparql_query or "
             "the get_related_*/get_popular_combinations/get_component_context tools, read the "
@@ -316,7 +318,57 @@ def build_server(
         label_col = workspace.columns[0]
         return [{"value": r.get(label_col), "itemId": r.get("itemId")} for r in records]
 
-    # ── Group 3 — WorkspaceManager (stateless: project dict in, project dict out) ──
+    # ── Group 3 — Segment / Calculated Metric / Date Range authoring ───────
+    # No builder class exists for these (unlike RequestCreator/WorkspaceManager for
+    # reports/workspaces), so the tools take/return the same raw dict shape as the
+    # underlying API. get_segment/list_calculated_metrics/list_date_ranges already
+    # return full metadata (including "definition") for existing components in this
+    # account — use one as a starting shape, cheaper and more reliable for an LLM to
+    # adapt than to construct from scratch. Full definition syntax:
+    # https://developer.adobe.com/analytics-apis/docs/2.0/guides/endpoints/segments/definition/
+    # https://developer.adobe.com/analytics-apis/docs/2.0/guides/endpoints/calculatedmetrics/
+
+    @mcp.tool()
+    def validate_segment(segment: dict) -> dict:
+        """Dry-run a segment definition against the API without saving it. `segment`
+        needs "name" and "definition" (a rule container — see get_segment on an
+        existing segment for the shape) and "rsid". Returns the API's validation
+        result, including any definition errors — check this before create_segment."""
+        return analytics.createSegmentValidate(segmentJSON=segment)
+
+    @mcp.tool()
+    def create_segment(segment: dict) -> dict:
+        """Create a new segment. `segment` needs "name" and "definition" (a rule
+        container — see get_segment on an existing segment for the shape) and "rsid".
+        Consider calling validate_segment first to catch definition errors before
+        saving."""
+        return analytics.createSegment(segmentJSON=segment)
+
+    @mcp.tool()
+    def validate_calculated_metric(calculated_metric: dict) -> dict:
+        """Dry-run a calculated metric definition against the API without saving it.
+        `calculated_metric` needs "name", "definition" and "rsid" — see
+        list_calculated_metrics on an existing one for the "definition" shape.
+        Returns the API's validation result, including any definition errors —
+        check this before create_calculated_metric."""
+        return analytics.createCalculatedMetricValidate(metricJSON=calculated_metric)
+
+    @mcp.tool()
+    def create_calculated_metric(calculated_metric: dict) -> dict:
+        """Create a new calculated metric. `calculated_metric` needs "name",
+        "definition" and "rsid" — see list_calculated_metrics on an existing one for
+        the "definition" shape. Consider calling validate_calculated_metric first to
+        catch definition errors before saving."""
+        return analytics.createCalculatedMetric(metricJSON=calculated_metric)
+
+    @mcp.tool()
+    def create_date_range(date_range: dict) -> dict:
+        """Create a new saved date range. `date_range` needs "name" and "definition"
+        — see list_date_ranges on an existing one for the exact shape used by this
+        account. There is no validate endpoint for date ranges; this saves directly."""
+        return analytics.createDateRange(dateRangeJSON=date_range)
+
+    # ── Group 4 — WorkspaceManager (stateless: project dict in, project dict out) ──
 
     @mcp.tool()
     def create_workspace(rsid: str, name: str, description: str = "") -> dict:
@@ -460,7 +512,7 @@ def build_server(
             )
         return analytics.updateProject(project_id, project)
 
-    # ── Group 4 — Classifications ────────────────────────────────────────
+    # ── Group 5 — Classifications ────────────────────────────────────────
 
     @mcp.tool()
     def list_classification_datasets(rsid: str = None) -> list:
@@ -496,7 +548,7 @@ def build_server(
         subscriptions) for a single classification dataset by ID."""
         return analytics.getClassificationDataset(datasetId=dataset_id)
 
-    # ── Group 5 — Knowledge Graph (read-only; local .ttl only, no remote endpoint yet) ──
+    # ── Group 6 — Knowledge Graph (read-only; local .ttl only, no remote endpoint yet) ──
 
     @mcp.resource(
         "ontology://knowledge-graph",

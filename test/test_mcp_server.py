@@ -33,6 +33,21 @@ class DummyAnalytics:
     def getReportSuite(self, rsid):
         return {"name": "RS"}
 
+    def createSegmentValidate(self, segmentJSON=None):
+        return {"valid": True, "segment": segmentJSON}
+
+    def createSegment(self, segmentJSON=None):
+        return {"id": "s_new", **segmentJSON}
+
+    def createCalculatedMetricValidate(self, metricJSON=None):
+        return {"valid": True, "metric": metricJSON}
+
+    def createCalculatedMetric(self, metricJSON=None):
+        return {"id": "cm_new", **metricJSON}
+
+    def createDateRange(self, dateRangeJSON=None):
+        return {"id": "dr_new", **dateRangeJSON}
+
 
 def _server():
     wmmod.WorkspaceManager._fetch_all_company_data = _fake_fetch_all_company_data
@@ -114,3 +129,41 @@ def test_update_workspace_requires_project_id():
         assert False, "expected a ToolError"
     except Exception as exc:
         assert "get_project" in str(exc)
+
+
+def test_create_segment_passes_definition_through():
+    mcp = _server()
+    segment = {"name": "Mobile visitors", "rsid": "rs1", "definition": {"container": {}}}
+    result = _call(mcp, "create_segment", {"segment": segment})
+    assert result["id"] == "s_new"
+    assert result["name"] == "Mobile visitors"
+
+
+def test_validate_segment_returns_api_result():
+    mcp = _server()
+    segment = {"name": "Mobile visitors", "rsid": "rs1", "definition": {"container": {}}}
+    result = _call(mcp, "validate_segment", {"segment": segment})
+    assert result["valid"] is True
+
+
+def test_create_calculated_metric_passes_definition_through():
+    mcp = _server()
+    metric = {"name": "Bounce rate", "rsid": "rs1", "definition": {"func": "divide"}}
+    result = _call(mcp, "create_calculated_metric", {"calculated_metric": metric})
+    assert result["id"] == "cm_new"
+    assert result["name"] == "Bounce rate"
+
+
+def test_validate_calculated_metric_returns_api_result():
+    mcp = _server()
+    metric = {"name": "Bounce rate", "rsid": "rs1", "definition": {"func": "divide"}}
+    result = _call(mcp, "validate_calculated_metric", {"calculated_metric": metric})
+    assert result["valid"] is True
+
+
+def test_create_date_range_passes_definition_through():
+    mcp = _server()
+    date_range = {"name": "Last quarter", "definition": {"dateRangeType": "Fixed"}}
+    result = _call(mcp, "create_date_range", {"date_range": date_range})
+    assert result["id"] == "dr_new"
+    assert result["name"] == "Last quarter"
