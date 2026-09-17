@@ -174,7 +174,7 @@ class Bulkapi:
             with open(file, "rb") as f:
                 data = f.read()
         res = requests.post(self.endpoint + path, files={"file": (None, data)},
-                            headers=self.header)
+                            headers=self.header, proxies=self.connector.proxies)
         return res
 
     def generateTemplate(self, includeAdv: bool = False, returnDF: bool = False, save: bool = True):
@@ -247,9 +247,10 @@ class Bulkapi:
                       for file in files_gz)  # generator for files
         workers_input = kwargs.get("workers", 4)
         workers = max(1, workers_input)
+        proxies = self.connector.proxies
         with futures.ThreadPoolExecutor(workers) as executor:
             res = executor.map(lambda x, y, z: requests.post(
-                x, headers=y, files=z), list_urls, list_headers, list_files)
+                x, headers=y, files=z, proxies=proxies), list_urls, list_headers, list_files)
             list_res = [response.json() for response in res]
         # cleaning temp folder
         if len(self._createdFiles) > 0:

@@ -8,7 +8,23 @@ import io
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from aanalytics2 import config
-from typing import Dict
+from typing import Dict, Optional, Union
+
+
+def normalize_proxy(proxy: Union[str, Dict[str, str], None]) -> Optional[Dict[str, str]]:
+    """
+    Normalize a proxy configuration value into the dict format expected by
+    the ``requests`` ``proxies`` argument (``{"http": ..., "https": ...}``).
+
+    Arguments:
+        proxy : a single URL string (applied to both http and https), a dict
+            already in the ``{"http": ..., "https": ...}`` shape, or None.
+    """
+    if not proxy:
+        return None
+    if isinstance(proxy, str):
+        return {"http": proxy, "https": proxy}
+    return proxy
 
 
 def get_oauth_token_and_expiry_for_config(config:dict,verbose:bool=False,save:bool=False)->Dict[str,str]:
@@ -29,7 +45,8 @@ def get_oauth_token_and_expiry_for_config(config:dict,verbose:bool=False,save:bo
             "scope": config["scopes"]
         }
         response = requests.post(
-            config["oauthTokenEndpointV2"], data=oauth_payload)
+            config["oauthTokenEndpointV2"], data=oauth_payload,
+            proxies=normalize_proxy(config.get("proxy")))
         json_response = response.json()
         if 'access_token' in json_response.keys():
             token = json_response['access_token']
@@ -61,7 +78,8 @@ class AdobeRequest:
                  retry: int = 0,
                  loggingEnabled: bool = False,
                  logger: object = None,
-                 company_id: str = None
+                 company_id: str = None,
+                 proxy: Union[str, Dict[str, str], None] = None
                  ) -> None:
         """
         Set the connector to be used for handling requests to Adobe Analytics.
@@ -73,6 +91,10 @@ class AdobeRequest:
             loggingEnabled: OPTIONAL : enable logging for this instance.
             logger        : OPTIONAL : logger instance.
             company_id    : OPTIONAL : global company id header value.
+            proxy         : OPTIONAL : proxy to use for all requests. Either a single URL string
+                            (e.g. "http://proxy.example.com:8080") applied to both http and https, or a
+                            dict such as {"http": "...", "https": "..."}. Falls back to the
+                            "proxy" key of config_object when not passed explicitly.
         """
         if config_object['org_id'] == '':
             raise Exception(
@@ -82,6 +104,11 @@ class AdobeRequest:
         self.loggingEnabled = loggingEnabled
         self.logger = logger
         self.retry = retry
+        self.proxies = normalize_proxy(proxy) or normalize_proxy(self.config.get('proxy'))
+        # keep config['proxy'] in sync so get_oauth_token_and_expiry_for_config (called here
+        # and from _checkingDate on token refresh) always sees the resolved value, even when
+        # proxy was only passed as an explicit constructor argument rather than via config_object.
+        self.config['proxy'] = self.proxies
         if self.config['token'] == '' or time.time() > self.config['date_limit']:
             token_and_expiry = get_oauth_token_and_expiry_for_config(
                 config=self.config, verbose=verbose)
@@ -125,6 +152,10 @@ class AdobeRequest:
         session.mount("https://", adapter)
         session.mount("http://", adapter)
         session.headers.update(self.header)
+        # When no proxy is configured, session.proxies stays empty and requests falls back to
+        # its normal behaviour (direct connection, or HTTP_PROXY/HTTPS_PROXY env vars if set).
+        if self.proxies:
+            session.proxies.update(self.proxies)
         return session
 
     def _checkingDate(self) -> None:

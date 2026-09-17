@@ -442,6 +442,7 @@ class FreeForm:
         dimension_name: str = None,
         items: List[dict] = None,
         rows: int = 5,
+        parent_item_id: str = None,
     ) -> "FreeForm":
         """
         Add a breakdown nested under this table (or under this breakdown level,
@@ -460,14 +461,34 @@ class FreeForm:
             items          : OPTIONAL : List of ``{"id", "name", "type"?}`` dicts for static
                              breakdown rows (segments or dimension items).
             rows           : OPTIONAL : Pagination page size for the breakdown (default ``5``).
+            parent_item_id : OPTIONAL : The real Adobe Analytics ``itemId`` (as returned by a
+                             report request against this table's own row dimension — see
+                             Analytics.getReport2 / the "itemId" column) of the specific row
+                             this breakdown attaches to. Required for Workspace to actually
+                             show the row as expandable when this table's rows come from a
+                             dynamic dimension (no ``items``/static rows): Adobe does not accept
+                             a placeholder here, and a table with no static rows has no other
+                             row identity to fall back on. Ignored (and unnecessary) when this
+                             table already has static rows, whose own row ``id`` is used instead.
         """
         if not dimension_id and not items:
             raise ValueError("Either dimension_id or items must be provided.")
         child = FreeForm(title=self.title)
         child.columnTree = self.columnTree
         child._rows = rows
-        child.breakdownByPosition = not bool(self.staticRows)
-        child.parentItemId = self.staticRows[0]["id"] if self.staticRows else "0"
+        child._n_columns = self._n_columns
+        # Verified against 3 independent real BMW-built breakdowns (both static-row and
+        # dynamic-dimension parents, single- and double-nested) — every one has
+        # breakdownByPosition: false. The previous `not bool(self.staticRows)` heuristic
+        # only happened to match the static-row case; it predicted `true` for a dynamic
+        # parent, which doesn't match any observed example.
+        child.breakdownByPosition = False
+        if self.staticRows:
+            child.parentItemId = self.staticRows[0]["id"]
+        elif parent_item_id:
+            child.parentItemId = parent_item_id
+        else:
+            child.parentItemId = "0"
         if dimension_id:
             child.dimension = {
                 "id": dimension_id, "__entity__": True, "type": "Dimension",
@@ -656,23 +677,16 @@ class FreeForm:
         return table
 
     def _to_breakdown_entry(self) -> dict:
-        use_dimension = self.dimension is not None
-        entry: dict = {
-            "breakdowns": [bd._to_breakdown_entry() for bd in self.breakdowns],
-            "pagination": {"currentPage": 0, "viewBy": self._rows},
-            "parentItemId": self.parentItemId or "0",
-            "search": _default_search(),
-            "settings": {
-                "breakdownByPosition": self.breakdownByPosition,
-                "includeNone": True,
-                "rowBasedPercentages": False,
-                "totalsType": "allVisits" if use_dimension else "columnSum",
-            },
-            "sort": {"asc": True, "columnId": "", "labelColumn": False},
-            "staticRows": deepcopy(self.staticRows),
-        }
-        if use_dimension:
-            entry["dimension"] = deepcopy(self.dimension)
+        # A breakdown entry is wire-identical to a top-level freeformTable — Adobe migrated
+        # both away from the bare `dimension`/`parentItemId`/`search` keys to
+        # `dimensionSettings`/`parentItemIds`/`staticSearch` (see _to_freeform_table), but only
+        # the top-level table serializer was updated to match; this one kept emitting the old
+        # shape, which createProject/updateProject now reject outright (verified against a real
+        # BMW project export using the current shape, and against createProject's actual "unwanted
+        # properties: dimension, parentItemId, search" validation error on the old shape).
+        entry = self._to_freeform_table()
+        entry["settings"]["breakdownByPosition"] = self.breakdownByPosition
+        entry["parentItemIds"] = [self.parentItemId] if self.parentItemId else []
         return entry
 
     def to_dict(self) -> dict:
@@ -775,7 +789,10 @@ class FreeForm:
         child.calculatedMetrics = list(self.calculatedMetrics)
         child.dateRanges = list(self.dateRanges)
         child.columnTree = self.columnTree
-        child.parentItemId = bd.get("parentItemId")
+        # `parentItemId` (singular) is the pre-migration key; current exports use
+        # `parentItemIds` (a list) instead — see _to_breakdown_entry.
+        parent_item_ids = bd.get("parentItemIds")
+        child.parentItemId = (parent_item_ids[0] if parent_item_ids else None) or bd.get("parentItemId")
         child.breakdownByPosition = bool((bd.get("settings") or {}).get("breakdownByPosition", False))
         child._parse_table_rows(bd)
         for nested in bd.get("breakdowns", []) or []:
@@ -1161,6 +1178,7 @@ class WorkspaceManager:
         self._panels: List[dict] = []
         self._current_panel_index: int = -1
         self.id: str = _upper_uuid()
+        self._has_real_id: bool = False
         self.name: str = ""
         self._definition_meta: dict = None
         self.tags: List[dict] = []
@@ -1199,6 +1217,7 @@ class WorkspaceManager:
                 else:
                     data = json.loads(data)
             data = deepcopy(data)
+            self._has_real_id = bool(data.get("id"))
             self.id = data.get("id") or self.id
             self.rsid = rsid or data.get("rsid", "")
             self.name = name or data.get("name", "")
@@ -1334,16 +1353,31 @@ class WorkspaceManager:
                 timeout=httpx.Timeout(10.0, read=120.0),
                 limits=httpx.Limits(max_connections=100, max_keepalive_connections=50),
             )
+        async def get_json(request_params):
+            # Adobe rate-limits (429) under bursty call volume — this fetcher runs once per
+            # WorkspaceManager instantiation, and the MCP builder tools instantiate one per
+            # call, so a chain of add_* calls can trigger several of these in quick succession.
+            # Without a retry, a 429 body (a small error dict, not the expected list) gets fed
+            # straight into `{el['id']: ... for el in json_data}` below and crashes with a
+            # confusing "string indices must be integers" TypeError instead of a clear one.
+            delay = 1.0
+            for attempt in range(5):
+                response = await client.get(endpoint, headers=header, timeout=httpx.Timeout(60.0, pool=None), params=request_params)
+                if response.status_code == 429 and attempt < 4:
+                    await asyncio.sleep(delay)
+                    delay = min(delay * 2, 10.0)
+                    continue
+                response.raise_for_status()
+                return response.json()
+
         try:
-            response = await client.get(endpoint, headers=header, timeout=httpx.Timeout(60.0, pool=None), params=params)
-            json_data = response.json()
+            json_data = await get_json(params)
             if service in ["segments", "calculatedMetrics","dateRanges"]:
                 data = json_data.get('content', [])
                 last_page = json_data.get('lastPage', True)
                 while not last_page:
                     params['page'] += 1
-                    response = await client.get(endpoint, headers=header, timeout=httpx.Timeout(60.0, pool=None), params=params)
-                    json_data = response.json()
+                    json_data = await get_json(params)
                     data += json_data.get('content', [])
                     last_page = json_data.get('lastPage', True)
         finally:
@@ -2337,7 +2371,7 @@ class WorkspaceManager:
                 "__metaData__": {"name": breakdown_dim_name},
             }
             bd.parentItemId = static_rows[0]["id"] if static_rows else "0"
-            bd.breakdownByPosition = not bool(static_rows)
+            bd.breakdownByPosition = False  # see FreeForm.addBreakdown
             bd._rows = breakdown_rows
             ft.setdefault("breakdowns", []).append(bd._to_breakdown_entry())
         return self
@@ -2451,6 +2485,13 @@ class WorkspaceManager:
             "type": "project",
             "definition": definition,
         }
+        # Only surface "id" when the loaded data actually had one (self._has_real_id) — every
+        # add_* builder tool round-trips through `data=`, including chains started from
+        # create_workspace, which never had a real id and would otherwise carry the
+        # placeholder self.id (see __init__) into a createProject POST body, which Adobe
+        # rejects outright ("Cannot create a project that already has an id").
+        if self._has_real_id:
+            result["id"] = self.id
         if self.owner is not None:
             result["owner"] = self.owner
         if self.tags:

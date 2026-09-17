@@ -54,6 +54,23 @@ As you can see, it takes no argument and the output of the file will look like t
 
 You update the information from the Adobe IO account that you have setup.
 
+#### Using a proxy
+
+If your network requires all outbound traffic to go through a proxy (common in some corporate environments), add an optional `"proxy"` key to the config file. It is applied to both `http` and `https` traffic, for every request the library makes, including the OAuth token exchange.
+
+```JSON
+{
+    "org_id": "<orgID>",
+    "client_id": "<APIkey>",
+    "secret": "<YourSecret>",
+    "scopes": "<scopes>",
+    "proxy": "http://proxy.example.com:8080"
+}
+```
+
+This is entirely optional — omit the key (the default) to connect directly, with no proxy involved.\
+You can also pass it programmatically, without a config file, via `configure(..., proxy='http://proxy.example.com:8080')`, or per-instance via `Login(config_object=..., proxy=...)` / `Analytics(config_object=..., proxy=...)`, which is handy for setting/overriding it independently of the config file (e.g. from an environment variable in a deployment script).
+
 ### importConfigFile
 
 As you have created your JSON config file, you will need to import it before realizing any request to the Analytics API.

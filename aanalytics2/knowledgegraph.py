@@ -97,12 +97,13 @@ class KnowledgeGraph:
         This will allow you to build a knowledge graph based on the dimensions, metrics, segments, and calculated metrics used in those projects.
         It gives more context to the relationships between the different elements of your analytics data.
         Arguments:
-            projects : A list of project IDs or a number of projects to load. 
+            projects : A list of project IDs, a number of projects to load or a list of email addresses
                         If a number is provided it will used the sampleMethod to select the projects to load. 
                         if the string "all" is provided, it will used all projects. This is taking a large amount of time (list|int|str)
-            sampleMethod : OPTIONAL : The method to use to select the projects to load if a number is provided. (str : default 'most_recent', possible values "random")
+            sampleMethod : OPTIONAL : The method to use to select the projects to load if a number or a list of email is provided. (str : default 'most_recent', possible values "random")
                 - 'most_recent' : Load the most recent projects based on the last modified date.
                 - 'random' : Load a random sample of projects.
+                - 'users' : Load projects based on the user(s) who own them (requires a list of user email addresses)
         """
         self.project_details = []
         def get_project_details(project):
@@ -120,7 +121,17 @@ class KnowledgeGraph:
             else:
                 raise ValueError("Invalid sampleMethod. Please use 'most_recent' or 'random'.")
         elif isinstance(projects, list):
-            self.projects = [p for p in self.projects if p.get('id') in projects]
+            if sampleMethod == 'users':
+                filter_projects = []
+                for p in self.projects:
+                    owner = p.get('owner',{}).get('login')
+                    for user in projects:
+                        if user in owner:
+                            filter_projects.append(p)
+                            break
+                self.projects = filter_projects
+            else:
+                self.projects = [p for p in self.projects if p.get('id') in projects]
         else:
             raise ValueError("Invalid projects argument. Please provide a list of project IDs or a number of projects to load.")
         with futures.ThreadPoolExecutor(max_workers=6) as executor:
@@ -451,3 +462,51 @@ class KnowledgeGraph:
             {str(var): (row[var].toPython() if row[var] is not None else None) for var in results.vars}
             for row in results
         ]
+
+    def addProjectAttribute(self,ProjectId: str, attribute: str, value: str) -> None:
+        """
+        Add an attribute to a project in the knowledge graph.
+        Arguments:
+            ProjectId : REQUIRED : The ID of the project to update.
+            attribute : REQUIRED : The attribute to add to the project.
+            value : REQUIRED : The value of the attribute to add.
+        """
+        project_node = None
+        for s, p, o in self.graph.triples((None, self.namespaces['project'].projectId, Literal(ProjectId))):
+            project_node = s
+            break
+        if project_node is None:
+            raise Exception(f"Project with ID {ProjectId} not found in the graph.")
+        self.graph.add((project_node, self.namespaces['project'][attribute], Literal(value)))
+
+    def addSegmentAttribute(self,SegmentId:str, attribute:str, value:str) -> None: 
+        """
+        Add an attribute to a segment in the knowledge graph.
+        Arguments:
+            SegmentId : REQUIRED : The ID of the segment to update.
+            attribute : REQUIRED : The attribute to add to the segment.
+            value : REQUIRED : The value of the attribute to add.
+        """
+        segment_node = None
+        for s, p, o in self.graph.triples((None, self.namespaces['segment'].segmentId, Literal(SegmentId))):
+            segment_node = s
+            break
+        if segment_node is None:
+            raise Exception(f"Segment with ID {SegmentId} not found in the graph.")
+        self.graph.add((segment_node, self.namespaces['segment'][attribute], Literal(value)))
+
+    def addCalculatedAttribute(self,metricId:str, attribute:str, value:str) -> None:
+        """
+        Add a calculated attribute to a metric in the knowledge graph.
+        Arguments:
+            metricId : REQUIRED : The ID of the metric to update.
+            attribute : REQUIRED : The attribute to add to the metric.
+            value : REQUIRED : The value of the attribute to add.
+        """
+        metric_node = None
+        for s, p, o in self.graph.triples((None, self.namespaces['metric'].metricId, Literal(metricId))):
+            metric_node = s
+            break
+        if metric_node is None:
+            raise Exception(f"Metric with ID {metricId} not found in the graph.")
+        self.graph.add((metric_node, self.namespaces['metric'][attribute], Literal(value)))

@@ -31,7 +31,7 @@ class Login:
     logger = None
 
     def __init__(self, config: dict| ConfigObj |None = None, header: dict| None = None, retry: int = 0,
-                 loggingObject: dict| None = None) -> None:
+                 loggingObject: dict| None = None, proxy: str | dict | None = None) -> None:
         """
         Instantiate the Loggin class.
         Arguments:
@@ -39,6 +39,10 @@ class Login:
             header : OPTIONAL : dictionary of your header. Falls back to global header.
             retry : OPTIONAL : if you want to retry, the number of time to retry
             loggingObject : OPTIONAL : If you want to set logging capability for your actions.
+            proxy : OPTIONAL : Proxy to use for all requests (a URL string applied to both http and
+                    https, or a dict such as {"http": "...", "https": "..."}). Falls back to the
+                    "proxy" key of config when not passed explicitly. Not required — omit it to
+                    connect without a proxy.
         """
         if config is None:
             config_data = config_module.config_object
@@ -69,10 +73,12 @@ class Login:
                 streamHandler.setFormatter(formatter)
                 self.logger.addHandler(streamHandler)
         self.connector = connector.AdobeRequest(
-            config_object=config_data, header=header, retry=retry, loggingEnabled=self.loggingEnabled, logger=self.logger)
+            config_object=config_data, header=header, retry=retry, loggingEnabled=self.loggingEnabled,
+            logger=self.logger, proxy=proxy)
         self.header = self.connector.header
         self.COMPANY_IDS = {}
         self.retry = retry
+        self.proxy = self.connector.proxies
 
     def getCompanyId(self, verbose: bool = False) -> dict:
         """
@@ -158,13 +164,14 @@ class Analytics:
         "" : "",
     }}
 
-    def __init__(self, 
+    def __init__(self,
                  company_id: str = None,
                  config_object: dict = None,
                  config: dict = None,
                  header: dict = None,
-                 retry: int = 0, 
-                 loggingObject: dict = None):
+                 retry: int = 0,
+                 loggingObject: dict = None,
+                 proxy: str | dict | None = None):
         """
         Instantiate the Analytics class.
         The Analytics class will be automatically connected to the API 2.0.
@@ -177,6 +184,10 @@ class Analytics:
             config_object : OPTIONAL : config dict to be used for setting token. Falls back to the global config.
             config : OPTIONAL : alias for config_object; used when unpacking a ConfigObj via **cfg.
             header : OPTIONAL : header dict for all requests. Falls back to the global header.
+            proxy : OPTIONAL : Proxy to use for all requests (a URL string applied to both http and
+                    https, or a dict such as {"http": "...", "https": "..."}). Falls back to the
+                    "proxy" key of config_object when not passed explicitly. Not required — omit it
+                    to connect without a proxy.
         """
         if company_id is None:
             raise AttributeError(
@@ -210,10 +221,11 @@ class Analytics:
                 self.logger.addHandler(streamHandler)
         self.connector = connector.AdobeRequest(
             config_object=config_object, header=header, retry=retry, loggingEnabled=self.loggingEnabled,
-            logger=self.logger,company_id=company_id)
+            logger=self.logger,company_id=company_id, proxy=proxy)
         self.header = self.connector.header
         self.endpoint_company = f"{self._endpoint}/{company_id}"
         self.company_id = company_id
+        self.proxy = self.connector.proxies
         self.listProjectIds = []
         self.projectsDetails = {}
         self.segments = []

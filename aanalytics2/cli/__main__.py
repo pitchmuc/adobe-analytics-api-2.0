@@ -24,7 +24,8 @@ from rich.panel import Panel
 import aanalytics2
 from aanalytics2 import Analytics, Login
 from aanalytics2.requestCreator import RequestCreator
-from aanalytics2.configs import importConfigFile, configure
+from aanalytics2.configs import importConfigFile, configure, createConfigFile
+from aanalytics2.knowledgegraph import KnowledgeGraph
 
 from ._helpers import (
     CLIError, SafeArgumentParser, login_required, str2bool,
@@ -43,13 +44,14 @@ ENV_SCOPES = "AANALYTICS2_SCOPES"
 ENV_TECH_ID = "AANALYTICS2_TECH_ID"
 ENV_COMPANY_ID = "AANALYTICS2_COMPANY_ID"
 ENV_RSID = "AANALYTICS2_RSID"
+ENV_PROXY = "AANALYTICS2_PROXY"
 
 # ---------------------------------------------------------------------------
 # Command group metadata (used by the custom help display)
 # ---------------------------------------------------------------------------
 COMMAND_GROUPS = {
     "Session": [
-        "config", "get_company_id", "set_company_id", "set_rsid", "whoami", "clear", "exit", "quit",
+        "create_config_file", "config", "get_company_id", "set_company_id", "set_rsid", "whoami", "clear", "exit", "quit",
     ],
     "Report Suites": [
         "get_report_suites", "get_report_suite",
@@ -123,6 +125,9 @@ COMMAND_GROUPS = {
     ],
     "Cloud": [
         "get_cloud_accounts", "get_cloud_locations",
+    ],
+    "Knowledge Graph": [
+        "build_knowledge_graph",
     ],
 }
 
@@ -549,6 +554,7 @@ class AnalyticsShell(cmd.Cmd):
         super().__init__()
         self.analytics: Optional[Analytics] = None
         self.login_obj: Optional[Login] = None
+        self.cfg = None
         self.company_id: Optional[str] = company_id
         self.rsid: Optional[str] = rsid
         self.verbose = verbose
@@ -570,12 +576,14 @@ class AnalyticsShell(cmd.Cmd):
         secret: Optional[str] = None,
         scopes: Optional[str] = None,
         tech_id: Optional[str] = None,
+        proxy: Optional[str] = None,
     ):
         """Load config, authenticate, and connect to Analytics."""
         try:
-            cfg = self._resolve_config(org_id, client_id, secret, scopes, tech_id)
+            cfg = self._resolve_config(org_id, client_id, secret, scopes, tech_id, proxy)
             if cfg is None:
                 return
+            self.cfg = cfg
             self.login_obj = Login(config=cfg)
 
             # Resolve company_id interactively if still unknown
@@ -602,6 +610,7 @@ class AnalyticsShell(cmd.Cmd):
         secret: Optional[str],
         scopes: Optional[str],
         tech_id: Optional[str],
+        proxy: Optional[str] = None,
     ):
         """Resolve credentials into a ConfigObj, in order of priority:
 
@@ -614,6 +623,11 @@ class AnalyticsShell(cmd.Cmd):
 
         Also resolves company_id/rsid, from the config file or from AANALYTICS2_COMPANY_ID /
         AANALYTICS2_RSID, when not already set by flags.
+
+        proxy (e.g. "http://proxy.example.com:8080") is entirely optional in every path below —
+        omit it to connect directly, with no proxy involved. When passed explicitly (-proxy flag
+        or AANALYTICS2_PROXY), it overrides whatever the config file may already contain, so a
+        proxy can be applied on top of an existing config file without editing it.
         """
         explicit_params = any([org_id, client_id, secret, scopes, tech_id])
 
@@ -627,13 +641,18 @@ class AnalyticsShell(cmd.Cmd):
             if self.rsid is None:
                 self.rsid = raw.get("rsid")
             # Build ConfigObj via importConfigFile (handles OAuth token acquisition)
-            return importConfigFile(self.config_file, return_object=True)
+            cfg = importConfigFile(self.config_file, return_object=True)
+            proxy = proxy or os.environ.get(ENV_PROXY)
+            if proxy:
+                cfg.config["proxy"] = proxy
+            return cfg
 
         org_id = org_id or os.environ.get(ENV_ORG_ID)
         client_id = client_id or os.environ.get(ENV_CLIENT_ID)
         secret = secret or os.environ.get(ENV_SECRET)
         scopes = scopes or os.environ.get(ENV_SCOPES)
         tech_id = tech_id or os.environ.get(ENV_TECH_ID)
+        proxy = proxy or os.environ.get(ENV_PROXY)
 
         if not (org_id and client_id and secret and scopes):
             console.print(
@@ -651,7 +670,7 @@ class AnalyticsShell(cmd.Cmd):
 
         return configure(
             org_id=org_id, client_id=client_id, secret=secret,
-            scopes=scopes, tech_id=tech_id, return_object=True,
+            scopes=scopes, tech_id=tech_id, proxy=proxy, return_object=True,
         )
 
     def _pick_company_id(self) -> Optional[str]:
@@ -707,7 +726,7 @@ class AnalyticsShell(cmd.Cmd):
     # Group 0 — Session / System
     # ------------------------------------------------------------------
     def do_config(self, args: Any):
-        """config [-cf path] [-org_id ID] [-client_id ID] [-secret SECRET] [-scopes SCOPES] [-tech_id ID]  — Reload configuration (and reconnect). Uses a config file by default; if none is found, falls back to these individual parameters or their AANALYTICS2_* environment variables."""
+        """config [-cf path] [-org_id ID] [-client_id ID] [-secret SECRET] [-scopes SCOPES] [-tech_id ID] [-proxy URL]  — Reload configuration (and reconnect). Uses a config file by default; if none is found, falls back to these individual parameters or their AANALYTICS2_* environment variables."""
         parser = SafeArgumentParser(prog="config")
         parser.add_argument("-cf", "--config_file", default=None)
         parser.add_argument("-org_id", "--org_id", default=None, metavar="ORG_ID",
@@ -725,6 +744,11 @@ class AnalyticsShell(cmd.Cmd):
         parser.add_argument("-tech_id", "--tech_id", default=None, metavar="TECH_ID",
                              help=f"Technical account ID. Falls back to the {ENV_TECH_ID} environment "
                                   "variable when omitted.")
+        parser.add_argument("-proxy", "--proxy", default=None, metavar="URL",
+                             help="Proxy URL to route all requests through (e.g. http://proxy.example.com:8080), "
+                                  f"for organizations that require one. Falls back to the {ENV_PROXY} environment "
+                                  "variable, then to any \"proxy\" set in the config file. Optional — omit it to "
+                                  "connect without a proxy.")
         args = self._parse(parser, args)
         if args is None:
             return
@@ -738,7 +762,36 @@ class AnalyticsShell(cmd.Cmd):
             secret=args.secret,
             scopes=args.scopes,
             tech_id=args.tech_id,
+            proxy=args.proxy,
         )
+
+    def do_create_config_file(self, args: Any):
+        """create_config_file [-fn file.json] [-auth_type oauthV2] [-cid company_id] [-rsid rsid] [-proxy URL]  — Create a config file template with placeholder credentials to fill in (default: config_analytics_template.json). Does not require a connection."""
+        parser = SafeArgumentParser(prog="create_config_file")
+        parser.add_argument("-fn", "--filename", default="config_analytics_template.json", metavar="FILE",
+                             help="Destination path for the generated config file "
+                                  "(default: config_analytics_template.json).")
+        parser.add_argument("-auth_type", "--auth_type", default="oauthV2", metavar="TYPE",
+                             help="OAuth type to use in the template (default: oauthV2).")
+        parser.add_argument("-cid", "--company_id", default=None, metavar="COMPANY_ID",
+                             help="Pre-fill the globalCompanyId in the generated file, so the CLI can "
+                                  "skip the interactive company-selection prompt once credentials are filled in.")
+        parser.add_argument("-rsid", "--rsid", default=None, metavar="RSID",
+                             help="Pre-fill the default report suite ID in the generated file.")
+        parser.add_argument("-proxy", "--proxy", default=None, metavar="URL",
+                             help="Pre-fill a proxy URL in the generated file (e.g. http://proxy.example.com:8080), "
+                                  "for organizations that need to reach the Adobe Analytics API through a proxy. "
+                                  "Optional — omit it (default) to leave the file without a proxy.")
+        args = self._parse(parser, args)
+        if args is None:
+            return
+        try:
+            createConfigFile(destination=args.filename, auth_type=args.auth_type,
+                              verbose=self.verbose, company_id=args.company_id, rsid=args.rsid,
+                              proxy=args.proxy)
+            console.print(f"[green]Config file template created → {args.filename}[/green]")
+        except Exception as exc:
+            console.print(f"[red]Error: {exc}[/red]")
 
     def do_get_company_id(self, args: Any):
         """get_company_id [-sv file.csv]  — List all companies accessible with the current credentials."""
@@ -2336,6 +2389,52 @@ class AnalyticsShell(cmd.Cmd):
             print_table(locations, columns=["id", "name", "type"], title="Cloud Locations")
             if args.save:
                 save_list(locations, args.save)
+        except Exception as exc:
+            console.print(f"[red]Error: {exc}[/red]")
+
+    # ------------------------------------------------------------------
+    # Group 19 — Knowledge Graph
+    # ------------------------------------------------------------------
+    @login_required
+    def do_build_knowledge_graph(self, args: Any):
+        """build_knowledge_graph [-rsids id1,id2|all] [-no-filter-dims] [-projects n|all|id_or_email [id_or_email ...]] [-sample most_recent|random|users] [-fn file.ttl] [-v]  — Build a Knowledge Graph (RDF graph of dimensions, metrics, segments, calculated metrics and projects) for the connected company and save it to a .ttl file."""
+        parser = SafeArgumentParser(prog="build_knowledge_graph")
+        parser.add_argument("-rsids", "--rsids", default=None, metavar="RSID1,RSID2,...",
+                             help="Report suite ID(s) to include, or 'all' for every report suite. Defaults to "
+                                  "the most commonly used report suite across projects when omitted.")
+        parser.add_argument("-no-filter-dims", "--no_filter_dims", action="store_true",
+                             help="Keep entry/exit and non-reportable dimensions (excluded by default).")
+        parser.add_argument("-projects", "--projects", nargs="+", default=None,
+                             metavar="N|all|ID_OR_EMAIL",
+                             help="Projects to load for extra context: a single integer sample size, the single "
+                                  "keyword 'all', or one or more project IDs / owner emails (use -sample users "
+                                  "for emails).")
+        parser.add_argument("-sample", "--sample_method", default="most_recent",
+                             choices=["most_recent", "random", "users"], metavar="METHOD",
+                             help="Sampling method used when -projects is an integer or a list of emails "
+                                  "(default: most_recent).")
+        parser.add_argument("-fn", "--filename", default="knowledge_graph.ttl", metavar="FILE",
+                             help="Output filename for the saved knowledge graph (default: knowledge_graph.ttl).")
+        parser.add_argument("-v", "--verbose", action="store_true")
+        args = self._parse(parser, args)
+        if args is None:
+            return
+        rsids = None
+        if args.rsids:
+            rsids = args.rsids if args.rsids.lower() == "all" else [r.strip() for r in args.rsids.split(",")]
+        try:
+            kg = KnowledgeGraph(config=self.cfg, companyId=self.company_id, rsids=rsids,
+                                 filterDims=not args.no_filter_dims)
+            if args.projects:
+                if len(args.projects) == 1 and args.projects[0].lower() == "all":
+                    projects: Any = "all"
+                elif len(args.projects) == 1 and args.projects[0].isdigit():
+                    projects = int(args.projects[0])
+                else:
+                    projects = args.projects
+                kg.loadProjects(projects=projects, sampleMethod=args.sample_method)
+            kg.buildGraph(save=True, filename=args.filename, verbose=args.verbose)
+            console.print(f"[green]Knowledge graph saved → {args.filename}[/green]")
         except Exception as exc:
             console.print(f"[red]Error: {exc}[/red]")
 

@@ -188,10 +188,10 @@ def test_build_path_round_trip():
     assert table_dict["columnWidths"] == [100.0, 100.0]
 
     bd1 = table_dict["breakdowns"][0]
-    assert bd1["parentItemId"] == table_dict["staticRows"][0]["id"]
+    assert bd1["parentItemIds"] == [table_dict["staticRows"][0]["id"]]
     bd2 = bd1["breakdowns"][0]
-    assert bd2["parentItemId"] == "0"
-    assert bd2["settings"]["breakdownByPosition"] is True
+    assert bd2["parentItemIds"] == ["0"]
+    assert bd2["settings"]["breakdownByPosition"] is False
 
     # The built project must itself parse back correctly (write/read symmetry).
     wm2 = api2.WorkspaceManager(data=d)

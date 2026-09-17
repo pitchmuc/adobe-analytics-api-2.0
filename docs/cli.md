@@ -25,7 +25,7 @@ python -m aanalytics2.cli
 ## Configuration file
 
 The CLI reads credentials from the same JSON config file used by the Python library.\
-Two optional CLI-specific fields can be added: `companyId` and `rsid`.
+Three optional CLI-specific fields can be added: `companyId`, `rsid`, and `proxy`.
 
 ```json
 {
@@ -34,12 +34,14 @@ Two optional CLI-specific fields can be added: `companyId` and `rsid`.
     "secret": "<your secret>",
     "scopes": "<your OAuth scopes>",
     "companyId": "<your globalCompanyId>",
-    "rsid": "<your default report suite ID>"
+    "rsid": "<your default report suite ID>",
+    "proxy": "<your proxy URL, e.g. http://proxy.example.com:8080>"
 }
 ```
 
 The `companyId` field skips the interactive company-selection prompt at startup.\
-The `rsid` field pre-sets the default report suite for the session.
+The `rsid` field pre-sets the default report suite for the session.\
+The `proxy` field is entirely optional — set it only if your network requires all traffic to go through a proxy (common in some corporate environments); omit it to connect directly. When set, it is applied to both `http` and `https` traffic, for every request the CLI makes (including the initial OAuth token exchange).
 
 You can generate a blank credentials file with:
 
@@ -48,7 +50,7 @@ import aanalytics2
 aanalytics2.createConfigFile()
 ```
 
-Then add `companyId` and `rsid` manually before launching the CLI.
+Then add `companyId`, `rsid` and `proxy` manually before launching the CLI.
 
 ### Configuring without a file
 
@@ -63,6 +65,7 @@ Environment variables:
 * `AANALYTICS2_TECH_ID` (optional)
 * `AANALYTICS2_COMPANY_ID` (optional — same role as `companyId` in the config file)
 * `AANALYTICS2_RSID` (optional — same role as `rsid` in the config file)
+* `AANALYTICS2_PROXY` (optional — same role as `proxy` in the config file; also works as an override on top of an existing config file, see [`config`](#config))
 
 ```bash
 export AANALYTICS2_ORG_ID="<your IMS org ID>"
@@ -172,22 +175,46 @@ Type `y` or `yes` to confirm. Anything else cancels the operation.
 
 These commands manage the CLI session itself.
 
+### `create_config_file`
+
+Create a config file template with placeholder credentials, ready to fill in. Does not require a connection, so it can be run before `config`.
+
+```
+create_config_file [-fn file.json] [-auth_type oauthV2] [-cid company_id] [-rsid rsid] [-proxy url]
+```
+
+Example:
+
+```
+not-connected> create_config_file -fn config_analytics.json
+Config file template created → config_analytics.json
+```
+
 ### `config`
 
 Reload the configuration and reconnect.\
 Useful when you want to switch credentials without restarting the shell.
 
 ```
-config [-cf path/to/config.json] [-org_id ID] [-client_id ID] [-secret SECRET] [-scopes SCOPES] [-tech_id ID]
+config [-cf path/to/config.json] [-org_id ID] [-client_id ID] [-secret SECRET] [-scopes SCOPES] [-tech_id ID] [-proxy URL]
 ```
 
 By default this loads `-cf` (or the current config file). If `-org_id`, `-client_id`, `-secret`, or `-scopes` are passed, they take priority over the config file and are used to build the credentials directly — any of them left unset falls back to the matching `AANALYTICS2_*` environment variable (see [Configuring without a file](#configuring-without-a-file)).
+
+`-proxy` is independent of that logic: it's optional in every case (omit it to connect directly, no proxy involved), and when passed — either as a flag or via `AANALYTICS2_PROXY` — it overrides the `proxy` value from the config file, if any, so you can route an existing config file through a proxy without editing it.
 
 Example — switching to a different set of credentials without a file, e.g. sourced from a secrets manager into environment variables at deploy time:
 
 ```
 mycompanyid> config -org_id 1234@AdobeOrg -client_id abcd1234 -secret ****** -scopes ent_analytics_bulk_ingest_sdk
 Connected to company: othercompanyid
+```
+
+Example — applying a proxy on top of an existing config file:
+
+```
+mycompanyid> config -proxy http://proxy.example.com:8080
+Connected to company: mycompanyid
 ```
 
 ### `get_company_id`
@@ -1177,4 +1204,35 @@ List all cloud locations.
 
 ```
 get_cloud_locations [-sv file.csv]
+```
+
+---
+
+## Knowledge Graph
+
+### `build_knowledge_graph`
+
+Build a Knowledge Graph (an RDF graph linking dimensions, metrics, segments, calculated metrics and projects) for the connected company, and save it to a `.ttl` file.
+
+```
+build_knowledge_graph [-rsids id1,id2|all] [-no-filter-dims] [-projects n|all|id_or_email [id_or_email ...]] [-sample most_recent|random|users] [-fn file.ttl] [-v]
+```
+
+* `-rsids` : Report suite ID(s) to include, or `all` for every report suite. Defaults to the most commonly used report suite across projects when omitted.
+* `-no-filter-dims` : Keep entry/exit and non-reportable dimensions (excluded by default).
+* `-projects` : Projects to load for extra context — a single integer sample size, the single keyword `all`, or one or more project IDs / owner emails (space-separated). Use `-sample users` when passing emails.
+* `-sample` : Sampling method used when `-projects` is an integer or a list of emails — `most_recent` (default), `random`, or `users`.
+* `-fn` : Output filename (default: `knowledge_graph.ttl`).
+
+Examples:
+
+```
+mycompanyid> build_knowledge_graph -rsids myprodrsid -fn myprod.ttl
+Knowledge graph saved → myprod.ttl
+
+mycompanyid> build_knowledge_graph -projects 10 -sample random
+Knowledge graph saved → knowledge_graph.ttl
+
+mycompanyid> build_knowledge_graph -projects jane@company.com john@company.com -sample users
+Knowledge graph saved → knowledge_graph.ttl
 ```

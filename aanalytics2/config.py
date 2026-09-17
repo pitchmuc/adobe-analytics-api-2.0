@@ -6,7 +6,8 @@ config_object = {
     "scopes":None,
     "date_limit": 0,
     "token": "",
-    "oauthTokenEndpointV2" : "https://ims-na1.adobelogin.com/ims/token/v3"
+    "oauthTokenEndpointV2" : "https://ims-na1.adobelogin.com/ims/token/v3",
+    "proxy": None
 }
 orga_admin = {'_org_admin', '_deployment_admin', '_support_admin'}
 header = {"Accept": "application/json",

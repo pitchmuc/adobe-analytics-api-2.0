@@ -66,7 +66,7 @@ def _company_id_from_config_file(path: str) -> Optional[str]:
     return raw.get("companyId") or raw.get("company_id")
 
 
-def _find_freeform_subpanel(wm: WorkspaceManager, table_title: str) -> dict:
+def _find_freeform_subpanel(wm: WorkspaceManager, table_title: str) -> tuple:
     # wm.panels re-parses a fresh, throwaway Panel/FreeForm tree on every access (see
     # WorkspaceManager.panels), so mutating it would never reach wm.to_dict(). The raw
     # sub-panel dicts in wm._panels are what to_dict() actually serialises, so a table
@@ -78,7 +78,7 @@ def _find_freeform_subpanel(wm: WorkspaceManager, table_title: str) -> dict:
             if reportlet.get("type") == "FreeformReportlet":
                 available.append(sp.get("name"))
                 if sp.get("name") == table_title:
-                    return sp
+                    return panel, sp
     raise ValueError(
         f"No FreeForm table named {table_title!r} found in this project "
         f"(title match is case-sensitive and exact). Available FreeForm tables: {available!r}"
@@ -285,11 +285,14 @@ def build_server(
         """Run a report request (from build_report_request or hand-built) and return
         the top rows. `n_results` caps returned rows (default 50) to avoid overflowing
         the LLM context on wide/long reports."""
-        workspace = analytics.getReport2(request=request, n_results=n_results)
+        # getReport2's own `limit` kwarg (default 20000) overwrites request["settings"]["limit"]
+        # otherwise, fetching (and returning, since "rows" below was never truncated either) far
+        # more than n_results asked for.
+        workspace = analytics.getReport2(request=request, n_results=n_results, limit=n_results)
         if not hasattr(workspace, "dataframe"):
             return {"raw": workspace}
         return {
-            "rows": _df_to_records(workspace.dataframe),
+            "rows": _df_to_records(workspace.dataframe)[:n_results],
             "row_count": workspace.row_numbers,
             "columns": list(workspace.columns),
         }
@@ -311,10 +314,13 @@ def build_server(
         rc.addMetric(metric_id)
         rc.setDateRange(dateRange=_resolve_date_range(rc, date_range))
         rc.setLimit(limit)
-        workspace = analytics.getReport2(request=rc.to_dict(), n_results=limit)
+        # getReport2's own `limit` kwarg (default 20000) overwrites request["settings"]["limit"]
+        # set above otherwise, fetching (and, since never truncated below, returning) far more
+        # rows than the caller's `limit` asked for.
+        workspace = analytics.getReport2(request=rc.to_dict(), n_results=limit, limit=limit)
         if not hasattr(workspace, "dataframe"):
             return []
-        records = _df_to_records(workspace.dataframe)
+        records = _df_to_records(workspace.dataframe)[:limit]
         label_col = workspace.columns[0]
         return [{"value": r.get(label_col), "itemId": r.get("itemId")} for r in records]
 
@@ -443,17 +449,64 @@ def build_server(
         case-sensitive and exact). Provide either `dimension_id` (+ optional
         `dimension_name`) for a dynamic breakdown, or `items` (list of {"id", "name",
         "type"?} dicts, or bare ID strings — the display name is then auto-resolved)
-        for static rows."""
+        for static rows.
+
+        When the table's own rows come from a dynamic dimension (not static `items`),
+        Adobe only shows a row as expandable if the breakdown is anchored to that row's
+        real `itemId` — a placeholder does not work. This is looked up automatically
+        with a live report request against the table's row dimension (same rsid/date
+        range/row count as the table), one breakdown entry per currently-visible row."""
         wm = WorkspaceManager(data=project, analytics=analytics)
-        subpanel = _find_freeform_subpanel(wm, table_title)
+        panel, subpanel = _find_freeform_subpanel(wm, table_title)
         ff = FreeForm.from_dict(subpanel["reportlet"])
         # Unlike WorkspaceManager.addFreeform, FreeForm.addBreakdown does not resolve
         # missing id/name pairs itself — reuse wm's already-loaded company lookup
-        # tables so an items entry with only "id" (or only "name") still resolves,
-        # same as it would if passed to add_freeform instead.
-        ff.addBreakdown(dimension_id=dimension_id, dimension_name=dimension_name,
-                         items=wm._normalize_items(_coerce_component_list(items)) if items else items,
-                         rows=rows)
+        # tables so a dimension_id/dimension_name pair or an items entry with only
+        # "id" (or only "name") still resolves, same as it would if passed to
+        # add_freeform instead.
+        if dimension_id or dimension_name:
+            dimension_id, dimension_name = wm._resolve_dim_pair(dimension_id or "", dimension_name or "")
+        normalized_items = wm._normalize_items(_coerce_component_list(items)) if items else None
+        if ff.dimension is not None:
+            date_range_obj = panel.get("dateRange", {}) or {}
+            date_range = date_range_obj.get("id") or (date_range_obj.get("__metaData__") or {}).get("definition")
+            if not date_range:
+                raise ValueError(
+                    f"Could not determine the date range of panel {panel.get('name')!r} to look "
+                    "up real row itemIds for this breakdown."
+                )
+            metric_id = "metrics/visits"
+            if ff.metrics:
+                metric_id = ff.metrics[0]["id"]
+            elif ff.calculatedMetrics:
+                metric_id = ff.calculatedMetrics[0]["id"]
+            page_size = ((subpanel["reportlet"].get("freeformTable") or {}).get("pagination") or {}).get("viewBy", 10)
+            rc = RequestCreator()
+            rc.setRSID(project.get("rsid"))
+            rc.setDimension(ff.dimension["id"])
+            rc.addMetric(metric_id)
+            rc.setDateRange(dateRange=_resolve_date_range(rc, date_range))
+            rc.setLimit(page_size)
+            # getReport2's own `limit` kwarg (default 20000) overwrites the request's own
+            # settings.limit set by rc.setLimit() above — pass it explicitly, or this fetches
+            # (and embeds itemIds for) every row of the dimension instead of just page_size,
+            # which blew a two-table test project up to 36MB and failed on Adobe's 16MB cap.
+            report = analytics.getReport2(request=rc.to_dict(), n_results=page_size, limit=page_size)
+            item_ids = []
+            if hasattr(report, "dataframe") and "itemId" in report.dataframe.columns:
+                item_ids = [str(v) for v in report.dataframe["itemId"].tolist()][:page_size]
+            if not item_ids:
+                raise ValueError(
+                    f"Could not fetch real row itemIds for dimension {ff.dimension['id']!r} "
+                    f"(rsid={project.get('rsid')!r}, date_range={date_range!r}) — Workspace would "
+                    "not show this breakdown as expandable without them."
+                )
+            for item_id in item_ids:
+                ff.addBreakdown(dimension_id=dimension_id, dimension_name=dimension_name,
+                                 items=normalized_items, rows=rows, parent_item_id=item_id)
+        else:
+            ff.addBreakdown(dimension_id=dimension_id, dimension_name=dimension_name,
+                             items=normalized_items, rows=rows)
         subpanel["reportlet"] = ff.to_dict()
         return wm.to_dict()
 
