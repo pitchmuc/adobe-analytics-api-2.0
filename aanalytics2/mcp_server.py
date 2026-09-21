@@ -24,7 +24,8 @@ from aanalytics2.configs import importConfigFile, find_path
 from aanalytics2.requestCreator import RequestCreator
 from aanalytics2.workspaceManager import WorkspaceManager, FreeForm
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 
 
 def _default_ontology_md() -> str:
@@ -79,7 +80,10 @@ def _find_freeform_subpanel(wm: WorkspaceManager, table_title: str) -> tuple:
                 available.append(sp.get("name"))
                 if sp.get("name") == table_title:
                     return panel, sp
-    raise ValueError(
+    # ToolError (not ValueError) so MCPServer surfaces this message to the caller as
+    # an anticipated tool failure instead of swallowing it into a generic
+    # "Error executing tool" UnexpectedToolError.
+    raise ToolError(
         f"No FreeForm table named {table_title!r} found in this project "
         f"(title match is case-sensitive and exact). Available FreeForm tables: {available!r}"
     )
@@ -88,7 +92,7 @@ def _find_freeform_subpanel(wm: WorkspaceManager, table_title: str) -> tuple:
 # Accepted shape for a metric/dimension-item/segment/component reference: either a bare
 # ID string or the full {"id": ..., "name"?: ..., "type"?: ...} dict. Declaring the Union
 # (rather than bare `list`/`dict`) both documents the shorthand in the tool's JSON schema
-# and — importantly — is required for it to work at all: FastMCP validates arguments
+# and — importantly — is required for it to work at all: MCPServer validates arguments
 # against the annotation via pydantic before the tool body runs, so a plain `List[dict]`
 # would reject a bare string with a validation error before _coerce_component_list ever saw it.
 ComponentSpec = Union[str, dict]
@@ -118,8 +122,8 @@ def build_server(
     default_rsid: Optional[str] = None,
     kg_graph: Optional[Graph] = None,
     ontology_md: Optional[str] = None,
-) -> FastMCP:
-    mcp = FastMCP(
+) -> MCPServer:
+    mcp = MCPServer(
         "aanalytics2",
         instructions=(
             "Adobe Analytics tools (Discovery, Reporting, Segment/CalculatedMetric/DateRange "
@@ -160,12 +164,12 @@ def build_server(
     def _require_rsid(rsid: Optional[str]) -> str:
         rsid = rsid or default_rsid
         if not rsid:
-            raise ValueError("rsid is required (no default report suite was configured with -rsid).")
+            raise ToolError("rsid is required (no default report suite was configured with -rsid).")
         return rsid
 
     def _require_kg() -> Graph:
         if kg_graph is None:
-            raise ValueError("Knowledge Graph not connected. Restart the server with -kg <file.ttl>.")
+            raise ToolError("Knowledge Graph not connected. Restart the server with -kg <file.ttl>.")
         return kg_graph
 
     def _local_id(uri) -> str:
@@ -471,7 +475,7 @@ def build_server(
             date_range_obj = panel.get("dateRange", {}) or {}
             date_range = date_range_obj.get("id") or (date_range_obj.get("__metaData__") or {}).get("definition")
             if not date_range:
-                raise ValueError(
+                raise ToolError(
                     f"Could not determine the date range of panel {panel.get('name')!r} to look "
                     "up real row itemIds for this breakdown."
                 )
@@ -496,7 +500,7 @@ def build_server(
             if hasattr(report, "dataframe") and "itemId" in report.dataframe.columns:
                 item_ids = [str(v) for v in report.dataframe["itemId"].tolist()][:page_size]
             if not item_ids:
-                raise ValueError(
+                raise ToolError(
                     f"Could not fetch real row itemIds for dimension {ff.dimension['id']!r} "
                     f"(rsid={project.get('rsid')!r}, date_range={date_range!r}) — Workspace would "
                     "not show this breakdown as expandable without them."
@@ -558,7 +562,7 @@ def build_server(
         the original."""
         project_id = project.get("id")
         if not project_id:
-            raise ValueError(
+            raise ToolError(
                 "project has no \"id\" — it must come from get_project (a project created "
                 "with create_workspace has no id until it is first published). Use "
                 "publish_workspace to create a new project instead."
@@ -734,7 +738,7 @@ def build_server(
     # is registered by hand instead of via the @mcp.tool() decorator used above.
     def sparql_query(query: str) -> list:
         if kg_graph is None:
-            raise ValueError("Knowledge Graph not connected. Restart the server with -kg <file.ttl>.")
+            raise ToolError("Knowledge Graph not connected. Restart the server with -kg <file.ttl>.")
         results = kg_graph.query(query)
         return [
             {str(v): (row[v].toPython() if row[v] is not None else None) for v in results.vars}

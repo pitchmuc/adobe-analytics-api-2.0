@@ -71,7 +71,7 @@ def _server():
 def _call(mcp, name, arguments):
     """Run an MCP tool call synchronously and return its decoded JSON result."""
     result = asyncio.run(mcp.call_tool(name, arguments))
-    return json.loads(result[0].text)
+    return json.loads(result.content[0].text)
 
 
 def test_add_freeform_accepts_bare_id_strings():

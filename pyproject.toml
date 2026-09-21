@@ -36,7 +36,7 @@ dependencies = [
     "httpx",
     "rich>=13.0.0",
     "rdflib",
-    "mcp>=1.0",
+    "mcp>=2.0",
 ]
 dynamic = ["version"]
 
