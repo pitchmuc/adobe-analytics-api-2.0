@@ -212,12 +212,14 @@ into `.mcp.json` (project scope) or your user-level Claude config (`claude mcp a
 
 | Group | Tools |
 | -- | -- |
-| Discovery | `list_report_suites`, `list_dimensions`, `list_metrics`, `list_segments`, `list_calculated_metrics`, `list_date_ranges`, `list_projects`, `get_segment`, `get_project` |
+| Discovery | `list_report_suites`, `list_dimensions`, `list_metrics`, `list_segments`, `find_segment`, `list_calculated_metrics`, `find_calculated_metric`, `list_date_ranges`, `list_projects`, `get_segment`, `get_project` |
 | Reporting | `build_report_request`, `run_report`, `get_top_items` |
 | Segment / Calculated Metric / Date Range authoring | `validate_segment`, `create_segment`, `update_segment`, `validate_calculated_metric`, `create_calculated_metric`, `update_calculated_metric`, `create_date_range`, `update_date_range` |
 | Workspace building | `create_workspace`, `add_panel`, `add_segment_filter`, `add_dropdown_filter`, `add_text`, `add_freeform`, `add_breakdown`, `add_chart`, `add_segment_comparison_table`, `publish_workspace`, `update_workspace` |
 | Classifications | `list_classification_datasets`, `get_classification_dataset_id`, `get_classification_dataset` |
 | Knowledge Graph *(needs `-kg`)* | `sparql_query`, `get_related_metrics`, `get_related_dimensions`, `get_related_segments`, `get_popular_combinations`, `get_component_context` |
+
+`list_segments`/`list_calculated_metrics` always hit the live API and return everything that matches, which on large accounts (thousands of segments/calculated metrics) can be very large. For a single lookup by name and/or rsid, use `find_segment`/`find_calculated_metric` instead — they query the local Knowledge Graph first (loaded with `-kg`), which is much cheaper, and only fall back to a live API call when: no Knowledge Graph is connected; the Knowledge Graph has no match for the given name/rsid (it's a point-in-time snapshot, so it can miss anything created or renamed since it was last built); or the caller passes `force_live=True` to explicitly bypass it. Either way the result is capped by `limit` (default 20) to keep the response small. The result is always `{"source": "knowledge_graph" | "live_api", "note": str | None, "results": [...]}` — `note` explains *why* the tool fell back to the live API and is only set when `source` is `"live_api"`, so a caller can tell at a glance whether an answer is Knowledge-Graph-backed or not.
 
 Workspace-building tools are stateless: each one takes the project dict returned by the previous call and returns an updated one, so a typical session chains `create_workspace` → `add_panel` → `add_freeform` → `add_chart` → `publish_workspace`. Each tool's full parameter list is in its own docstring, visible to the client when it inspects the tool.
 

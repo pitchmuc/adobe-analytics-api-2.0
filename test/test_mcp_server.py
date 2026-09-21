@@ -5,6 +5,7 @@ import sys
 import inspect
 
 import pandas as pd
+from rdflib import Graph, Literal, RDF, RDFS, URIRef, Namespace
 
 current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parent_dir = os.path.dirname(current_dir)
@@ -62,6 +63,12 @@ class DummyAnalytics:
     def updateProject(self, projectId=None, projectObj=None):
         return {"id": projectId, **projectObj}
 
+    def getSegments(self, name=None, rsids_list=None, extended_info=None, format=None):
+        return [{"id": "s_live", "name": "Mobile visitors (live)", "rsid": "rs1", "description": ""}]
+
+    def getCalculatedMetrics(self, name=None, rsids_list=None, extended_info=None, format=None):
+        return [{"id": "cm_live", "name": "Bounce rate (live)", "rsid": "rs1", "description": ""}]
+
     def getReport2(self, request=None, n_results=None, limit=None):
         class _FakeReport:
             dataframe = pd.DataFrame({
@@ -75,6 +82,37 @@ class DummyAnalytics:
 def _server():
     wmmod.WorkspaceManager._fetch_all_company_data = _fake_fetch_all_company_data
     return build_server(analytics=DummyAnalytics(), company_id="dummy", default_rsid="rs1")
+
+
+def _build_test_kg():
+    """Minimal Knowledge Graph matching the triple shapes KnowledgeGraph.buildGraph()
+    produces for Segment/CalculatedMetric nodes (see knowledgeGraph.py's
+    build_segment_graph/build_calculated_graph), scoped to company_id="dummy"."""
+    g = Graph()
+    seg_ns = Namespace("http://analytics.com/dummy/segment#")
+    cm_ns = Namespace("http://analytics.com/dummy/calculatedMetric#")
+    rs_ns = Namespace("http://analytics.com/dummy/reportSuite#")
+
+    seg_uri = URIRef("http://analytics.com/dummy/segment/s_kg1")
+    g.add((seg_uri, RDF.type, Literal("Segment")))
+    g.add((seg_uri, RDFS.label, Literal("Mobile Visitors KG")))
+    g.add((seg_uri, RDFS.comment, Literal("KG segment description")))
+    g.add((seg_uri, seg_ns.id, Literal("s_kg1")))
+    g.add((seg_uri, seg_ns.rsid, rs_ns["rs1"]))
+
+    cm_uri = URIRef("http://analytics.com/dummy/calculatedMetric/cm_kg1")
+    g.add((cm_uri, RDF.type, Literal("CalculatedMetric")))
+    g.add((cm_uri, RDFS.label, Literal("Bounce Rate KG")))
+    g.add((cm_uri, cm_ns.id, Literal("cm_kg1")))
+    g.add((cm_uri, cm_ns.rsid, rs_ns["rs1"]))
+    return g
+
+
+def _server_with_kg():
+    wmmod.WorkspaceManager._fetch_all_company_data = _fake_fetch_all_company_data
+    return build_server(
+        analytics=DummyAnalytics(), company_id="dummy", default_rsid="rs1", kg_graph=_build_test_kg()
+    )
 
 
 def _call(mcp, name, arguments):
@@ -264,6 +302,40 @@ def test_validate_segment_returns_api_result():
     assert result["valid"] is True
 
 
+def test_find_segment_uses_knowledge_graph_when_available():
+    mcp = _server_with_kg()
+    result = _call(mcp, "find_segment", {"name": "Mobile"})
+    assert result["source"] == "knowledge_graph"
+    assert result["note"] is None
+    assert result["results"] == [
+        {"id": "s_kg1", "name": "Mobile Visitors KG", "description": "KG segment description", "rsid": "rs1"}
+    ]
+
+
+def test_find_segment_falls_back_when_no_kg_connected():
+    mcp = _server()  # built without kg_graph
+    result = _call(mcp, "find_segment", {"name": "Mobile"})
+    assert result["source"] == "live_api"
+    assert "No Knowledge Graph connected" in result["note"]
+    assert result["results"][0]["id"] == "s_live"
+
+
+def test_find_segment_falls_back_when_kg_has_no_match():
+    mcp = _server_with_kg()
+    result = _call(mcp, "find_segment", {"name": "Nonexistent Segment Name"})
+    assert result["source"] == "live_api"
+    assert "No matching segment found in the Knowledge Graph" in result["note"]
+    assert result["results"][0]["id"] == "s_live"
+
+
+def test_find_segment_force_live_bypasses_knowledge_graph():
+    mcp = _server_with_kg()  # KG would otherwise match "Mobile"
+    result = _call(mcp, "find_segment", {"name": "Mobile", "force_live": True})
+    assert result["source"] == "live_api"
+    assert "force_live=True" in result["note"]
+    assert result["results"][0]["id"] == "s_live"
+
+
 def test_create_calculated_metric_passes_definition_through():
     mcp = _server()
     metric = {"name": "Bounce rate", "rsid": "rs1", "definition": {"func": "divide"}}
@@ -285,6 +357,40 @@ def test_validate_calculated_metric_returns_api_result():
     metric = {"name": "Bounce rate", "rsid": "rs1", "definition": {"func": "divide"}}
     result = _call(mcp, "validate_calculated_metric", {"calculated_metric": metric})
     assert result["valid"] is True
+
+
+def test_find_calculated_metric_uses_knowledge_graph_when_available():
+    mcp = _server_with_kg()
+    result = _call(mcp, "find_calculated_metric", {"name": "Bounce"})
+    assert result["source"] == "knowledge_graph"
+    assert result["note"] is None
+    assert result["results"] == [
+        {"id": "cm_kg1", "name": "Bounce Rate KG", "description": None, "rsid": "rs1"}
+    ]
+
+
+def test_find_calculated_metric_falls_back_when_no_kg_connected():
+    mcp = _server()  # built without kg_graph
+    result = _call(mcp, "find_calculated_metric", {"name": "Bounce"})
+    assert result["source"] == "live_api"
+    assert "No Knowledge Graph connected" in result["note"]
+    assert result["results"][0]["id"] == "cm_live"
+
+
+def test_find_calculated_metric_falls_back_when_kg_has_no_match():
+    mcp = _server_with_kg()
+    result = _call(mcp, "find_calculated_metric", {"name": "Nonexistent Metric Name"})
+    assert result["source"] == "live_api"
+    assert "No matching calculated metric found in the Knowledge Graph" in result["note"]
+    assert result["results"][0]["id"] == "cm_live"
+
+
+def test_find_calculated_metric_force_live_bypasses_knowledge_graph():
+    mcp = _server_with_kg()  # KG would otherwise match "Bounce"
+    result = _call(mcp, "find_calculated_metric", {"name": "Bounce", "force_live": True})
+    assert result["source"] == "live_api"
+    assert "force_live=True" in result["note"]
+    assert result["results"][0]["id"] == "cm_live"
 
 
 def test_create_date_range_passes_definition_through():

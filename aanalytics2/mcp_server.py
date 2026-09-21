@@ -132,7 +132,11 @@ def build_server(
             "and co-occurrence relationships between components. Before calling sparql_query or "
             "the get_related_*/get_popular_combinations/get_component_context tools, read the "
             "'ontology://knowledge-graph' resource for the entity types, predicates and namespace "
-            "patterns the graph uses."
+            "patterns the graph uses. For a single segment or calculated metric lookup by name, "
+            "prefer find_segment/find_calculated_metric over list_segments/list_calculated_metrics "
+            "-- they check the Knowledge Graph first (far cheaper on large accounts) and clearly "
+            "flag via the result's \"source\"/\"note\" fields whenever an answer falls back to a "
+            "live API call instead."
         ),
     )
 
@@ -175,6 +179,12 @@ def build_server(
     def _local_id(uri) -> str:
         return str(uri).rsplit("/", 1)[-1]
 
+    def _rsid_from_uri(uri) -> str:
+        # rsid nodes are fragment-based (.../reportSuite#{rsid}), not path-based like
+        # dimension/metric/segment/calculatedMetric nodes, so _local_id's "/" split
+        # would return "reportSuite#{rsid}" instead of the bare rsid.
+        return str(uri).rsplit("#", 1)[-1]
+
     def _apply_filter(records: list, filter: Optional[str], key: str = "name") -> list:
         if not filter:
             return records
@@ -210,18 +220,134 @@ def build_server(
     def list_segments(rsid: str = None, filter: str = None) -> list:
         """List segments (id, name, description). Scoped to `rsid` if provided,
         otherwise all segments visible to this connection. Optional case-insensitive
-        substring `filter` on the segment name."""
+        substring `filter` on the segment name. This always hits the live API and
+        returns everything that matches, which can be very large on accounts with
+        thousands of segments -- for a single lookup by name, prefer find_segment,
+        which checks the local Knowledge Graph first and is much cheaper."""
         records = analytics.getSegments(
             rsids_list=[rsid] if rsid else None, extended_info=True, format="raw"
         )
         return _apply_filter(records, filter)
 
     @mcp.tool()
+    def find_segment(name: str = None, rsid: str = None, limit: int = 20, force_live: bool = False) -> dict:
+        """Look up segments by case-insensitive substring on `name` and/or `rsid`.
+        Prefers the local Knowledge Graph (-kg) over a live list_segments call, which
+        is far cheaper on accounts with thousands of segments. Falls back to a live
+        API call -- and always says so via the result's "source"/"note" fields, so
+        you know when an answer is NOT based on the Knowledge Graph -- when: no
+        Knowledge Graph is connected; the Knowledge Graph has no match (it can be
+        stale for segments created/renamed since it was last built); or `force_live`
+        is explicitly set to True. Result shape: {"source": "knowledge_graph" |
+        "live_api", "note": str | None, "results": [...]}. `note` is only set when
+        `source` is "live_api". Call list_segments directly if you need the full,
+        unfiltered, always-live list instead of a targeted lookup."""
+        if not force_live and kg_graph is not None:
+            q = prefix_header + """
+            SELECT ?id ?label ?comment ?rsUri WHERE {
+                ?s seg:id ?id ; rdfs:label ?label .
+                OPTIONAL { ?s rdfs:comment ?comment }
+                OPTIONAL { ?s seg:rsid ?rsUri }
+            }
+            """
+            records = []
+            for r in kg_graph.query(q):
+                row_rsid = _rsid_from_uri(r.rsUri) if r.rsUri else None
+                if rsid and row_rsid != rsid:
+                    continue
+                if name and name.lower() not in str(r.label).lower():
+                    continue
+                records.append({
+                    "id": str(r.id), "name": str(r.label),
+                    "description": str(r.comment) if r.comment else None,
+                    "rsid": row_rsid,
+                })
+            if records:
+                return {"source": "knowledge_graph", "note": None, "results": records[:limit]}
+            note = (
+                "No matching segment found in the Knowledge Graph"
+                + (f" for rsid={rsid!r}" if rsid else "")
+                + (f", name filter {name!r}" if name else "")
+                + " -- falling back to a live list_segments API call. This is NOT a "
+                  "Knowledge Graph answer; it can also find segments created or "
+                  "renamed since the Knowledge Graph was last built."
+            )
+        elif force_live:
+            note = ("force_live=True was passed -- this is NOT a Knowledge Graph answer; "
+                     "results come directly from a live list_segments API call.")
+        else:
+            note = ("No Knowledge Graph connected (server not started with -kg) -- this is "
+                     "NOT a Knowledge Graph answer; results come from a live list_segments API call.")
+        records = analytics.getSegments(
+            name=name, rsids_list=[rsid] if rsid else None, extended_info=True, format="raw"
+        )
+        return {"source": "live_api", "note": note, "results": records[:limit]}
+
+    @mcp.tool()
     def list_calculated_metrics(filter: str = None) -> list:
         """List calculated metrics (id, name, description). Optional case-insensitive
-        substring `filter` on the name."""
+        substring `filter` on the name. This always hits the live API and returns
+        everything that matches, which can be very large -- for a single lookup by
+        name, prefer find_calculated_metric, which checks the local Knowledge Graph
+        first and is much cheaper."""
         records = analytics.getCalculatedMetrics(extended_info=True, format="raw")
         return _apply_filter(records, filter)
+
+    @mcp.tool()
+    def find_calculated_metric(name: str = None, rsid: str = None, limit: int = 20, force_live: bool = False) -> dict:
+        """Look up calculated metrics by case-insensitive substring on `name` and/or
+        `rsid`. Prefers the local Knowledge Graph (-kg) over a live
+        list_calculated_metrics call, which is far cheaper on accounts with thousands
+        of calculated metrics. Falls back to a live API call -- and always says so via
+        the result's "source"/"note" fields, so you know when an answer is NOT based
+        on the Knowledge Graph -- when: no Knowledge Graph is connected; the Knowledge
+        Graph has no match (it can be stale for calculated metrics created/renamed
+        since it was last built); or `force_live` is explicitly set to True. Result
+        shape: {"source": "knowledge_graph" | "live_api", "note": str | None,
+        "results": [...]}. `note` is only set when `source` is "live_api". Call
+        list_calculated_metrics directly if you need the full, unfiltered, always-live
+        list instead of a targeted lookup."""
+        if not force_live and kg_graph is not None:
+            q = prefix_header + """
+            SELECT ?id ?label ?comment ?rsUri WHERE {
+                ?s cm:id ?id ; rdfs:label ?label .
+                OPTIONAL { ?s rdfs:comment ?comment }
+                OPTIONAL { ?s cm:rsid ?rsUri }
+            }
+            """
+            records = []
+            for r in kg_graph.query(q):
+                row_rsid = _rsid_from_uri(r.rsUri) if r.rsUri else None
+                if rsid and row_rsid != rsid:
+                    continue
+                if name and name.lower() not in str(r.label).lower():
+                    continue
+                records.append({
+                    "id": str(r.id), "name": str(r.label),
+                    "description": str(r.comment) if r.comment else None,
+                    "rsid": row_rsid,
+                })
+            if records:
+                return {"source": "knowledge_graph", "note": None, "results": records[:limit]}
+            note = (
+                "No matching calculated metric found in the Knowledge Graph"
+                + (f" for rsid={rsid!r}" if rsid else "")
+                + (f", name filter {name!r}" if name else "")
+                + " -- falling back to a live list_calculated_metrics API call. This is "
+                  "NOT a Knowledge Graph answer; it can also find calculated metrics "
+                  "created or renamed since the Knowledge Graph was last built."
+            )
+        elif force_live:
+            note = ("force_live=True was passed -- this is NOT a Knowledge Graph answer; "
+                     "results come directly from a live list_calculated_metrics API call.")
+        else:
+            note = ("No Knowledge Graph connected (server not started with -kg) -- this is "
+                     "NOT a Knowledge Graph answer; results come from a live "
+                     "list_calculated_metrics API call.")
+        records = analytics.getCalculatedMetrics(
+            name=name, rsids_list=[rsid] if rsid else None, extended_info=True, format="raw"
+        )
+        return {"source": "live_api", "note": note, "results": records[:limit]}
 
     @mcp.tool()
     def list_date_ranges(filter: str = None) -> list:

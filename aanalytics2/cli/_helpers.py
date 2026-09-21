@@ -114,12 +114,48 @@ def load_json(path: str) -> Optional[dict]:
     return None
 
 
-def resolve_rsid(arg_rsid: Optional[str], session_rsid: Optional[str], required: bool = True) -> Optional[str]:
-    """Return the effective RSID, falling back to the session default. Prints an error if required and missing."""
+def _resolve_rsid(arg_rsid: Optional[str], session_rsid: Optional[str], analytics=None,
+                  required: bool = True) -> Optional[str]:
+    """Return the effective RSID, falling back to the session default. Prints an error if
+    required and missing.
+
+    If `analytics` is given and the resolved value isn't an exact RSID, it's treated as a
+    partial report suite name/id (e.g. "UK") and resolved via a case-insensitive substring
+    match against the account's report suites — auto-picking a single match, or printing an
+    error and returning None on zero or multiple matches.
+    """
     rsid = arg_rsid or session_rsid
-    if required and rsid is None:
-        console.print("[red]RSID required. Use -rsid <id> or run 'set_rsid <id>' first.[/red]")
-    return rsid
+    if rsid is None:
+        if required:
+            console.print("[red]RSID required. Use -rsid <id> or run 'set_rsid <id>' first.[/red]")
+        return None
+    if analytics is None:
+        return rsid
+    try:
+        df = analytics.getReportSuites()
+    except Exception:
+        return rsid
+    if df is None or df.empty or "rsid" not in df.columns:
+        return rsid
+    if (df["rsid"] == rsid).any():
+        return rsid
+    needle = rsid.lower()
+    mask = (
+        df["rsid"].str.lower().str.contains(needle, na=False)
+        | df["name"].str.lower().str.contains(needle, na=False)
+    )
+    matches = df[mask]
+    if matches.empty:
+        console.print(f"[red]No report suite found matching '{rsid}' (checked names and IDs).[/red]")
+        return None
+    if len(matches) > 1:
+        candidates = ", ".join(f"{row['name']} ({row['rsid']})" for _, row in matches.iterrows())
+        console.print(f"[red]'{rsid}' matches multiple report suites — be more specific: {candidates}[/red]")
+        return None
+    resolved_rsid = matches.iloc[0]["rsid"]
+    resolved_name = matches.iloc[0]["name"]
+    console.print(f"[cyan]Resolved '{rsid}' → report suite '{resolved_rsid}' ({resolved_name}).[/cyan]")
+    return resolved_rsid
 
 
 def _pick_default_dimension(df: pd.DataFrame, keyword: str = "page") -> Optional[str]:

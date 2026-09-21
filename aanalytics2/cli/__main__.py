@@ -30,7 +30,7 @@ from aanalytics2.knowledgegraph import KnowledgeGraph
 from ._helpers import (
     CLIError, SafeArgumentParser, login_required, str2bool,
     confirm_action, print_table, print_dataframe,
-    save_df, save_list, load_json, resolve_rsid, console,
+    save_df, save_list, load_json, _resolve_rsid, console,
     _pick_default_dimension, _pick_default_metrics,
 )
 
@@ -358,7 +358,7 @@ class RequestCreatorShell(cmd.Cmd):
         args = self._parse(parser, args)
         if args is None:
             return
-        rsid = resolve_rsid(args.rsid, getattr(self.rc, "rsid", None))
+        rsid = _resolve_rsid(args.rsid, getattr(self.rc, "rsid", None), analytics=self.analytics)
         if rsid is None:
             return
         try:
@@ -385,7 +385,7 @@ class RequestCreatorShell(cmd.Cmd):
         args = self._parse(parser, args)
         if args is None:
             return
-        rsid = resolve_rsid(args.rsid, getattr(self.rc, "rsid", None))
+        rsid = _resolve_rsid(args.rsid, getattr(self.rc, "rsid", None), analytics=self.analytics)
         if rsid is None:
             return
         try:
@@ -1025,7 +1025,7 @@ class AnalyticsShell(cmd.Cmd):
         args = self._parse(parser, args)
         if args is None:
             return
-        rsid = resolve_rsid(args.rsid, self.rsid)
+        rsid = _resolve_rsid(args.rsid, self.rsid, analytics=self.analytics)
         if rsid is None:
             return
         try:
@@ -1053,7 +1053,7 @@ class AnalyticsShell(cmd.Cmd):
         args = self._parse(parser, args)
         if args is None:
             return
-        rsid = resolve_rsid(args.rsid, self.rsid)
+        rsid = _resolve_rsid(args.rsid, self.rsid, analytics=self.analytics)
         if rsid is None:
             return
         try:
@@ -1639,7 +1639,7 @@ class AnalyticsShell(cmd.Cmd):
         args = self._parse(parser, args)
         if args is None:
             return
-        rsid = resolve_rsid(args.rsid, self.rsid)
+        rsid = _resolve_rsid(args.rsid, self.rsid, analytics=self.analytics)
         if rsid is None:
             return
         try:
@@ -1700,7 +1700,9 @@ class AnalyticsShell(cmd.Cmd):
         request = load_json(args.definition)
         if request is None:
             return
-        rsid = args.rsid or self.rsid
+        rsid = _resolve_rsid(args.rsid, self.rsid, analytics=self.analytics, required=False)
+        if rsid is None and (args.rsid or self.rsid):
+            return
         n = args.n_results if args.n_results == "inf" else int(args.n_results)
         try:
             workspace = self.analytics.getReport2(request=request, n_results=n, rsid=rsid)
@@ -1729,7 +1731,7 @@ class AnalyticsShell(cmd.Cmd):
         args = self._parse(parser, args)
         if args is None:
             return
-        rsid = resolve_rsid(args.rsid, self.rsid)
+        rsid = _resolve_rsid(args.rsid, self.rsid, analytics=self.analytics)
         if rsid is None:
             return
         try:
@@ -2118,7 +2120,7 @@ class AnalyticsShell(cmd.Cmd):
         args = self._parse(parser, args)
         if args is None:
             return
-        rsid = resolve_rsid(args.rsid, self.rsid)
+        rsid = _resolve_rsid(args.rsid, self.rsid, analytics=self.analytics)
         if rsid is None:
             return
         try:
@@ -2252,7 +2254,7 @@ class AnalyticsShell(cmd.Cmd):
         args = self._parse(parser, args)
         if args is None:
             return
-        rsid = resolve_rsid(args.rsid, self.rsid)
+        rsid = _resolve_rsid(args.rsid, self.rsid, analytics=self.analytics)
         if rsid is None:
             return
         try:
@@ -2387,7 +2389,7 @@ class AnalyticsShell(cmd.Cmd):
         args = self._parse(parser, args)
         if args is None:
             return
-        rsid = resolve_rsid(args.rsid, self.rsid)
+        rsid = _resolve_rsid(args.rsid, self.rsid, analytics=self.analytics)
         if rsid is None:
             return
         try:
@@ -2411,7 +2413,7 @@ class AnalyticsShell(cmd.Cmd):
         args = self._parse(parser, args)
         if args is None:
             return
-        rsid = resolve_rsid(args.rsid, self.rsid)
+        rsid = _resolve_rsid(args.rsid, self.rsid, analytics=self.analytics)
         if rsid is None:
             return
         try:
