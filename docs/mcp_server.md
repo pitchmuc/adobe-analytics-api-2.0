@@ -16,6 +16,7 @@ It is a companion to the CLI: same config file, same `Analytics` connection, sam
   - [Knowledge Graph ontology (resource)](#knowledge-graph-ontology-resource)
   - [Running it manually (smoke test)](#running-it-manually-smoke-test)
   - [Claude Desktop setup](#claude-desktop-setup)
+  - [GitHub Copilot CLI / Copilot app setup](#github-copilot-cli--copilot-app-setup)
   - [VS Code setup](#vs-code-setup)
     - [GitHub Copilot Chat (Agent Mode)](#github-copilot-chat-agent-mode)
     - [Claude Code extension](#claude-code-extension)
@@ -147,6 +148,42 @@ Edit Claude Desktop's config file:
 Omit the `-kg` line entirely if you don't have a Knowledge Graph file yet — the server starts fine without it, just without the KG tools. Omit `-cid` only if your credential has access to a single Adobe Analytics company, or if `companyId` is already set in the config file — see the [Command-line flags](#command-line-flags) note and [Troubleshooting](#troubleshooting) below on why pinning it explicitly matters when a credential has access to more than one.
 
 Fully quit and reopen Claude Desktop (not just close the window) for it to pick up the change. A hammer/tools icon showing `aanalytics2` tools should then appear in the chat composer.
+
+## GitHub Copilot CLI / Copilot app setup
+
+The [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers) (the terminal-based Copilot "app") can also load `aanalytics2` as a local (stdio) MCP server, either for every session (user-level) or scoped to this repository (project-level).
+
+**Option A — one-off, from the terminal:**
+
+```bash
+copilot mcp add aanalytics2 -- aanalytics2-mcp -cf "C:\path\to\config_analytics.json" -cid your_globalCompanyId -rsid your_rsid -kg "C:\path\to\analytics_knowledge_graph.ttl"
+```
+
+This writes the entry to your user config at `~/.copilot/mcp-config.json`. Omit `-kg` (and its value) if you don't have a Knowledge Graph file yet.
+
+**Option B — interactively:** inside a `copilot` session, run `/mcp add`, then fill in the form: **Server Name** `aanalytics2`, **Server Type** `Local`/`STDIO`, **Command** `aanalytics2-mcp -cf "C:\path\to\config_analytics.json" -cid your_globalCompanyId -rsid your_rsid -kg "C:\path\to\analytics_knowledge_graph.ttl"`, **Tools** `*`. Press `Ctrl+S` to save — it's available immediately, no restart needed.
+
+**Option C — edit the config file directly**, either the user-level `~/.copilot/mcp-config.json` (applies to every session) or a project-level `.mcp.json`/`.github/mcp.json` at the repository root (loaded only for this project, after you trust the folder):
+
+```json
+{
+  "mcpServers": {
+    "aanalytics2": {
+      "type": "local",
+      "command": "aanalytics2-mcp",
+      "args": [
+        "-cf", "C:\\path\\to\\config_analytics.json",
+        "-cid", "your_globalCompanyId",
+        "-rsid", "your_rsid",
+        "-kg", "C:\\path\\to\\analytics_knowledge_graph.ttl"
+      ],
+      "tools": ["*"]
+    }
+  }
+}
+```
+
+Note this is `"type": "local"` (Copilot CLI's naming), not `"type": "stdio"` used by VS Code/Claude Code below — the `.vscode/mcp.json` format isn't read by Copilot CLI. As with the other clients, use absolute paths for `-cf`/`-kg` since the CLI doesn't run the server from your project directory. Run `copilot mcp list` to confirm the server registered, then ask Copilot to use an `aanalytics2` tool — no restart required for the CLI, though project-level files only load after you confirm folder trust.
 
 ## VS Code setup
 
