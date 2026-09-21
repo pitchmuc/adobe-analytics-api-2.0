@@ -642,6 +642,46 @@ delete_project <id>
 
 ## Reporting
 
+### `create_report_request`
+
+Generate a report request JSON file, ready to use with [`get_report`](#get_report).\
+Any parameter left unset is auto-filled from real accessible data on the report suite: occurrences and visits metrics (whichever of the two exists), the page dimension, the predefined `All_Visits` segment, and the last 30 days.
+
+```
+create_report_request [-rsid id] [-dr date_range] [-dim dimension_id] [-m id1,id2] [-seg segment_id] [-limit n] [-fn file.json]
+```
+
+Arguments:
+* `-rsid` : OPTIONAL : Report suite ID. Uses the session default if set.
+* `-dr` / `--date_range` : OPTIONAL : ISO date range (`YYYY-MM-DD/YYYY-MM-DD`) or a preset name (`thisMonth`, `last30daysTillToday`, etc. — see [`set_date_range`](#building-the-request)). Defaults to the last 30 days.
+* `-dim` / `--dimension` : OPTIONAL : Dimension ID, e.g. `variables/eVar1`. Defaults to the report suite's page dimension.
+* `-m` / `--metrics` : OPTIONAL : Comma-separated metric IDs. Defaults to occurrences and visits.
+* `-seg` / `--segment` : OPTIONAL : Segment ID applied as a global filter. Defaults to the predefined `All_Visits` segment.
+* `-limit` : OPTIONAL : Row limit. Default `100`.
+* `-fn` / `--filename` : OPTIONAL : Output JSON filename. Default `report_request_<rsid>.json`.
+
+Example — fully generated from live account data:
+
+```
+mycompanyid:myprodrsid> create_report_request
+No dimension provided — defaulting to 'variables/page'.
+No metrics provided — defaulting to ['metrics/occurrences', 'metrics/visits'].
+Report request saved → report_request_myprodrsid.json
+Run it with: get_report -d report_request_myprodrsid.json
+```
+
+Example — customizing a few parameters while letting the rest default:
+
+```
+mycompanyid:myprodrsid> create_report_request -dim variables/eVar1 -dr 2024-01-01/2024-01-31 -fn my_report.json
+```
+
+The resulting file can be run directly:
+
+```
+mycompanyid:myprodrsid> get_report -d report_request_myprodrsid.json
+```
+
 ### `get_report`
 
 Run a report from a saved JSON request file.\

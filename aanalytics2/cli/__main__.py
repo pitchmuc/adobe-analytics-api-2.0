@@ -31,6 +31,7 @@ from ._helpers import (
     CLIError, SafeArgumentParser, login_required, str2bool,
     confirm_action, print_table, print_dataframe,
     save_df, save_list, load_json, resolve_rsid, console,
+    _pick_default_dimension, _pick_default_metrics,
 )
 
 # ---------------------------------------------------------------------------
@@ -84,7 +85,7 @@ COMMAND_GROUPS = {
         "create_project", "update_project", "delete_project",
     ],
     "Reporting": [
-        "get_report", "get_top_items", "decode_aa_requests",
+        "create_report_request", "get_report", "get_top_items", "decode_aa_requests",
     ],
     "Request Creator": [
         "request_creator",
@@ -1614,6 +1615,75 @@ class AnalyticsShell(cmd.Cmd):
     # ------------------------------------------------------------------
     # Group 7 — Reporting
     # ------------------------------------------------------------------
+    @login_required
+    def do_create_report_request(self, args: Any):
+        """create_report_request [-rsid id] [-dr date_range] [-dim dimension_id] [-m id1,id2] [-seg segment_id] [-limit n] [-fn file.json]  — Generate a report request JSON file, ready for get_report. Any parameter left unset is auto-filled from real accessible data (occurrences & visits metrics, page dimension, All_Visits segment, last 30 days)."""
+        parser = SafeArgumentParser(prog="create_report_request")
+        parser.add_argument("-rsid", default=None)
+        parser.add_argument("-dr", "--date_range", default=None, metavar="RANGE",
+                             help="ISO date range 'YYYY-MM-DD/YYYY-MM-DD', or a preset name "
+                                  "('thisMonth', 'last30daysTillToday', etc. — see RequestCreator "
+                                  "sub-shell docs). Defaults to the last 30 days when omitted.")
+        parser.add_argument("-dim", "--dimension", default=None, metavar="DIMENSION_ID",
+                             help="Dimension ID, e.g. 'variables/eVar1'. Defaults to the report "
+                                  "suite's page dimension when omitted.")
+        parser.add_argument("-m", "--metrics", default=None, metavar="ID1,ID2",
+                             help="Comma-separated metric IDs. Defaults to occurrences and visits "
+                                  "when omitted (whichever of those two the report suite exposes).")
+        parser.add_argument("-seg", "--segment", default=None, metavar="SEGMENT_ID",
+                             help="Segment ID applied as a global filter. Defaults to the "
+                                  "predefined 'All_Visits' segment when omitted.")
+        parser.add_argument("-limit", type=int, default=100, metavar="N")
+        parser.add_argument("-fn", "--filename", default=None, metavar="FILE",
+                             help="Output JSON filename. Defaults to report_request_<rsid>.json.")
+        args = self._parse(parser, args)
+        if args is None:
+            return
+        rsid = resolve_rsid(args.rsid, self.rsid)
+        if rsid is None:
+            return
+        try:
+            dimension_id = args.dimension
+            if dimension_id is None:
+                dims_df = self.analytics.getDimensions(rsid=rsid)
+                dimension_id = _pick_default_dimension(dims_df)
+                if dimension_id is None:
+                    console.print("[red]No dimensions accessible on this report suite to default to.[/red]")
+                    return
+                console.print(f"[cyan]No dimension provided — defaulting to '{dimension_id}'.[/cyan]")
+
+            if args.metrics:
+                metric_ids = [m.strip() for m in args.metrics.split(",") if m.strip()]
+            else:
+                metrics_df = self.analytics.getMetrics(rsid=rsid)
+                metric_ids = _pick_default_metrics(metrics_df)
+                if not metric_ids:
+                    console.print("[red]No metrics accessible on this report suite to default to.[/red]")
+                    return
+                console.print(f"[cyan]No metrics provided — defaulting to {metric_ids}.[/cyan]")
+
+            segment_id = args.segment or "All_Visits"
+
+            rc = RequestCreator()
+            rc.setRSID(rsid)
+            rc.setDimension(dimension_id)
+            for metric_id in metric_ids:
+                rc.addMetric(metric_id)
+            rc.addGlobalFilter(segment_id)
+            if args.date_range:
+                rc.setDateRange(dateRange=rc.dates.get(args.date_range, args.date_range))
+            else:
+                rc.setDateRange(last=30)
+            rc.setLimit(args.limit)
+
+            filename = args.filename or f"report_request_{rsid}.json"
+            rc.save(filename)
+            console.print_json(json.dumps(rc.to_dict(), indent=2))
+            console.print(f"[green]Report request saved → {filename}[/green]")
+            console.print(f"[cyan]Run it with: get_report -d {filename}[/cyan]")
+        except Exception as exc:
+            console.print(f"[red]Error: {exc}[/red]")
+
     @login_required
     def do_get_report(self, args: Any):
         """get_report -d request.json [-rsid id] [-n rows] [-sv file.csv]  — Run a report from a JSON request file."""

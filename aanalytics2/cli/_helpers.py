@@ -120,3 +120,48 @@ def resolve_rsid(arg_rsid: Optional[str], session_rsid: Optional[str], required:
     if required and rsid is None:
         console.print("[red]RSID required. Use -rsid <id> or run 'set_rsid <id>' first.[/red]")
     return rsid
+
+
+def _pick_default_dimension(df: pd.DataFrame, keyword: str = "page") -> Optional[str]:
+    """Pick a sensible default dimension ID from a getDimensions() dataframe: prefer the
+    exact 'variables/<keyword>' id, then any id/name containing the keyword, then fall
+    back to the first dimension accessible on the report suite."""
+    if df is None or df.empty:
+        return None
+    exact = f"variables/{keyword}"
+    if (df["id"] == exact).any():
+        return exact
+    mask = (
+        df["id"].str.lower().str.contains(keyword, na=False)
+        | df["name"].str.lower().str.contains(keyword, na=False)
+    )
+    matches = df[mask]
+    if not matches.empty:
+        return matches.iloc[0]["id"]
+    return df.iloc[0]["id"]
+
+
+def _pick_default_metrics(df: pd.DataFrame, keywords: Optional[list] = None) -> list:
+    """Pick sensible default metric IDs from a getMetrics() dataframe: for each keyword
+    (default ["occurrences", "visits"]), prefer the exact 'metrics/<keyword>' id, then any
+    id/name containing the keyword. Falls back to the first two metrics accessible on the
+    report suite if neither keyword matches anything."""
+    if df is None or df.empty:
+        return []
+    keywords = keywords or ["occurrences", "visits"]
+    picked = []
+    for keyword in keywords:
+        exact = f"metrics/{keyword}"
+        if (df["id"] == exact).any():
+            picked.append(exact)
+            continue
+        mask = (
+            df["id"].str.lower().str.contains(keyword, na=False)
+            | df["name"].str.lower().str.contains(keyword, na=False)
+        )
+        matches = df[mask]
+        if not matches.empty:
+            picked.append(matches.iloc[0]["id"])
+    if not picked:
+        picked = df["id"].head(2).tolist()
+    return picked

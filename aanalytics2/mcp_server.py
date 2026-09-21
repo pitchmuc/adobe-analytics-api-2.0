@@ -355,6 +355,16 @@ def build_server(
         return analytics.createSegment(segmentJSON=segment)
 
     @mcp.tool()
+    def update_segment(segment_id: str, segment: dict) -> dict:
+        """Update an existing segment in place. `segment_id` is the segment to
+        overwrite; `segment` is the full replacement definition — start from
+        get_segment(segment_id) and edit that dict rather than building one from
+        scratch, since this replaces the whole definition, not just the fields you
+        set. Consider calling validate_segment first to catch definition errors
+        before saving."""
+        return analytics.updateSegment(segmentID=segment_id, segmentJSON=segment)
+
+    @mcp.tool()
     def validate_calculated_metric(calculated_metric: dict) -> dict:
         """Dry-run a calculated metric definition against the API without saving it.
         `calculated_metric` needs "name", "definition" and "rsid" — see
@@ -372,11 +382,30 @@ def build_server(
         return analytics.createCalculatedMetric(metricJSON=calculated_metric)
 
     @mcp.tool()
+    def update_calculated_metric(calculated_metric_id: str, calculated_metric: dict) -> dict:
+        """Update an existing calculated metric in place. `calculated_metric_id` is
+        the metric to overwrite; `calculated_metric` is the full replacement
+        definition — start from an entry in list_calculated_metrics and edit that
+        dict rather than building one from scratch, since this replaces the whole
+        definition, not just the fields you set. Consider calling
+        validate_calculated_metric first to catch definition errors before saving."""
+        return analytics.updateCalculatedMetric(calcID=calculated_metric_id, calcJSON=calculated_metric)
+
+    @mcp.tool()
     def create_date_range(date_range: dict) -> dict:
         """Create a new saved date range. `date_range` needs "name" and "definition"
         — see list_date_ranges on an existing one for the exact shape used by this
         account. There is no validate endpoint for date ranges; this saves directly."""
         return analytics.createDateRange(dateRangeJSON=date_range)
+
+    @mcp.tool()
+    def update_date_range(date_range_id: str, date_range: dict) -> dict:
+        """Update an existing saved date range in place. `date_range_id` is the date
+        range to overwrite; `date_range` is the full replacement definition — start
+        from an entry in list_date_ranges and edit that dict rather than building one
+        from scratch, since this replaces the whole definition, not just the fields
+        you set. There is no validate endpoint for date ranges; this saves directly."""
+        return analytics.updateDateRange(dateRangeID=date_range_id, dateRangeJSON=date_range)
 
     # ── Group 4 — WorkspaceManager (stateless: project dict in, project dict out) ──
 

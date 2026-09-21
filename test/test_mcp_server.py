@@ -41,14 +41,23 @@ class DummyAnalytics:
     def createSegment(self, segmentJSON=None):
         return {"id": "s_new", **segmentJSON}
 
+    def updateSegment(self, segmentID=None, segmentJSON=None):
+        return {"id": segmentID, **segmentJSON}
+
     def createCalculatedMetricValidate(self, metricJSON=None):
         return {"valid": True, "metric": metricJSON}
 
     def createCalculatedMetric(self, metricJSON=None):
         return {"id": "cm_new", **metricJSON}
 
+    def updateCalculatedMetric(self, calcID=None, calcJSON=None):
+        return {"id": calcID, **calcJSON}
+
     def createDateRange(self, dateRangeJSON=None):
         return {"id": "dr_new", **dateRangeJSON}
+
+    def updateDateRange(self, dateRangeID=None, dateRangeJSON=None):
+        return {"id": dateRangeID, **dateRangeJSON}
 
     def updateProject(self, projectId=None, projectObj=None):
         return {"id": projectId, **projectObj}
@@ -240,6 +249,14 @@ def test_create_segment_passes_definition_through():
     assert result["name"] == "Mobile visitors"
 
 
+def test_update_segment_passes_id_and_definition_through():
+    mcp = _server()
+    segment = {"name": "Mobile visitors v2", "rsid": "rs1", "definition": {"container": {}}}
+    result = _call(mcp, "update_segment", {"segment_id": "s1", "segment": segment})
+    assert result["id"] == "s1"
+    assert result["name"] == "Mobile visitors v2"
+
+
 def test_validate_segment_returns_api_result():
     mcp = _server()
     segment = {"name": "Mobile visitors", "rsid": "rs1", "definition": {"container": {}}}
@@ -255,6 +272,14 @@ def test_create_calculated_metric_passes_definition_through():
     assert result["name"] == "Bounce rate"
 
 
+def test_update_calculated_metric_passes_id_and_definition_through():
+    mcp = _server()
+    metric = {"name": "Bounce rate v2", "rsid": "rs1", "definition": {"func": "divide"}}
+    result = _call(mcp, "update_calculated_metric", {"calculated_metric_id": "cm1", "calculated_metric": metric})
+    assert result["id"] == "cm1"
+    assert result["name"] == "Bounce rate v2"
+
+
 def test_validate_calculated_metric_returns_api_result():
     mcp = _server()
     metric = {"name": "Bounce rate", "rsid": "rs1", "definition": {"func": "divide"}}
@@ -268,3 +293,11 @@ def test_create_date_range_passes_definition_through():
     result = _call(mcp, "create_date_range", {"date_range": date_range})
     assert result["id"] == "dr_new"
     assert result["name"] == "Last quarter"
+
+
+def test_update_date_range_passes_id_and_definition_through():
+    mcp = _server()
+    date_range = {"name": "Last quarter v2", "definition": {"dateRangeType": "Fixed"}}
+    result = _call(mcp, "update_date_range", {"date_range_id": "dr1", "date_range": date_range})
+    assert result["id"] == "dr1"
+    assert result["name"] == "Last quarter v2"
