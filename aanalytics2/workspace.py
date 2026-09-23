@@ -44,8 +44,12 @@ class Workspace:
         """
         for filter in dataRequest["globalFilters"]:
             if filter["type"] == "dateRange":
-                self.startDate = filter["dateRange"].split("/")[0]
-                self.endDate = filter["dateRange"].split("/")[1]
+                if "dateRangeId" not in filter.keys():
+                    self.startDate = filter["dateRange"].split("/")[0]
+                    self.endDate = filter["dateRange"].split("/")[1]
+                else:
+                    self.startDate = filter["dateRangeId"]
+                    self.endDate = filter["dateRangeId"]
         self.dataRequest = RequestCreator(dataRequest)
         self.requestSize = dataRequest.get("settings", {}).get("limit")
         self.settings = dataRequest.get("settings", {})

@@ -4582,24 +4582,32 @@ class Analytics:
         """
         dataRows = []
         ## retrieve StaticRow ID and segmentID
-        if len([metric for metric in dataRequest['metricContainer'].get('metricFilters', []) if
-                metric.get('id', '').startswith("STATIC_ROW_COMPONENT")]) > 0:
-            if "dateRange" in list(dataRequest['metricContainer'].get('metricFilters', [])[0].keys()):
-                tableSegmentsRows = {
-                    obj["id"]: obj["dateRange"]
-                    for obj in dataRequest["metricContainer"]["metricFilters"]
-                    if obj["id"].startswith("STATIC_ROW_COMPONENT")
-                }
-            elif "segmentId" in list(dataRequest['metricContainer'].get('metricFilters', [])[0].keys()):
-                tableSegmentsRows = {
-                    obj["id"]: obj["segmentId"]
-                    for obj in dataRequest["metricContainer"]["metricFilters"]
-                    if obj["id"].startswith("STATIC_ROW_COMPONENT")
-                }
+        metric_filters = dataRequest["metricContainer"].get("metricFilters", [])
+        static_row_filters = [
+            metric_filter
+            for metric_filter in metric_filters
+            if metric_filter.get("id", "").startswith("STATIC_ROW_COMPONENT")
+        ]
+
+        if static_row_filters:
+            tableSegmentsRows = {}
+            for metric_filter in static_row_filters:
+                if "dateRange" in metric_filter:
+                    value = metric_filter["dateRange"]
+                elif "dateRangeId" in metric_filter:
+                    value = metric_filter["dateRangeId"]
+                elif "segmentId" in metric_filter:
+                    value = metric_filter["segmentId"]
+                else:
+                    raise ValueError(
+                        f"Unsupported static-row filter: {metric_filter!r}"
+                    )
+
+                tableSegmentsRows[metric_filter["id"]] = value
         else:
             tableSegmentsRows = {
-                obj["id"]: obj["segmentId"]
-                for obj in dataRequest["metricContainer"]["metricFilters"]
+                metric_filter["id"]: metric_filter["segmentId"]
+                for metric_filter in metric_filters
             }
         ## retrieve place and segmentID
         segmentApplied = {}
@@ -4610,7 +4618,7 @@ class Analytics:
                 elif obj["type"] == "segment":
                     segmentApplied[obj["id"]] = obj["segmentId"]
                 elif obj["type"] == "dateRange":
-                    segmentApplied[obj["id"]] = obj["dateRange"]
+                    segmentApplied[obj["id"]] = obj.get("dateRange", obj.get("dateRangeId"))
         ### table columnIds and StaticRow IDs
         tableColumnIds = {
             obj["columnId"]: obj["filters"][0]
@@ -4630,7 +4638,7 @@ class Analytics:
         staticRows = set(val for val in tableSegmentsRows.values())
         staticRowsNames = []
         for row in staticRows:
-            if row.startswith("s") in row and row[1].isdigit():
+            if (isinstance(row, str) and len(row) > 1 and row.startswith("s") and row[1].isdigit()):
                 filter = self.Segment(row)
                 staticRowsNames.append(filter["name"])
             else:
@@ -4804,7 +4812,7 @@ class Analytics:
                     filterValue = f"{filter['dimension']}:{filter['itemId']}"
                     metricFilters[filter["dimension"]] = filter["itemId"]
                 elif filter["type"] == "dateRange":
-                    filterValue = f"{filter['dateRange']}"
+                    filterValue = f"{filter['dateRange'] if 'dateRange' in filter.keys() else filter['dateRangeId']}"
                     metricFilters[filterValue] = filterValue
                 elif filter["type"] == "segment":
                     filterValue = f"{filter['segmentId']}"

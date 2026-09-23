@@ -91,6 +91,11 @@ class KnowledgeGraph:
             self.namespaces[f"{rsid}/dimensions"] = Namespace(f"http://analytics.com/{self.companyId}/{rsid}/dimension#")
             self.namespaces[f"{rsid}/metrics"] = Namespace(f"http://analytics.com/{self.companyId}/{rsid}/metric#")
 
+    @staticmethod
+    def _normalize_dimension_id(dimension_id: str) -> str:
+        """Remove a specific dimension item value from a dimension ID."""
+        return dimension_id.partition("::")[0]
+
     def loadProjects(self, projects: list|int|str,sampleMethod:str='most_recent',**kwargs):
         """
         Load a list of projects to the knowledge graph. 
@@ -186,18 +191,19 @@ class KnowledgeGraph:
                 graph.add((self.namespaces['reportSuites'][rsid], self.namespaces['reportSuites'].id, Literal(row['rsid'],datatype=XSD.string)))
                 graph.add((self.namespaces['reportSuites'][rsid], self.namespaces['reportSuites'].currency, Literal(row['currency'])))
         def build_dimension_graph(graph, dimension,rsid):
-            dimension_uri = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/dimension/{dimension['id']}")
+            dimension_id = self._normalize_dimension_id(dimension['id'])
+            dimension_uri = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/dimension/{dimension_id}")
             graph.add((dimension_uri, RDF.type, Literal("Dimension")))
             graph.add((dimension_uri, self.namespaces['dimensions'].dataType, Literal(dimension['type'])))
             graph.add((dimension_uri, RDFS.label, Literal(dimension['name'])))
-            if '.' in dimension['id']:
+            if '.' in dimension_id:
                 graph.add((dimension_uri, self.namespaces['dimensions'].classification, Literal(True,datatype=XSD.boolean)))
-                parentRef = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/dimension/{dimension['id'].split('.')[0]}")
+                parentRef = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/dimension/{dimension_id.split('.')[0]}")
                 graph.add((dimension_uri, self.namespaces['dimensions'].parent_dimension, parentRef))
                 graph.add((parentRef, self.namespaces['dimensions'].children_dimension, dimension_uri))
             else:
                 graph.add((dimension_uri, self.namespaces['dimensions'].classification, Literal(False,datatype=XSD.boolean)))
-            graph.add((dimension_uri, self.namespaces['dimensions'].id, Literal(dimension['id'])))
+            graph.add((dimension_uri, self.namespaces['dimensions'].id, Literal(dimension_id)))
             if 'description' in dimension:
                 graph.add((dimension_uri, RDFS.comment, Literal(dimension['description'])))
             for reportable in dimension['reportable']:
@@ -268,7 +274,8 @@ class KnowledgeGraph:
             scannedSegment = self.analyticsAPI.scanSegment(segment)
             segRsid = scannedSegment['rsid']
             for dim in scannedSegment['dimensions']:
-                dimRef = URIRef(f"http://analytics.com/{self.companyId}/{segRsid}/dimension/{dim}")
+                dimension_id = self._normalize_dimension_id(dim)
+                dimRef = URIRef(f"http://analytics.com/{self.companyId}/{segRsid}/dimension/{dimension_id}")
                 bump_usage(usage, dimRef, 'segmentUsage')
             for met in scannedSegment['metrics']:
                 metRef = URIRef(f"http://analytics.com/{self.companyId}/{segRsid}/metric/{met}")
@@ -323,7 +330,8 @@ class KnowledgeGraph:
         def register_element_components(graph, usage, dim_metric_cooc, dim_segment_cooc, element, project_ref, rsid):
             dimRefs, metricRefs, segRefs = [], [], []
             for dimension in element.dimensions:
-                dimRef = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/dimension/{dimension['id']}")
+                dimension_id = self._normalize_dimension_id(dimension['id'])
+                dimRef = URIRef(f"http://analytics.com/{self.companyId}/{rsid}/dimension/{dimension_id}")
                 graph.add((dimRef, self.namespaces['projects'].dimension_ref,project_ref))
                 bump_usage(usage, dimRef, 'projectUsage')
                 dimRefs.append(dimRef)
