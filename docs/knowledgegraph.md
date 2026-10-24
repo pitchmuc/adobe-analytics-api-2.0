@@ -17,11 +17,14 @@ It relies on the `WorkspaceManager` class to parse Workspace project definitions
   - [What happens at instantiation](#what-happens-at-instantiation)
 - [Attributes](#attributes)
 - [Methods](#methods)
+  - [loadGraph](#loadgraph)
   - [loadProjects](#loadprojects)
   - [buildGraph](#buildgraph)
+  - [getUsageCounts](#getusagecounts)
   - [exportGraph](#exportgraph)
   - [query](#query)
 - [Complete Example](#complete-example)
+  - [Resume a saved graph](#resume-a-saved-graph)
 - [Ontology](#ontology)
   - [Namespaces](#namespaces)
   - [Node types](#node-types)
@@ -44,6 +47,11 @@ On top of these entities, `buildGraph` derives two kinds of relationships that a
 * **Co-occurrence** : which dimensions are used *together with* which metrics, and which dimensions are used *together with* which segments, inside the same Workspace visualization — with a count of how often that pairing occurs.
 
 The result is a `rdflib.Graph` that can be serialized to Turtle (`.ttl`) and queried with SPARQL, or explored with any RDF-compatible tool. The full node/predicate vocabulary is described in [Ontology](#ontology).
+
+Use [loadGraph](#loadgraph) to restore a saved snapshot, then
+[buildGraph](#buildgraph) with `incremental=True` to add new projects without rebuilding
+its components. [getUsageCounts](#getusagecounts) exposes the stored usage counters as
+Python dictionaries.
 
 ## Importing the module
 
@@ -69,6 +77,7 @@ kg_all = KnowledgeGraph(config=cfg, rsids="all")
 
 # Restrict to specific report suites
 kg_some = KnowledgeGraph(config=cfg, rsids=["rsid_a", "rsid_b"])
+
 ```
 
 Arguments:
@@ -80,6 +89,11 @@ Arguments:
   * `str` : a single report suite ID.
   * `list` : an explicit list of report suite IDs.
 * filterDims : OPTIONAL : If set to `True` (default), entry/exit dimensions (`/entry`, `/exit`) are excluded and only Oberon-reportable dimensions are kept.
+
+The proxy is always inherited from the configuration; there is no Knowledge Graph
+proxy override. Set `cfg.config["proxy"]` to a proxy URL or a mapping such as
+`{"http": "...", "https": "..."}`. The resolved login configuration is reused for
+the Analytics connection, including scan requests and OAuth token refreshes.
 
 ### What happens at instantiation
 
@@ -105,10 +119,66 @@ Once instantiated, the `KnowledgeGraph` object exposes the following attributes:
 * `kg.projects` : raw list of project stubs (`id`, `name`, `rsid`, `modified`, …) — not full definitions. Use `loadProjects` to fetch full definitions.
 * `kg.annotations` : raw list of annotations.
 * `kg.namespaces` : `dict` of `rdflib.Namespace` objects, one per entity type (`"segments"`, `"metrics"`, `"reportSuites"`, `"usage"`, …), plus one `"{rsid}/dimensions"` / `"{rsid}/metrics"` pair per report suite. See [Namespaces](#namespaces).
-* `kg.project_details` : populated by `loadProjects` — list of `WorkspaceManager` instances, one per loaded project.
-* `kg.graph` : populated by `buildGraph` — the resulting `rdflib.Graph`.
+* `kg.project_details` : initially empty list of `WorkspaceManager` instances.
+  Each `loadProjects` call appends its results without replacing previously loaded details.
+* `kg.graph` : an initially empty `rdflib.Graph`, populated by `loadGraph` or `buildGraph`.
+* `kg.entity_usage` : a Python dictionary mapping entity `URIRef` objects to their
+  integer `segmentUsage`, `metricUsage`, and `projectUsage` counters.
+* `kg.dim_metric_cooccurrence` / `kg.dim_segment_cooccurrence` : Python dictionaries
+  mapping `(dimension_uri, metric_or_segment_uri, report_suite_uri)` tuples to integer counts.
+
+The three counter dictionaries are per-instance, initially empty, restored by `loadGraph`,
+and synchronized after builds. They are snapshots, not setters for the RDF graph. If a
+loaded graph contains invalid or ambiguous counters, including after an explicit merge,
+a warning is logged and these attributes become `None`. Incremental builds validate the
+RDF counters again and reject invalid data rather than guess the counts. A clean full
+build restores the dictionaries.
 
 ## Methods
+
+### loadGraph
+
+Load an existing local Turtle (`.ttl`) file into `kg.graph`, ready to query, edit, export,
+or extend with `buildGraph`.
+
+```py
+kg = KnowledgeGraph(config=cfg, rsids=["rsid_a"])
+graph = kg.loadGraph("previous_graph.ttl")
+
+# Reuse its components and add only new projects, saving a separate snapshot
+kg.loadProjects(["new_project_id"])
+graph = kg.buildGraph(incremental=True, save=True, filename="extended_graph.ttl")
+
+# Loading another snapshot replaces the graph and counter state by default
+kg.loadGraph("another_graph.ttl")
+
+# Explicitly combine triples from a separate file with the current graph
+kg.loadGraph("additional_graph.ttl", merge=True)
+```
+
+Arguments:
+* filename : REQUIRED : Path to an existing local Turtle file (`str` or `pathlib.Path`).
+  Relative paths are resolved from the current working directory; no extension is appended.
+* merge : OPTIONAL : Whether to combine the file's triples with the current graph
+  (bool : default `False`). By default, replace the current graph and counter state.
+
+Returns the loaded or merged `rdflib.Graph`, also stored on `kg.graph`. Namespace
+bindings from the Turtle file are retained. Missing/unreadable files and invalid Turtle
+raise their original exceptions (such as `FileNotFoundError` or a Turtle parser error)
+without changing the current graph or counter dictionaries.
+
+Usage and co-occurrence counters are reconstructed as Python dictionaries, including
+counts from projects whose definitions have not been loaded in this Python session.
+Loading does not repopulate the Analytics metadata attributes or restore
+`WorkspaceManager` instances. Use the same company and report suite scope as the saved
+graph when you intend to extend it.
+Instantiation still connects to Adobe Analytics as described above; `loadGraph` itself
+makes no Analytics API calls.
+
+When `merge=True`, identical triples are deduplicated, but conflicting numeric values or
+duplicate co-occurrence records are not guessed or summed. Such graphs remain loadable,
+with a warning and unavailable counter dictionaries, but cannot be incrementally updated
+until the counters are corrected or rebuilt.
 
 ### loadProjects
 
@@ -125,6 +195,9 @@ kg.loadProjects(20, sampleMethod='random')
 # Load specific projects by ID
 kg.loadProjects(['5f9...abc', '5f9...def'])
 
+# Load projects whose owner login contains either value (case-insensitive)
+kg.loadProjects(['analyst@example.com', 'reporting-team'], sampleMethod='users')
+
 # Load every project in the company (can take a long time)
 kg.loadProjects('all')
 ```
@@ -132,13 +205,24 @@ kg.loadProjects('all')
 Arguments:
 * projects : REQUIRED : Which projects to load.
   * `int` : number of projects to load, selected via `sampleMethod`.
-  * `list` : explicit list of project IDs.
+  * `list` : explicit list of project IDs, or owner login filters when `sampleMethod='users'`.
   * `"all"` : every project in the company. This fetches each project definition individually and can take a large amount of time on big accounts.
-* sampleMethod : OPTIONAL : Used only when `projects` is an `int`. (str : default `'most_recent'`)
-  * `'most_recent'` : the most recently modified projects.
-  * `'random'` : a random sample of projects.
+* sampleMethod : OPTIONAL : How to select projects. (str : default `'most_recent'`)
+  * `'most_recent'` : the most recently modified projects, when `projects` is an `int`.
+  * `'random'` : a random sample of projects, when `projects` is an `int`.
+  * `'users'` : match a list of values against project owner logins using
+    case-insensitive substring matching.
 
 Project definitions are fetched concurrently (`ThreadPoolExecutor`, up to 6 workers) and stored as `WorkspaceManager` instances in `kg.project_details`.
+
+Returns `None`. Repeated calls append project details and leave the complete
+`kg.projects` catalogue intact, so you can load additional batches later. Previously
+loaded IDs are not skipped during fetching. Avoid loading the same project more than
+once before a full build, which counts every entry in `kg.project_details`; incremental
+builds deduplicate project IDs.
+
+Loading projects does not update the RDF graph. Call `buildGraph(incremental=True)` to
+incorporate only projects not already registered in its counter snapshot.
 
 ### buildGraph
 
@@ -152,16 +236,74 @@ graph = kg.buildGraph(save=True, filename='my_graph.ttl')
 
 # Print progress while building
 graph = kg.buildGraph(verbose=True)
+
+# Discard any loaded or previously built graph and rebuild from scratch
+graph = kg.buildGraph(merge=False)
+
+# Reuse a loaded or previously built component graph, processing only new projects
+graph = kg.buildGraph(incremental=True, save=True, filename='new_snapshot.ttl')
 ```
 
 Arguments:
 * save : OPTIONAL : If set to `True`, serializes the graph to a Turtle file. (bool : default `False`)
 * filename : OPTIONAL : Filename used when `save=True`. A `.ttl` extension is appended automatically if missing. (str : default `'knowledge_graph.ttl'`)
 * verbose : OPTIONAL : If set to `True`, prints progress statements while the graph is being built.
+* merge : OPTIONAL : Retain existing metadata and add the newly built data (`True`, the default).
+  Generated counters are replaced during a full build, even with `merge=True`.
+  Set to `False` to discard the entire current graph before building.
+* incremental : OPTIONAL : Reuse existing components and process only new projects
+  (`False`, the default). Requires a non-empty graph and `merge=True`; incompatible
+  combinations raise `ValueError`.
+* calculatedMetricWorkers : OPTIONAL : Keyword argument controlling the number of
+  concurrent calculated-metric scan workers (int : default `10`). Applies only to
+  full builds; incremental builds do not perform these scans.
 
 Returns the built `rdflib.Graph`, also stored on `kg.graph`.
 
-What gets added to the graph:
+**Full builds** compute a fresh counter snapshot from the current Analytics data and
+`kg.project_details`. Old usage values, co-occurrence records and direct co-occurrence
+links are replaced, rather than retaining obsolete values alongside new ones. Project
+registrations are reset to the projects included in that computation. Other metadata
+is retained when `merge=True`. Load all desired projects before a full build, or use
+incremental mode to preserve contributions from projects already in a saved snapshot.
+
+**Incremental builds** skip dimension, metric, marketing-channel, segment,
+calculated-metric and date-range construction, including segment/calculated-metric scans.
+Only newly loaded projects are processed. Persisted project registrations identify
+projects already counted, including after a Turtle round trip; repeated project IDs in
+the same batch are also counted once. An existing project's changed definition is not
+refreshed in this mode; use a full build with all desired projects to refresh it.
+
+Stored counters are read and validated as Python integers before adding projects.
+New `projectUsage` contributions are added to their existing totals, while
+`segmentUsage` and `metricUsage` remain unchanged. Co-occurrence counts are incremented
+on the existing node for the same dimension/component/report-suite tuple, or a new node
+is created for a new pairing. Each counter has one current numeric value in the output.
+The instance counter dictionaries are updated alongside the graph. Direct RDF edits are
+reread on each incremental build so stale Python snapshots cannot corrupt the totals.
+
+Negative/non-integer counts, multiple values for one counter, malformed co-occurrence
+records and duplicate records for the same pairing raise `ValueError` before new projects
+are added. Missing usage fields count as zero. Counter validation does not repair ambiguous
+historical merges automatically; a full build can recompute a clean snapshot.
+
+Saving to a different filename leaves the original Turtle snapshot unchanged.
+Incremental mode speeds up graph construction, not instantiation: the initial Analytics
+metadata fetches still take place.
+
+If a segment or calculated-metric scan raises a Requests connection error (including proxy
+and TLS errors) or timeout, graph construction continues with the remaining components.
+A warning from the `aanalytics2.knowledgegraph` logger identifies the failed component and
+error type, even when `verbose=False`. Its metadata is retained, but usage counts from that
+scan are omitted, so aggregate usage counts may be incomplete. Other exceptions still
+propagate, as do network errors during initial data loading or project loading.
+
+Segment definitions supplied as dictionaries are scanned locally. Calculated-metric scans
+reuse the already-loaded segments and only fetch a referenced segment when it is absent
+or its definition is missing; these fallback requests use the same Analytics connection
+and proxy as other API calls.
+
+What gets added during a full build (incremental builds add only new project data and counters):
 * One node per **ReportSuite**, **Dimension**, **Metric**, **MarketingChannel**, **Segment**, **CalculatedMetric**, and **DateRange**, each carrying its own properties (`RDFS.label`, `id`, `type`, `reportable`, `segmentable`, tags, share counts, last-access timestamps, …) under its entity namespace (`kg.namespaces[...]`).
 * Classification dimensions (IDs containing `.`) are linked to their parent via `parent_dimension` / `children_dimension` predicates.
 * Every `Segment` and `CalculatedMetric` is scanned (`scanSegment` / `scanCalculatedMetric`) to increment `usage.segmentUsage` / `usage.metricUsage` on every dimension/metric/report suite it references.
@@ -170,9 +312,39 @@ What gets added to the graph:
 
 The full list of node types and predicates produced here is detailed in [Ontology](#ontology).
 
+### getUsageCounts
+
+Read the RDF usage counters into a fresh Python dictionary, keyed by entity `URIRef`.
+Only stored usage fields are returned, and values are ordinary Python integers.
+This method takes no arguments and returns `dict[URIRef, dict[str, int]]`; the inner
+keys are `segmentUsage`, `metricUsage`, and `projectUsage`. Missing fields are omitted
+rather than filled with zero, and an empty graph returns `{}`.
+
+```py
+from rdflib import URIRef
+
+metric_uri = URIRef(
+    f"http://analytics.com/{kg.companyId}/{kg.rsids[0]}/metric/metrics/visits"
+)
+counts = kg.getUsageCounts()
+project_count = counts.get(metric_uri, {}).get("projectUsage", 0)
+
+# The instance also exposes the last loaded/built counter snapshots
+usage_counts = kg.entity_usage
+metric_pairs = kg.dim_metric_cooccurrence
+segment_pairs = kg.dim_segment_cooccurrence
+```
+
+Editing the returned dictionary does not modify the RDF graph or the instance counter
+snapshots. Each call rereads the RDF graph but does not synchronize those attributes.
+Negative or non-integer values (including booleans), multiple values for the same
+counter, and counters attached to something other than an entity URI raise `ValueError`.
+Co-occurrence counters are exposed through the instance dictionaries, not this method;
+they are validated when loading or incrementally building a graph.
+
 ### exportGraph
 
-Serialize the already-built graph (`kg.graph`) to a Turtle file. Use this when you want to save the graph separately from `buildGraph`, e.g. after running additional edits on `kg.graph`.
+Serialize the built or loaded graph (`kg.graph`) to a Turtle file. Use this when you want to save the graph separately from `buildGraph`, e.g. after running additional edits on `kg.graph`.
 
 ```py
 kg.exportGraph(filename='my_graph.ttl')
@@ -183,7 +355,7 @@ Arguments:
 
 ### query
 
-Run a SPARQL query against the graph built by `buildGraph()`.\
+Run a SPARQL query against the graph built by `buildGraph()` or loaded by `loadGraph()`.\
 Unlike calling `kg.graph.query(...)` directly, this returns a list of plain Python dictionaries (one per result row, values converted with `.toPython()`) instead of raw `rdflib` `Result` rows — easier to load straight into a `pandas.DataFrame`.
 
 ```py
@@ -239,6 +411,30 @@ for row in rows:
 # 6. Re-export the graph later without rebuilding it
 kg.exportGraph(filename='analytics_knowledge_graph_backup.ttl')
 ```
+
+### Resume a saved graph
+
+Continuing from the example above, create a new instance with the same company and
+report suite scope, then load the snapshot. Replace `new_project_id` with an actual
+project ID that was not already counted.
+
+```py
+resumed = KnowledgeGraph(config=cfg, companyId=kg.companyId, rsids=kg.rsids)
+graph = resumed.loadGraph('analytics_knowledge_graph.ttl')
+
+resumed.loadProjects(['new_project_id'])
+graph = resumed.buildGraph(
+    incremental=True,
+    save=True,
+    filename='analytics_knowledge_graph_extended.ttl',
+)
+counts = resumed.getUsageCounts()
+```
+
+The original file is unchanged. Saved usage and co-occurrence counts are retained,
+new project contributions are added once, and the extended graph can be queried or
+exported using the same methods as a freshly built graph. Instantiation still fetches
+Analytics metadata; incremental mode avoids rebuilding and rescanning the components.
 
 ## Ontology
 

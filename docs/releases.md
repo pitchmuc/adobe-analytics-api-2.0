@@ -3,17 +3,40 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
-## version 0.6.0
-* adding the `getMarketingChannels` method to retrieve the marketing channels for a specific report suite. [Documentation](./main.md#getMarketingChannels)
-* adding new class `WorkspaceManager` to create workspace projects from scratch with the API. [Documentation](./workspaceManager.md)
-* adding new methods for `WorkspaceManager` class:
-  * createProjectFromTemplate
-  * createProjectFromReport
-  * createProjectFromRequest
-  * createProjectFromDataFrame
-* Adding the `getTargetReport` method to be able to build confidence and significance report with calculated metrics from the API. [Documentation](./main.md#getTargetReport)\
-Patch: 
-* Fix the issue with project details not being properly loaded in the knowledge graph.
+## version 0.5.5
+* Migrate the MCP server from `FastMCP` to `MCPServer` and require `mcp>=2.0`. Expected tool errors now return actionable messages to the client.
+* Add MCP tools to update existing segments, calculated metrics, and date ranges: `update_segment`, `update_calculated_metric`, and `update_date_range`. [Documentation](./mcp_server.md#available-tools)
+* Add MCP lookup tools `find_segment` and `find_calculated_metric`. These search the local Knowledge Graph first and explicitly identify when results fall back to the live API.
+* Add the CLI command `create_report_request` to generate a report request JSON file, with optional dimension, metrics, segment, date range, and output filename. Omitted report components are selected from accessible report suite data. [Documentation](./cli.md#create_report_request)
+
+Patches:
+* Fix `Workspace` parsing of report requests that reference a saved date range via `dateRangeId`.
+* Normalize Knowledge Graph dimension IDs by removing item-specific `::` suffixes, so dimension metadata and usage references point to the same component.
+* Initialize Knowledge Graph project details even when `loadProjects` has not been called, allowing `buildGraph` to run without loading Workspace projects.
+* Add `KnowledgeGraph.loadGraph` to restore local Turtle snapshots, including namespace bindings and usage/co-occurrence counters. Loading replaces the current graph by default; `merge=True` explicitly combines graphs. File and parsing errors leave the current graph unchanged. [Documentation](./knowledgegraph.md#loadgraph)
+* Add `buildGraph(incremental=True)` to reuse an existing component graph and add only newly loaded Workspace projects, without rescanning segments or calculated metrics. Previously counted project IDs are skipped, including after saving and reloading a Turtle snapshot. Use a full build to refresh an existing project's changed definition. [Documentation](./knowledgegraph.md#buildgraph)
+* Add `getUsageCounts` and per-instance `entity_usage`, `dim_metric_cooccurrence`, and `dim_segment_cooccurrence` dictionaries to inspect counters as Python integers. The dictionaries are restored on load and synchronized after builds; editing them does not change the RDF graph. [Documentation](./knowledgegraph.md#getusagecounts)
+* Validate stored usage and co-occurrence counters before incremental updates, rejecting negative, non-integer, conflicting, or malformed values and duplicate co-occurrence records. Loading a graph with invalid counters logs a warning and leaves the counter dictionaries unavailable until the data is corrected or rebuilt.
+* Preserve existing Knowledge Graph metadata during full builds by default, while replacing generated usage counters, co-occurrence records, and project registrations with a fresh snapshot to avoid stale or duplicate counts. Use `buildGraph(merge=False)` to rebuild the entire graph from scratch.
+* Allow repeated `loadProjects` calls to accumulate project details without narrowing the available project catalogue. Match project-owner filters case-insensitively. [Documentation](./knowledgegraph.md#loadprojects)
+* Reuse the resolved login configuration for Knowledge Graph connections, including the proxy configured in that configuration. Continue building after scan connection errors or timeouts, retaining component metadata and warning that usage counts are incomplete.
+
+## version 0.5.4
+* Add `getMarketingChannels` to retrieve marketing channel configurations for one or more report suites. [Documentation](./main.md#getMarketingChannels)
+* Replace the earlier Workspace creator with the `workspaceManager` module and its `WorkspaceManager`, `TextBuilder`, `FreeForm`, and `Panel` classes. Build and parse Workspace projects with panels, rich text, freeform tables, metric filters, breakdowns, segment filters, dropdowns, summary numbers, and charts. [Documentation](./workspaceManager.md)
+* Add the interactive `aanalytics2` CLI, including non-interactive commands, CSV exports, and a `RequestCreator` sub-shell for building and running reports. [Documentation](./cli.md)
+* Add the `KnowledgeGraph` class to build RDF graphs of report suites and components, track usage and co-occurrence, export Turtle files, and query with SPARQL. Workspace project loading is optional. [Documentation](./knowledgegraph.md)
+* Add the `aanalytics2-mcp` server with tools for component discovery, reporting, Workspace creation, and optional Knowledge Graph queries, plus an ontology resource for MCP clients. [Documentation](./mcp_server.md)
+* Add `format="raw"` support to `getDimensions` and `getDateRanges`, and allow `scanCalculatedMetric` to reuse segment definitions through `knownSegments`.
+* Extend `RequestCreator.setDateRange` to support saved date range IDs and named date presets.\
+Patches:
+* Fix MCP connection startup and remove obsolete JWT configuration references.
+* Respect the company ID in the configuration file when starting the MCP server, unless explicitly overridden.
+* Fix parsing of existing Workspace/freeform data and add the MCP `update_workspace` tool to save changes to an existing project.
+* Add MCP tools to list classification datasets and retrieve dataset metadata.
+* Add `shares` to `getSegment` extended information, and MCP tools to validate/create segments and calculated metrics and create saved date ranges.
+* Fix Workspace breakdown creation through MCP by resolving actual row item IDs.
+* Add optional proxy support for API requests and OAuth token generation, configurable through the library and CLI.
 
 
 ## version 0.5.3 
