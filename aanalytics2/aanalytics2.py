@@ -224,6 +224,7 @@ class Analytics:
             logger=self.logger,company_id=company_id, proxy=proxy)
         self.header = self.connector.header
         self.endpoint_company = f"{self._endpoint}/{company_id}"
+        self.schedulerEndpoint = None  # resolved lazily via _getSchedulerEndpoint()
         self.company_id = company_id
         self.proxy = self.connector.proxies
         self.listProjectIds = []
@@ -1612,6 +1613,33 @@ class Analytics:
         res = self.connector.putData(self.endpoint_company + path, data=data, headers=self.header)
         return res
 
+    def _getSchedulerEndpoint(self) -> str:
+        """
+        Return the base URL of the Scheduler API (scheduled projects and delivery settings).
+        Adobe retired the former endpoint (https://analytics.adobe.io/api/{companyId}/scheduler/scheduler/...),
+        which now returns 404. The replacement lives on the data processing center (DPC) specific host
+        https://analytics.{dpc}.appsvc.an.adobe.com/analytics/1.0/scheduler and accepts the same OAuth headers.
+        The DPC of the company (e.g. "lon", "pnw", "sin") is read once from the discovery endpoint and cached.
+        You can override the endpoint by setting the `schedulerEndpoint` attribute.
+        """
+        if self.schedulerEndpoint is not None:
+            return self.schedulerEndpoint
+        res = self.connector.getData("https://analytics.adobe.io/discovery/me", headers=self.header)
+        dpc = None
+        for org in res.get("imsOrgs", []) if isinstance(res, dict) else []:
+            for company in org.get("companies", []):
+                if company.get("globalCompanyId") == self.company_id:
+                    dpc = company.get("dpc")
+        if dpc is None:
+            if self.loggingEnabled:
+                self.logger.error(f"Could not find DPC for company {self.company_id}: {res}")
+            raise Exception(f"Could not determine the data processing center (dpc) of company {self.company_id} "
+                            f"via the discovery endpoint. Set the `schedulerEndpoint` attribute manually.")
+        self.schedulerEndpoint = f"https://analytics.{dpc}.appsvc.an.adobe.com/analytics/1.0/scheduler"
+        if self.loggingEnabled:
+            self.logger.debug(f"Scheduler endpoint resolved to {self.schedulerEndpoint}")
+        return self.schedulerEndpoint
+
     def getScheduledJobs(self, includeType: str = "all", full: bool = True, limit: int = 1000, format: str = "df",
                          verbose: bool = False) -> JsonListOrDataFrameType:
         """
@@ -1636,10 +1664,10 @@ class Analytics:
         if full is True:
             params[
                 "expansion"] = "ownerFullName,groups,tags,sharesFullName,modified,favorite,approved,scheduledItemName,scheduledUsersFullNames,deletedReason"
-        path = "/scheduler/scheduler/scheduledjobs/"
+        path = "/scheduledjobs/"
         if verbose:
             print(f"Getting Scheduled Jobs with Parameters {params}")
-        res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
+        res = self.connector.getData(self._getSchedulerEndpoint() + path, params=params, headers=self.header)
         if res.get("content") is None:
             raise Exception(f"Scheduled Job had no content in response. Parameters were: {params}")
         # get Scheduled Jobs data into Data Frame
@@ -1654,7 +1682,7 @@ class Analytics:
             if verbose:
                 print(f"last_page is {last_page}, next round")
             params["page"] += 1
-            res = self.connector.getData(self.endpoint_company + path, params=params, headers=self.header)
+            res = self.connector.getData(self._getSchedulerEndpoint() + path, params=params, headers=self.header)
             data += res.get("content")
             last_page = res.get("lastPage", True)
         if format == "df":
@@ -1672,10 +1700,10 @@ class Analytics:
             raise ValueError("A schedule ID is required")
         if self.loggingEnabled:
             self.logger.debug(f"starting getScheduledJob with ID: {scheduleId}")
-        path = f"/scheduler/scheduler/scheduledjobs/{scheduleId}"
+        path = f"/scheduledjobs/{scheduleId}"
         params = {
             'expansion': 'modified,favorite,approved,tags,shares,sharesFullName,reportSuiteName,schedule,triggerObject,tasks,deliverySetting'}
-        res = self.connector.getData(self.endpoint_company + path, params=params)
+        res = self.connector.getData(self._getSchedulerEndpoint() + path, params=params)
         return res
 
     def createScheduledJob(self, projectId: str = None, type: str = "pdf", schedule: dict = None, loginIds: list = None,
@@ -1717,7 +1745,7 @@ class Analytics:
         """
         if self.loggingEnabled:
             self.logger.debug(f"starting createScheduleJob")
-        path = f"/scheduler/scheduler/scheduledjobs/"
+        path = f"/scheduledjobs/"
         dateNow = datetime.datetime.now()
         nowDateTime = datetime.datetime.isoformat(dateNow, timespec='seconds')
         futureDate = datetime.datetime.isoformat(dateNow.replace(dateNow.year + 1), timespec='seconds')
@@ -1773,7 +1801,7 @@ class Analytics:
         }
         if width is not None and width >= 800:
             data['tasks'][0]['requestParams']['width'] = width
-        res = self.connector.postData(self.endpoint_company + path, data=data)
+        res = self.connector.postData(self._getSchedulerEndpoint() + path, data=data)
         return res
 
     def updateScheduledJob(self, scheduleId: str = None, scheduleObj: dict = None) -> dict:
@@ -1789,8 +1817,8 @@ class Analytics:
             raise ValueError('A schedule Object is required')
         if self.loggingEnabled:
             self.logger.debug(f"starting updateScheduleJob with ID: {scheduleId}")
-        path = f"/scheduler/scheduler/scheduledjobs/{scheduleId}"
-        res = self.connector.putData(self.endpoint_company + path, data=scheduleObj)
+        path = f"/scheduledjobs/{scheduleId}"
+        res = self.connector.putData(self._getSchedulerEndpoint() + path, data=scheduleObj)
         return res
 
     def deleteScheduledJob(self, scheduleId: str = None) -> dict:
@@ -1803,22 +1831,22 @@ class Analytics:
             raise Exception("A schedule ID is required for deletion")
         if self.loggingEnabled:
             self.logger.debug(f"starting deleteScheduleJob with ID: {scheduleId}")
-        path = f"/scheduler/scheduler/scheduledjobs/{scheduleId}"
-        res = self.connector.deleteData(self.endpoint_company + path)
+        path = f"/scheduledjobs/{scheduleId}"
+        res = self.connector.deleteData(self._getSchedulerEndpoint() + path)
         return res
 
     def getDeliverySettings(self) -> list:
         """
         Return a list of delivery settings.
         """
-        path = f"/scheduler/scheduler/deliverysettings/"
-        params = {'expansion': 'definition', "limit": 2000}
+        path = f"/deliverysettings/"
+        params = {'expansion': 'definition', "limit": 1000}  # the API caps page size at 1000
         lastPage = False
         page_nb = 0
         data = []
         while lastPage != True:
             params['page'] = page_nb
-            res = self.connector.getData(self.endpoint_company + path, params=params)
+            res = self.connector.getData(self._getSchedulerEndpoint() + path, params=params)
             data += res.get('content', [])
             if len(res.get('content', [])) == params["limit"]:
                 lastPage = False
@@ -1833,9 +1861,9 @@ class Analytics:
         Argument:
             deliverySettingId : REQUIRED : The delivery setting ID of the scheduled project.
         """
-        path = f"/scheduler/scheduler/deliverysettings/{deliverySettingId}/"
+        path = f"/deliverysettings/{deliverySettingId}/"
         params = {'expansion': 'definition'}
-        res = self.connector.getData(self.endpoint_company + path, params=params)
+        res = self.connector.getData(self._getSchedulerEndpoint() + path, params=params)
         return res
 
     def createDeliverySetting(self, loginIds: list = None, emails: list = None, groupIds: list = None) -> dict:
@@ -1847,7 +1875,7 @@ class Analytics:
             emails : OPTIONAL : In case the recipient are not in the analytics interface.
             groupIds : OPTIONAL : List of group ID to send the scheduled project to.
         """
-        path = f"/scheduler/scheduler/deliverysettings/"
+        path = f"/deliverysettings/"
         if loginIds is None:
             loginIds = []
         if emails is None:
@@ -1864,7 +1892,7 @@ class Analytics:
             },
             "name": "email-aanalytics2"
         }
-        res = self.connector.postData(self.endpoint_company + path, data=data)
+        res = self.connector.postData(self._getSchedulerEndpoint() + path, data=data)
         return res
 
     def updateDeliverySetting(self, deliveryId: str = None, loginIds: list = None, emails: list = None,
@@ -1880,7 +1908,7 @@ class Analytics:
         """
         if deliveryId is None:
             raise ValueError("Require a delivery setting ID")
-        path = f"/scheduler/scheduler/deliverysettings/{deliveryId}"
+        path = f"/deliverysettings/{deliveryId}"
         if loginIds is None:
             loginIds = []
         if emails is None:
@@ -1897,7 +1925,7 @@ class Analytics:
             },
             "name": "email-aanalytics2"
         }
-        res = self.connector.putData(self.endpoint_company + path, data=data)
+        res = self.connector.putData(self._getSchedulerEndpoint() + path, data=data)
         return res
 
     def deleteDeliverySetting(self, deliveryId: str = None) -> dict:
@@ -1908,8 +1936,8 @@ class Analytics:
         """
         if deliveryId is None:
             raise ValueError("Require a delivery setting ID")
-        path = f"/scheduler/scheduler/deliverysettings/{deliveryId}"
-        res = self.connector.deleteData(self.endpoint_company + path)
+        path = f"/deliverysettings/{deliveryId}"
+        res = self.connector.deleteData(self._getSchedulerEndpoint() + path)
         return res
 
     def getProjects(self, includeType: str = 'all', full: bool = False, expansion: str = None, limit: int = None,
