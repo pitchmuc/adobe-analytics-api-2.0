@@ -75,11 +75,15 @@ If `aanalytics2-mcp` isn't found (e.g. it's installed in a virtual environment y
 | `-cf`, `--config_file` | Path to the JSON config file. Default: `config_analytics.json` in the current directory. |
 | `-cid`, `--company_id` | Adobe Analytics `globalCompanyId`. Overrides the config file. Optional — resolved from the config file's `companyId`/`company_id` field if omitted (same field the CLI reads — see [cli.md](./cli.md)), or from the first company returned by the API if that field isn't set either. |
 | `-rsid`, `--report_suite_id` | Default report suite ID used by any tool call that omits `rsid`. Optional, but recommended — most Discovery/Reporting/KG tools need an rsid, and a session default lets the LLM skip re-specifying it every call. |
-| `-kg`, `--knowledge_graph` | Path to a local Knowledge Graph `.ttl` file. Enables the KG tool group. |
+| `-kg`, `--knowledge_graph` | Path to a local Knowledge Graph `.ttl` file. Enables the KG tool group when loaded. If the file does not exist, the server warns on stderr and starts without a Knowledge Graph. |
 | `-kg-endpoint`, `--kg_endpoint` | Remote SPARQL endpoint URL. **Not implemented yet** — the server exits with an error if you pass this today. |
 | `-kg-ontology`, `--kg_ontology` | Path to a markdown file describing a custom Knowledge Graph ontology. Overrides the built-in default (see [below](#knowledge-graph-ontology-resource)). |
 
 `-kg` and `-kg-endpoint` are mutually exclusive.
+
+When a `-kg` file is missing, non-KG tools remain available and `find_segment` /
+`find_calculated_metric` use the live API fallback. KG-only tools require restarting with
+an existing graph file. Invalid Turtle or permission errors still stop startup.
 
 Because your MCP client (Claude Desktop, VS Code, …) launches the server itself and does not run it from your project directory, **always pass an absolute path** to `-cf` and `-kg` in the client configs below — a relative path resolves against whatever the client's own working directory happens to be, not your project folder.
 
@@ -259,6 +263,17 @@ into `.mcp.json` (project scope) or your user-level Claude config (`claude mcp a
 `list_segments`/`list_calculated_metrics` always hit the live API and return everything that matches, which on large accounts (thousands of segments/calculated metrics) can be very large. For a single lookup by name and/or rsid, use `find_segment`/`find_calculated_metric` instead — they query the local Knowledge Graph first (loaded with `-kg`), which is much cheaper, and only fall back to a live API call when: no Knowledge Graph is connected; the Knowledge Graph has no match for the given name/rsid (it's a point-in-time snapshot, so it can miss anything created or renamed since it was last built); or the caller passes `force_live=True` to explicitly bypass it. Either way the result is capped by `limit` (default 20) to keep the response small. The result is always `{"source": "knowledge_graph" | "live_api", "note": str | None, "results": [...]}` — `note` explains *why* the tool fell back to the live API and is only set when `source` is `"live_api"`, so a caller can tell at a glance whether an answer is Knowledge-Graph-backed or not.
 
 Workspace-building tools are stateless: each one takes the project dict returned by the previous call and returns an updated one, so a typical session chains `create_workspace` → `add_panel` → `add_freeform` → `add_chart` → `publish_workspace`. Each tool's full parameter list is in its own docstring, visible to the client when it inspects the tool.
+
+`get_top_items` returns the dimension's display value alongside its Adobe `itemId`;
+the display value is not the numeric item ID. Knowledge Graph relationship tools
+return integer co-occurrence counts and preserve full component IDs such as
+`variables/page` and `metrics/visits`, so those IDs can be passed directly to the
+reporting tools. `get_component_context` returns the bare report suite ID for
+dimensions, metrics, segments, and calculated metrics.
+Adobe API responses containing `errorCode` or `error` are surfaced as MCP tool
+errors with the API's error description, rather than successful results or empty
+classification/report lists. Validation results such as `{"valid": false}` remain
+normal responses so callers can inspect definition errors.
 
 To edit an **existing** project instead of building a new one, start from `get_project` instead of `create_workspace`, chain the same `add_*` tools on the returned dict, then call `update_workspace` instead of `publish_workspace` — `update_workspace` requires the project dict to still carry its original `"id"` (present on anything returned by `get_project`) and saves in place rather than creating a duplicate.
 

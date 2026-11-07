@@ -41,6 +41,13 @@ Building the graph creates RDF entities (as `URIRef` nodes) for:
 * **Segment** / **CalculatedMetric** / **DateRange** — company-wide (not scoped to a single report suite).
 * **Workspace** — one per project loaded via `loadProjects`.
 
+Workspace entities include owner name/login, tag names, share-entry counts, and
+approval/company-template/organization-template flags when available. Empty owner
+and tag values are omitted; explicit `False` flags are retained. Full builds replace
+these fields for processed projects, while incremental builds only add new projects.
+Existing text, visualization and freeform summaries describe subpanel content, not
+top-level panel names and descriptions.
+
 On top of these entities, `buildGraph` derives two kinds of relationships that aren't available anywhere else in the API:
 
 * **Usage counts** : how many times each dimension, metric, segment, calculated metric, and report suite is referenced across segments, calculated metrics, and loaded Workspace projects (`segmentUsage`, `metricUsage`, `projectUsage`).
@@ -214,6 +221,8 @@ Arguments:
     case-insensitive substring matching.
 
 Project definitions are fetched concurrently (`ThreadPoolExecutor`, up to 6 workers) and stored as `WorkspaceManager` instances in `kg.project_details`.
+Full project JSON is not stored in the RDF graph; builds retain freeform summaries
+and component relationships instead.
 
 Returns `None`. Repeated calls append project details and leave the complete
 `kg.projects` catalogue intact, so you can load additional batches later. Previously
@@ -274,6 +283,23 @@ projects already counted, including after a Turtle round trip; repeated project 
 the same batch are also counted once. An existing project's changed definition is not
 refreshed in this mode; use a full build with all desired projects to refresh it.
 
+Both modes retain `proj:panelFreeForm` titles/descriptions and record the components
+used across every parsed freeform and visualization, including nested breakdowns.
+Projects have outgoing `proj:dimensions`, `proj:metrics`, `proj:calculatedMetrics` and
+`proj:segments` links; component-to-project backlinks are retained as well. These
+links are a project-wide union, not per-freeform pairings. Co-occurrence counts still
+come from individual elements, rather than pairing components across separate tables.
+Newly processed projects also have a `proj:id`.
+
+On each build, outgoing links are derived from component backlinks, including those
+already in a loaded graph. This makes dimensions, metrics and calculated metrics
+visible directly on previously counted projects without fetching them again or
+changing counters. Older snapshots did not store segment backlinks; a full build
+with all desired projects is needed to populate those missing segment links. Missing
+summaries or component backlinks cannot be recovered from aggregate counters alone.
+Full project JSON is not serialized, and any `proj:definition` payloads retained from
+earlier builds are removed when building.
+
 Stored counters are read and validated as Python integers before adding projects.
 New `projectUsage` contributions are added to their existing totals, while
 `segmentUsage` and `metricUsage` remain unchanged. Co-occurrence counts are incremented
@@ -307,7 +333,7 @@ What gets added during a full build (incremental builds add only new project dat
 * One node per **ReportSuite**, **Dimension**, **Metric**, **MarketingChannel**, **Segment**, **CalculatedMetric**, and **DateRange**, each carrying its own properties (`RDFS.label`, `id`, `type`, `reportable`, `segmentable`, tags, share counts, last-access timestamps, …) under its entity namespace (`kg.namespaces[...]`).
 * Classification dimensions (IDs containing `.`) are linked to their parent via `parent_dimension` / `children_dimension` predicates.
 * Every `Segment` and `CalculatedMetric` is scanned (`scanSegment` / `scanCalculatedMetric`) to increment `usage.segmentUsage` / `usage.metricUsage` on every dimension/metric/report suite it references.
-* One **Workspace** node per project in `kg.project_details` (populated by `loadProjects`), linked to its report suite, with each panel's text, freeform table, and visualization content attached, and every dimension/metric/calculated-metric/segment it uses incrementing `usage.projectUsage`.
+* One **Workspace** node per project in `kg.project_details` (populated by `loadProjects`), with its ID, report-suite link, panel text and freeform/visualization summaries. Outgoing component links and component backlinks identify every dimension/metric/calculated-metric/segment used across its parsed elements; each reference increments `usage.projectUsage`.
 * **Co-occurrence** blank nodes: a `MetricCooccurrence` node for every (dimension, metric) pair found together in the same Workspace visualization, and a `SegmentCooccurrence` node for every (dimension, segment) pair — each carrying a `cooccurrenceCount` and the `rsid` it was observed on. The dimension and metric/segment nodes are additionally linked directly via `usedWithMetric` / `usedWithDimension` and `usedWithSegment` / `usedWithDimension` predicates.
 
 The full list of node types and predicates produced here is detailed in [Ontology](#ontology).
@@ -429,6 +455,17 @@ graph = resumed.buildGraph(
     filename='analytics_knowledge_graph_extended.ttl',
 )
 counts = resumed.getUsageCounts()
+
+# Inspect components used by projects, without storing their full JSON
+rows = resumed.query(f"""
+    PREFIX proj: <{resumed.namespaces['projects']}>
+    SELECT ?project ?relationship ?component WHERE {{
+        VALUES ?relationship {{
+            proj:dimensions proj:metrics proj:calculatedMetrics proj:segments
+        }}
+        ?project ?relationship ?component .
+    }}
+""")
 ```
 
 The original file is unchanged. Saved usage and co-occurrence counts are retained,
@@ -531,12 +568,19 @@ usage → kg.namespaces['usage']
 | `seg:shares` / `cm:shares` | number of shares |
 | `dr:description` / `dr:definition` | date range metadata |
 | `proj:contains` | the projects root node → each loaded Workspace |
+| `proj:id` | raw Workspace project ID |
 | `proj:rsid` | Workspace → its ReportSuite |
 | `proj:description` / `proj:created` | Workspace metadata |
+| `proj:ownername` / `proj:ownerlogin` | owner name and login from the project export (`xsd:string`); omitted when empty or unavailable |
+| `proj:tag` | one triple per non-empty project tag name |
+| `proj:shares` | number of project share entries (`xsd:integer`) |
+| `proj:approved` | project approval flag (`xsd:boolean`); omitted when unavailable |
+| `proj:companyTemplate` / `proj:organizationTemplate` | company and organization template flags (`xsd:boolean`); omitted when unavailable |
 | `proj:text` | text panel content (title, and body when not empty) |
 | `proj:visualition` *(sic — kept as-is to match the current implementation)* | name of a Visualization panel |
 | `proj:panelFreeForm` | name (and description) of a FreeForm panel |
-| `proj:dimension_ref` / `proj:metric_ref` / `proj:calculated_ref` | back-links from a Dimension / Metric / CalculatedMetric node to every Workspace that uses it |
+| `proj:dimensions` / `proj:metrics` / `proj:calculatedMetrics` / `proj:segments` | Workspace → each component used across its parsed freeforms and visualizations |
+| `proj:dimension_ref` / `proj:metric_ref` / `proj:calculated_ref` / `proj:segment_ref` | back-links from a Dimension / Metric / CalculatedMetric / Segment node to every Workspace that uses it |
 | `usage:segmentUsage` / `usage:projectUsage` / `usage:metricUsage` | integer counters on Dimension/Metric/ReportSuite/Segment/CalculatedMetric nodes: how many times it is referenced by segments, Workspace projects, or calculated metrics respectively |
 | `usage:usedWithMetric` / `usage:usedWithDimension` | direct co-occurrence edge between a Dimension and a Metric node (both directions) |
 | `usage:usedWithSegment` / `usage:usedWithDimension` | direct co-occurrence edge between a Dimension and a Segment node (both directions) |
@@ -562,10 +606,14 @@ graph TD
     MarketingChannel -->|mc:rsid| ReportSuite
     ProjectsRoot["Projects (root)"] -->|proj:contains| Workspace
     Workspace -->|proj:rsid| ReportSuite
+    Workspace -->|proj:dimensions| Dimension
+    Workspace -->|proj:metrics| Metric
+    Workspace -->|proj:calculatedMetrics| CalculatedMetric
+    Workspace -->|proj:segments| Segment
     Dimension -->|proj:dimension_ref| Workspace
     Metric -->|proj:metric_ref| Workspace
     CalculatedMetric -->|proj:calculated_ref| Workspace
-    Segment -.->|counted via usage:projectUsage| Workspace
+    Segment -->|proj:segment_ref| Workspace
     Dimension -->|usage:usedWithMetric| Metric
     Metric -->|usage:usedWithDimension| Dimension
     Dimension -->|usage:usedWithSegment| Segment

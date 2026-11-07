@@ -215,6 +215,11 @@ Once loaded, these are available directly on the `WorkspaceManager` — useful f
 * `wc.version`  : Workspace schema version (`definition.version`, e.g. `"27"`). Different versions can encode the same table differently (see `FreeForm` below) — this lets you explain or group parsing differences.
 * `wc.created`  / `wc.modified` : ISO-8601 timestamps from the project root.
 * `wc.owner`    : `{"id", "name", "login"}` of the project's actual owner, as recorded in the export (not the credentials used to load it).
+* `wc.approved` : project approval flag (`bool`, or `None` when absent).
+* `wc.companyTemplate` / `wc.organizationTemplate` : company and organization template flags (`bool`, or `None` when absent).
+
+Approval and template flags are preserved by `to_dict()`, including explicit `False`
+values. Flags that are `None` are omitted from the serialized payload.
 
 These are project-level only — individual panels/tables don't carry their own timestamps or authorship in the Workspace schema, so every `Panel`/`FreeForm` you visit is one hop away from this provenance via the `wc` object it came from.
 
@@ -799,7 +804,7 @@ wc.addShare(share_to_type="all")          # share with everyone in the org
 #### to_dict
 Return the complete project definition as a Python **dictionary** ready to be passed to the Adobe Analytics API (e.g. `createProject`).\
 Returns:
-* `dict` : Full project payload including `name`, `rsid`, `type`, `definition`, and optionally `owner`, `tags`, `shares`.
+* `dict` : Full project payload including `name`, `rsid`, `type`, `definition`, and optionally `owner`, `tags`, `shares`, `approved`, `companyTemplate`, `organizationTemplate`.
 
 ```py
 project_definition = wc.to_dict()
