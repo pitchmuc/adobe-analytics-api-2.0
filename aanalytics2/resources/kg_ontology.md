@@ -77,12 +77,19 @@ For a company with ID `{companyId}`:
 | `seg:shares` / `cm:shares` | number of shares |
 | `dr:description` / `dr:definition` | date range metadata |
 | `proj:contains` | the projects root node → each loaded Workspace |
+| `proj:id` | raw Workspace project ID |
 | `proj:rsid` | Workspace → its ReportSuite |
 | `proj:description` / `proj:created` | Workspace metadata |
+| `proj:ownername` / `proj:ownerlogin` | owner name and login from the project export (`xsd:string`); omitted when empty or unavailable |
+| `proj:tag` | one triple per non-empty project tag name |
+| `proj:shares` | number of project share entries (`xsd:integer`) |
+| `proj:approved` | project approval flag (`xsd:boolean`); omitted when unavailable |
+| `proj:companyTemplate` / `proj:organizationTemplate` | company and organization template flags (`xsd:boolean`); omitted when unavailable |
 | `proj:text` | text panel content (title, and body when not empty) |
 | `proj:visualition` *(sic)* | name of a Visualization panel |
 | `proj:panelFreeForm` | name (and description) of a FreeForm panel |
-| `proj:dimension_ref` / `proj:metric_ref` / `proj:calculated_ref` | back-links from a Dimension / Metric / CalculatedMetric node to every Workspace that uses it |
+| `proj:dimensions` / `proj:metrics` / `proj:calculatedMetrics` / `proj:segments` | Workspace → each component used across its parsed freeforms and visualizations (project-wide union, not per-freeform pairings). Both full and incremental builds retain these links and freeform summaries without storing full project JSON. |
+| `proj:dimension_ref` / `proj:metric_ref` / `proj:calculated_ref` / `proj:segment_ref` | back-links from a Dimension / Metric / CalculatedMetric / Segment node to every Workspace that uses it. Builds derive outgoing links from existing backlinks, so older dimension/metric/calculated-metric references are exposed without recounting usage. Older snapshots lack segment backlinks; a full rebuild is needed to recover those. |
 | `usage:segmentUsage` / `usage:projectUsage` / `usage:metricUsage` | integer counters: how many times a node is referenced by segments, Workspace projects, or calculated metrics |
 | `usage:usedWithMetric` / `usage:usedWithDimension` | direct co-occurrence edge between a Dimension and a Metric node (both directions) |
 | `usage:usedWithSegment` / `usage:usedWithDimension` | direct co-occurrence edge between a Dimension and a Segment node (both directions) |

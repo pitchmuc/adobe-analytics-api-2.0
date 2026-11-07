@@ -15,7 +15,7 @@ import json
 import sys
 from importlib import resources as importlib_resources
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, TypeVar, Union
 
 from rdflib import Graph, Literal, URIRef
 
@@ -26,6 +26,17 @@ from aanalytics2.workspaceManager import WorkspaceManager, FreeForm
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
+
+
+_ApiResult = TypeVar("_ApiResult")
+
+
+def _check_api_result(result: _ApiResult) -> _ApiResult:
+    if isinstance(result, dict) and ("errorCode" in result or "error" in result):
+        code = result.get("errorCode") or result.get("error")
+        message = result.get("errorDescription") or result.get("message") or str(code)
+        raise ToolError(f"Analytics API error {code}: {message}")
+    return result
 
 
 def _default_ontology_md() -> str:
@@ -177,7 +188,12 @@ def build_server(
         return kg_graph
 
     def _local_id(uri) -> str:
-        return str(uri).rsplit("/", 1)[-1]
+        value = str(uri)
+        for kind in ("dimension", "metric", "segment", "calculatedMetric"):
+            marker = f"/{kind}/"
+            if marker in value:
+                return value.split(marker, 1)[1]
+        return value.rsplit("/", 1)[-1]
 
     def _rsid_from_uri(uri) -> str:
         # rsid nodes are fragment-based (.../reportSuite#{rsid}), not path-based like
@@ -197,7 +213,7 @@ def build_server(
     def list_report_suites(filter: str = None) -> list:
         """List report suites available to this connection. Optional case-insensitive
         substring `filter` on the report suite name."""
-        df = analytics.getReportSuites(extended_info=True)
+        df = _check_api_result(analytics.getReportSuites(extended_info=True))
         return _apply_filter(_df_to_records(df), filter)
 
     @mcp.tool()
@@ -205,7 +221,7 @@ def build_server(
         """List dimensions available in a report suite (id, name, type, description).
         Optional case-insensitive substring `filter` on the dimension name."""
         rsid = _require_rsid(rsid)
-        records = analytics.getDimensions(rsid=rsid, description=True, format="raw")
+        records = _check_api_result(analytics.getDimensions(rsid=rsid, description=True, format="raw"))
         return _apply_filter(records, filter)
 
     @mcp.tool()
@@ -213,7 +229,7 @@ def build_server(
         """List metrics available in a report suite (id, name, type, description).
         Optional case-insensitive substring `filter` on the metric name."""
         rsid = _require_rsid(rsid)
-        records = analytics.getMetrics(rsid=rsid, description=True, format="raw")
+        records = _check_api_result(analytics.getMetrics(rsid=rsid, description=True, format="raw"))
         return _apply_filter(records, filter)
 
     @mcp.tool()
@@ -224,9 +240,9 @@ def build_server(
         returns everything that matches, which can be very large on accounts with
         thousands of segments -- for a single lookup by name, prefer find_segment,
         which checks the local Knowledge Graph first and is much cheaper."""
-        records = analytics.getSegments(
+        records = _check_api_result(analytics.getSegments(
             rsids_list=[rsid] if rsid else None, extended_info=True, format="raw"
-        )
+        ))
         return _apply_filter(records, filter)
 
     @mcp.tool()
@@ -278,9 +294,9 @@ def build_server(
         else:
             note = ("No Knowledge Graph connected (server not started with -kg) -- this is "
                      "NOT a Knowledge Graph answer; results come from a live list_segments API call.")
-        records = analytics.getSegments(
+        records = _check_api_result(analytics.getSegments(
             name=name, rsids_list=[rsid] if rsid else None, extended_info=True, format="raw"
-        )
+        ))
         return {"source": "live_api", "note": note, "results": records[:limit]}
 
     @mcp.tool()
@@ -290,7 +306,7 @@ def build_server(
         everything that matches, which can be very large -- for a single lookup by
         name, prefer find_calculated_metric, which checks the local Knowledge Graph
         first and is much cheaper."""
-        records = analytics.getCalculatedMetrics(extended_info=True, format="raw")
+        records = _check_api_result(analytics.getCalculatedMetrics(extended_info=True, format="raw"))
         return _apply_filter(records, filter)
 
     @mcp.tool()
@@ -344,34 +360,34 @@ def build_server(
             note = ("No Knowledge Graph connected (server not started with -kg) -- this is "
                      "NOT a Knowledge Graph answer; results come from a live "
                      "list_calculated_metrics API call.")
-        records = analytics.getCalculatedMetrics(
+        records = _check_api_result(analytics.getCalculatedMetrics(
             name=name, rsids_list=[rsid] if rsid else None, extended_info=True, format="raw"
-        )
+        ))
         return {"source": "live_api", "note": note, "results": records[:limit]}
 
     @mcp.tool()
     def list_date_ranges(filter: str = None) -> list:
         """List saved date ranges (id, name). Optional case-insensitive substring
         `filter` on the name."""
-        records = analytics.getDateRanges(extended_info=True, format="raw")
+        records = _check_api_result(analytics.getDateRanges(extended_info=True, format="raw"))
         return _apply_filter(records, filter)
 
     @mcp.tool()
     def list_projects(filter: str = None) -> list:
         """List Workspace projects (id, name, rsid, owner). Optional case-insensitive
         substring `filter` on the project name."""
-        records = analytics.getProjects(format="raw")
+        records = _check_api_result(analytics.getProjects(format="raw"))
         return _apply_filter(records, filter)
 
     @mcp.tool()
     def get_segment(segment_id: str) -> dict:
         """Return the full definition of a single segment by ID."""
-        return analytics.getSegment(segment_id, full=True)
+        return _check_api_result(analytics.getSegment(segment_id, full=True))
 
     @mcp.tool()
     def get_project(project_id: str) -> dict:
         """Return the full definition of a single Workspace project by ID."""
-        return analytics.getProject(projectId=project_id)
+        return _check_api_result(analytics.getProject(projectId=project_id))
 
     # ── Group 2 — Reporting ──────────────────────────────────────────────
 
@@ -418,7 +434,7 @@ def build_server(
         # getReport2's own `limit` kwarg (default 20000) overwrites request["settings"]["limit"]
         # otherwise, fetching (and returning, since "rows" below was never truncated either) far
         # more than n_results asked for.
-        workspace = analytics.getReport2(request=request, n_results=n_results, limit=n_results)
+        workspace = _check_api_result(analytics.getReport2(request=request, n_results=n_results, limit=n_results))
         if not hasattr(workspace, "dataframe"):
             return {"raw": workspace}
         return {
@@ -447,12 +463,11 @@ def build_server(
         # getReport2's own `limit` kwarg (default 20000) overwrites request["settings"]["limit"]
         # set above otherwise, fetching (and, since never truncated below, returning) far more
         # rows than the caller's `limit` asked for.
-        workspace = analytics.getReport2(request=rc.to_dict(), n_results=limit, limit=limit)
+        workspace = _check_api_result(analytics.getReport2(request=rc.to_dict(), n_results=limit, limit=limit))
         if not hasattr(workspace, "dataframe"):
             return []
         records = _df_to_records(workspace.dataframe)[:limit]
-        label_col = workspace.columns[0]
-        return [{"value": r.get(label_col), "itemId": r.get("itemId")} for r in records]
+        return [{"value": r.get(dimension_id), "itemId": r.get("itemId")} for r in records]
 
     # ── Group 3 — Segment / Calculated Metric / Date Range authoring ───────
     # No builder class exists for these (unlike RequestCreator/WorkspaceManager for
@@ -470,7 +485,7 @@ def build_server(
         needs "name" and "definition" (a rule container — see get_segment on an
         existing segment for the shape) and "rsid". Returns the API's validation
         result, including any definition errors — check this before create_segment."""
-        return analytics.createSegmentValidate(segmentJSON=segment)
+        return _check_api_result(analytics.createSegmentValidate(segmentJSON=segment))
 
     @mcp.tool()
     def create_segment(segment: dict) -> dict:
@@ -478,7 +493,7 @@ def build_server(
         container — see get_segment on an existing segment for the shape) and "rsid".
         Consider calling validate_segment first to catch definition errors before
         saving."""
-        return analytics.createSegment(segmentJSON=segment)
+        return _check_api_result(analytics.createSegment(segmentJSON=segment))
 
     @mcp.tool()
     def update_segment(segment_id: str, segment: dict) -> dict:
@@ -488,7 +503,7 @@ def build_server(
         scratch, since this replaces the whole definition, not just the fields you
         set. Consider calling validate_segment first to catch definition errors
         before saving."""
-        return analytics.updateSegment(segmentID=segment_id, segmentJSON=segment)
+        return _check_api_result(analytics.updateSegment(segmentID=segment_id, segmentJSON=segment))
 
     @mcp.tool()
     def validate_calculated_metric(calculated_metric: dict) -> dict:
@@ -497,7 +512,7 @@ def build_server(
         list_calculated_metrics on an existing one for the "definition" shape.
         Returns the API's validation result, including any definition errors —
         check this before create_calculated_metric."""
-        return analytics.createCalculatedMetricValidate(metricJSON=calculated_metric)
+        return _check_api_result(analytics.createCalculatedMetricValidate(metricJSON=calculated_metric))
 
     @mcp.tool()
     def create_calculated_metric(calculated_metric: dict) -> dict:
@@ -505,7 +520,7 @@ def build_server(
         "definition" and "rsid" — see list_calculated_metrics on an existing one for
         the "definition" shape. Consider calling validate_calculated_metric first to
         catch definition errors before saving."""
-        return analytics.createCalculatedMetric(metricJSON=calculated_metric)
+        return _check_api_result(analytics.createCalculatedMetric(metricJSON=calculated_metric))
 
     @mcp.tool()
     def update_calculated_metric(calculated_metric_id: str, calculated_metric: dict) -> dict:
@@ -515,14 +530,14 @@ def build_server(
         dict rather than building one from scratch, since this replaces the whole
         definition, not just the fields you set. Consider calling
         validate_calculated_metric first to catch definition errors before saving."""
-        return analytics.updateCalculatedMetric(calcID=calculated_metric_id, calcJSON=calculated_metric)
+        return _check_api_result(analytics.updateCalculatedMetric(calcID=calculated_metric_id, calcJSON=calculated_metric))
 
     @mcp.tool()
     def create_date_range(date_range: dict) -> dict:
         """Create a new saved date range. `date_range` needs "name" and "definition"
         — see list_date_ranges on an existing one for the exact shape used by this
         account. There is no validate endpoint for date ranges; this saves directly."""
-        return analytics.createDateRange(dateRangeJSON=date_range)
+        return _check_api_result(analytics.createDateRange(dateRangeJSON=date_range))
 
     @mcp.tool()
     def update_date_range(date_range_id: str, date_range: dict) -> dict:
@@ -531,7 +546,7 @@ def build_server(
         from an entry in list_date_ranges and edit that dict rather than building one
         from scratch, since this replaces the whole definition, not just the fields
         you set. There is no validate endpoint for date ranges; this saves directly."""
-        return analytics.updateDateRange(dateRangeID=date_range_id, dateRangeJSON=date_range)
+        return _check_api_result(analytics.updateDateRange(dateRangeID=date_range_id, dateRangeJSON=date_range))
 
     # ── Group 4 — WorkspaceManager (stateless: project dict in, project dict out) ──
 
@@ -650,7 +665,7 @@ def build_server(
             # settings.limit set by rc.setLimit() above — pass it explicitly, or this fetches
             # (and embeds itemIds for) every row of the dimension instead of just page_size,
             # which blew a two-table test project up to 36MB and failed on Adobe's 16MB cap.
-            report = analytics.getReport2(request=rc.to_dict(), n_results=page_size, limit=page_size)
+            report = _check_api_result(analytics.getReport2(request=rc.to_dict(), n_results=page_size, limit=page_size))
             item_ids = []
             if hasattr(report, "dataframe") and "itemId" in report.dataframe.columns:
                 item_ids = [str(v) for v in report.dataframe["itemId"].tolist()][:page_size]
@@ -706,7 +721,7 @@ def build_server(
     @mcp.tool()
     def publish_workspace(project: dict) -> dict:
         """Save a project dict as a new Workspace project via the Analytics API."""
-        return analytics.createProject(project)
+        return _check_api_result(analytics.createProject(project))
 
     @mcp.tool()
     def update_workspace(project: dict) -> dict:
@@ -722,7 +737,7 @@ def build_server(
                 "with create_workspace has no id until it is first published). Use "
                 "publish_workspace to create a new project instead."
             )
-        return analytics.updateProject(project_id, project)
+        return _check_api_result(analytics.updateProject(project_id, project))
 
     # ── Group 5 — Classifications ────────────────────────────────────────
 
@@ -733,7 +748,7 @@ def build_server(
         linked dataset ID(s). Use get_classification_dataset_id to look up a single
         dimension, or get_classification_dataset for a dataset's full metadata."""
         rsid = _require_rsid(rsid)
-        data = analytics.getClassificationDatasets(rsid=rsid)
+        data = _check_api_result(analytics.getClassificationDatasets(rsid=rsid))
         return [
             {"dimension_id": dim_id, "dataset_ids": entry.get("datasets", [])}
             for entry in data.get("metrics", [])
@@ -746,7 +761,7 @@ def build_server(
         suite (dimension_id accepts either "evar5" or "variables/evar5"). Empty list if
         that dimension has no classification dataset attached."""
         rsid = _require_rsid(rsid)
-        data = analytics.getClassificationDatasets(rsid=rsid)
+        data = _check_api_result(analytics.getClassificationDatasets(rsid=rsid))
         target = _dimension_key(dimension_id)
         dataset_ids: list = []
         for entry in data.get("metrics", []):
@@ -758,7 +773,7 @@ def build_server(
     def get_classification_dataset(dataset_id: str) -> dict:
         """Return the full metadata (name, description, columns, report suite
         subscriptions) for a single classification dataset by ID."""
-        return analytics.getClassificationDataset(datasetId=dataset_id)
+        return _check_api_result(analytics.getClassificationDataset(datasetId=dataset_id))
 
     # ── Group 6 — Knowledge Graph (read-only; local .ttl only, no remote endpoint yet) ──
 
@@ -788,7 +803,7 @@ def build_server(
         """
         rows = graph.query(q, initBindings={"dim": _dim_uri(rsid, dimension_id)})
         return [{"metric_id": _local_id(r.metric), "name": str(r.label) if r.label else None,
-                 "count": int(r.count)} for r in rows]
+                 "count": int(r["count"])} for r in rows]
 
     @mcp.tool()
     def get_related_dimensions(metric_id: str, rsid: str = None, limit: int = 10) -> list:
@@ -804,7 +819,7 @@ def build_server(
         """
         rows = graph.query(q, initBindings={"met": _met_uri(rsid, metric_id)})
         return [{"dimension_id": _local_id(r.dimension), "name": str(r.label) if r.label else None,
-                 "count": int(r.count)} for r in rows]
+                 "count": int(r["count"])} for r in rows]
 
     @mcp.tool()
     def get_related_segments(dimension_id: str = None, rsid: str = None, limit: int = 10) -> list:
@@ -823,7 +838,7 @@ def build_server(
         """
         rows = graph.query(q, initBindings={"dim": _dim_uri(rsid, dimension_id)})
         return [{"segment_id": _local_id(r.segment), "name": str(r.label) if r.label else None,
-                 "count": int(r.count)} for r in rows]
+                 "count": int(r["count"])} for r in rows]
 
     @mcp.tool()
     def get_popular_combinations(rsid: str = None, limit: int = 10) -> list:
@@ -840,7 +855,7 @@ def build_server(
         rows = graph.query(q, initBindings={"rs": _rsid_uri(rsid)})
         return [{"dimension_id": _local_id(r.dim), "dimension_name": str(r.dimLabel) if r.dimLabel else None,
                  "metric_id": _local_id(r.metric), "metric_name": str(r.metLabel) if r.metLabel else None,
-                 "count": int(r.count)} for r in rows]
+                 "count": int(r["count"])} for r in rows]
 
     @mcp.tool()
     def get_component_context(component_id: str) -> dict:
@@ -858,8 +873,10 @@ def build_server(
             UNION { ?s cm:id ?cid . BIND("calculatedMetric" AS ?kind) }
             OPTIONAL { ?s rdfs:label ?label }
             OPTIONAL { ?s rdfs:comment ?comment }
-            OPTIONAL { ?s dim:rsid ?rs }
-            OPTIONAL { ?s met:rsid ?rs }
+            OPTIONAL {
+                VALUES ?rsPredicate { dim:rsid met:rsid seg:rsid cm:rsid }
+                ?s ?rsPredicate ?rs
+            }
         }
         """
         matches = list(graph.query(find_q, initBindings={"cid": Literal(component_id)}))
@@ -880,10 +897,10 @@ def build_server(
                 "kind": str(m.kind),
                 "name": str(m.label) if m.label else None,
                 "description": str(m.comment) if m.comment else None,
-                "rsid": _local_id(m.rs) if m.rs else None,
+                "rsid": _rsid_from_uri(m.rs) if m.rs else None,
                 "top_related": [
                     {"id": _local_id(p.other), "name": str(p.otherLabel) if p.otherLabel else None,
-                     "count": int(p.count)} for p in partners
+                     "count": int(p["count"])} for p in partners
                 ],
             })
         return {"matches": results}
@@ -947,7 +964,8 @@ def main():
     parser.add_argument("-rsid", "--report_suite_id", default=None, metavar="RSID",
                          help="Default report suite ID used when a tool call omits rsid")
     parser.add_argument("-kg", "--knowledge_graph", default=None, metavar="FILE.ttl",
-                         help="Path to a local Knowledge Graph .ttl file, enabling Group 4 KG tools")
+                         help="Path to a local Knowledge Graph .ttl file, enabling Group 4 KG tools. "
+                              "If missing, warn and continue without a Knowledge Graph.")
     parser.add_argument("-kg-endpoint", "--kg_endpoint", default=None, metavar="URL",
                          help="Remote SPARQL endpoint URL (not yet implemented — Phase 3)")
     parser.add_argument("-kg-ontology", "--kg_ontology", default=None, metavar="FILE.md",
@@ -990,8 +1008,18 @@ def main():
     if args.knowledge_graph:
         print(f"Loading Knowledge Graph from {args.knowledge_graph} ...", file=sys.stderr)
         kg_graph = Graph()
-        kg_graph.parse(args.knowledge_graph, format="turtle")
-        print(f"Knowledge Graph loaded: {len(kg_graph)} triples.", file=sys.stderr)
+        try:
+            with Path(args.knowledge_graph).open("rb") as source:
+                kg_graph.parse(source=source, format="turtle")
+        except FileNotFoundError:
+            print(
+                f"Warning: Knowledge Graph file not found: {args.knowledge_graph}. "
+                "Continuing without a Knowledge Graph.",
+                file=sys.stderr,
+            )
+            kg_graph = None
+        else:
+            print(f"Knowledge Graph loaded: {len(kg_graph)} triples.", file=sys.stderr)
 
     if args.kg_ontology:
         ontology_md = Path(args.kg_ontology).read_text(encoding="utf-8")

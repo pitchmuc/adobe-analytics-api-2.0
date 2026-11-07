@@ -215,6 +215,18 @@ class KnowledgeGraph:
         projects = self.namespaces["projects"]
         self.graph.remove((URIRef(projects), projects.contains, None))
 
+    def _add_project_component_links(self) -> None:
+        """Expose project components from backlinks, including those in older snapshots."""
+        projects = self.namespaces["projects"]
+        for backlink, field in (
+            ("dimension_ref", "dimensions"),
+            ("metric_ref", "metrics"),
+            ("calculated_ref", "calculatedMetrics"),
+            ("segment_ref", "segments"),
+        ):
+            for component_ref, project_ref in self.graph.subject_objects(projects[backlink]):
+                self.graph.add((project_ref, projects[field], component_ref))
+
     def buildGraph(
         self, save: bool = False, filename: str = 'knowledge_graph.ttl',
         verbose: bool = False, merge: bool = True, incremental: bool = False, **kwargs,
@@ -228,6 +240,8 @@ class KnowledgeGraph:
         A full build replaces generated usage/co-occurrence counters and project registrations
         with a snapshot computed from the current Analytics data and loaded projects.
         With incremental=True, only projects absent from the existing graph are processed.
+        Both modes retain freeform summaries and lightweight project/component links, not
+        full project JSON. Outgoing links are also restored from existing component backlinks.
         Stored counters are read into Python dictionaries, incremented and replaced in the graph.
         Network failures during component scans are logged as warnings. The component metadata is
         retained, but usage counts from the failed scan are omitted.
@@ -461,6 +475,7 @@ class KnowledgeGraph:
                 metricRefs.append(calcRef)
             for segment in element.segments:
                 segRef = URIRef(f"http://analytics.com/{self.companyId}/segment/{segment['id']}")
+                graph.add((segRef, self.namespaces['projects'].segment_ref, project_ref))
                 bump_usage(usage, segRef, 'projectUsage')
                 segRefs.append(segRef)
             for dimRef in dimRefs:
@@ -477,9 +492,25 @@ class KnowledgeGraph:
             bump_usage(usage, rsidRef, 'projectUsage')
             graph.add((project_ref, RDFS.label,Literal(Wproject.name)))
             graph.add((project_ref, RDF.type,Literal("Workspace")))
+            graph.add((project_ref, self.namespaces['projects'].id, Literal(Wproject.id)))
             graph.add((project_ref, self.namespaces['projects'].description,Literal(Wproject.description)))
             if Wproject.created is not None and Wproject.created != "":
                 graph.add((project_ref, self.namespaces['projects'].created,Literal(Wproject.created,datatype=XSD.dateTime)))
+            projects = self.namespaces['projects']
+            owner = Wproject.owner or {}
+            for field, key in (("ownername", "name"), ("ownerlogin", "login")):
+                value = owner.get(key)
+                if value is not None and value != "":
+                    graph.add((project_ref, projects[field], Literal(value, datatype=XSD.string)))
+            for tag in Wproject.tags:
+                name = tag.get('name')
+                if name is not None and name != "":
+                    graph.add((project_ref, projects.tag, Literal(name)))
+            graph.add((project_ref, projects.shares, Literal(len(Wproject.shares), datatype=XSD.integer)))
+            for field in ("approved", "companyTemplate", "organizationTemplate"):
+                value = getattr(Wproject, field)
+                if value is not None:
+                    graph.add((project_ref, projects[field], Literal(value, datatype=XSD.boolean)))
             for panel in Wproject.panels:
                 for element in panel.elements:
                     if element.type == "Text":
@@ -540,6 +571,13 @@ class KnowledgeGraph:
             if verbose:
                 print("merging sub-graphs")
             self._clear_graph_counters()
+            projects = self.namespaces['projects']
+            for project_ref in projects_graph.objects(URIRef(projects), projects.contains):
+                for field in (
+                    "ownername", "ownerlogin", "tag", "shares", "approved",
+                    "companyTemplate", "organizationTemplate",
+                ):
+                    self.graph.remove((project_ref, projects[field], None))
             for subgraph in (dimensions_graph, metrics_graph, segments_graph, calculated_graph, projects_graph):
                 self.graph += subgraph
             for usage_source in (segments_usage, calculated_usage, projects_usage):
@@ -554,6 +592,7 @@ class KnowledgeGraph:
             for ref, usage in dict_entity_usage.items():
                 for key, value in usage.items():
                     self.graph.add((ref, self.namespaces['usage'][key],Literal(value,datatype=XSD.integer)))
+        self._add_project_component_links()
         for (dimRef, metRef), data in dim_metric_cooccurrence.items():
             self.graph.add((dimRef, self.namespaces['usage'].usedWithMetric, metRef))
             self.graph.add((metRef, self.namespaces['usage'].usedWithDimension, dimRef))
