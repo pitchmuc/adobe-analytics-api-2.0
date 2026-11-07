@@ -3,15 +3,19 @@ import json
 import os
 import sys
 import inspect
+from unittest.mock import Mock
 
 import pandas as pd
+import pytest
 from rdflib import Graph, Literal, RDF, RDFS, URIRef, Namespace
+from rdflib.plugins.parsers.notation3 import BadSyntax
 
 current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
 from aanalytics2 import workspaceManager as wmmod
+from aanalytics2 import mcp_server
 from aanalytics2.mcp_server import build_server
 
 # Company-wide lookup tables WorkspaceManager fetches once per instantiation to
@@ -407,3 +411,91 @@ def test_update_date_range_passes_id_and_definition_through():
     result = _call(mcp, "update_date_range", {"date_range_id": "dr1", "date_range": date_range})
     assert result["id"] == "dr1"
     assert result["name"] == "Last quarter v2"
+
+
+@pytest.fixture
+def startup(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["aanalytics2-mcp", "-cid", "dummy", "-rsid", "rs1"])
+    monkeypatch.setattr(mcp_server, "importConfigFile", Mock(return_value=object()))
+    monkeypatch.setattr(mcp_server, "Login", Mock())
+    monkeypatch.setattr(mcp_server, "Analytics", Mock(return_value=DummyAnalytics()))
+    server_builder = Mock()
+    monkeypatch.setattr(mcp_server, "build_server", server_builder)
+    return server_builder
+
+
+@pytest.mark.parametrize("flag", ["-kg", "--knowledge_graph"])
+@pytest.mark.parametrize("path_kind", ["relative", "absolute", "missing_parent"])
+def test_main_missing_knowledge_graph_warns_and_starts(
+    startup, monkeypatch, tmp_path, capsys, flag, path_kind
+):
+    graph_path = "missing graph.ttl"
+    if path_kind == "absolute":
+        graph_path = str(tmp_path / graph_path)
+    elif path_kind == "missing_parent":
+        graph_path = str(tmp_path / "missing directory" / graph_path)
+    monkeypatch.setattr(sys, "argv", [*sys.argv, flag, graph_path])
+
+    mcp_server.main()
+
+    startup.assert_called_once()
+    assert startup.call_args.kwargs["kg_graph"] is None
+    startup.return_value.run.assert_called_once_with(transport="stdio")
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Warning:" in captured.err
+    assert graph_path in captured.err
+    assert "Continuing without a Knowledge Graph" in captured.err
+    assert "Knowledge Graph loaded:" not in captured.err
+
+
+def test_main_without_knowledge_graph_starts_without_warning(startup, capsys):
+    mcp_server.main()
+
+    assert startup.call_args.kwargs["kg_graph"] is None
+    startup.return_value.run.assert_called_once_with(transport="stdio")
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_main_loads_existing_knowledge_graph(startup, monkeypatch, tmp_path, capsys, empty):
+    expected = Graph() if empty else _build_test_kg()
+    graph_path = tmp_path / "knowledge graph.ttl"
+    expected.serialize(destination=graph_path, format="turtle")
+    monkeypatch.setattr(sys, "argv", [*sys.argv, "-kg", str(graph_path)])
+
+    mcp_server.main()
+
+    loaded = startup.call_args.kwargs["kg_graph"]
+    assert isinstance(loaded, Graph)
+    assert set(loaded) == set(expected)
+    startup.return_value.run.assert_called_once_with(transport="stdio")
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"Knowledge Graph loaded: {len(expected)} triples." in captured.err
+    assert "Warning:" not in captured.err
+
+
+def test_main_invalid_knowledge_graph_still_raises(startup, monkeypatch, tmp_path):
+    graph_path = tmp_path / "invalid.ttl"
+    graph_path.write_text("not valid Turtle", encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", [*sys.argv, "-kg", str(graph_path)])
+
+    with pytest.raises(BadSyntax):
+        mcp_server.main()
+
+    startup.assert_not_called()
+
+
+def test_main_unreadable_knowledge_graph_still_raises(startup, monkeypatch, tmp_path):
+    graph_path = tmp_path / "unreadable.ttl"
+    monkeypatch.setattr(sys, "argv", [*sys.argv, "-kg", str(graph_path)])
+    monkeypatch.setattr(mcp_server.Path, "open", Mock(side_effect=PermissionError("Access denied")))
+
+    with pytest.raises(PermissionError, match="Access denied"):
+        mcp_server.main()
+
+    startup.assert_not_called()

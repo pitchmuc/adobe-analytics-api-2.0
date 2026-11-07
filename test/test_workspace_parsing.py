@@ -3,6 +3,8 @@ import sys
 import inspect
 import json
 
+import pytest
+
 ## changing current_dir to ensure you are running test on your version of the aanalytics2 module.
 current_dir = os.path.dirname(os.path.abspath(
     inspect.getfile(inspect.currentframe())))
@@ -121,6 +123,24 @@ def test_parses_panel_tree_and_types():
     assert [table.type, note.type, donut.type, histogram.type, flow.type] == \
         ["FreeForm", "Text", "Visualization", "Visualization", "Visualization"]
     assert note.text == "hello"
+
+
+@pytest.mark.parametrize("value", [None, False, True])
+def test_project_approval_and_template_flags_round_trip(value):
+    project = _sample_project()
+    fields = ("approved", "companyTemplate", "organizationTemplate")
+    if value is not None:
+        project.update({field: value for field in fields})
+    wm = api2.WorkspaceManager(data=project)
+    serialized = wm.to_dict()
+    restored = api2.WorkspaceManager(data=serialized)
+    for field in fields:
+        assert getattr(wm, field) is value
+        assert getattr(restored, field) is value
+        if value is None:
+            assert field not in serialized
+        else:
+            assert serialized[field] is value
 
 
 def test_freeform_component_lists_include_breakdowns():

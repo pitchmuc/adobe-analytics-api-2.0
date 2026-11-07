@@ -2,6 +2,7 @@
 import os
 import sys
 import inspect
+import warnings
 
 import pytest
 
@@ -23,7 +24,7 @@ DISCOVERY_RESPONSE = {
 
 
 class FakeConnector:
-    """Records all getData calls and returns canned responses per URL."""
+    """Records all request URLs and returns canned responses per URL."""
 
     def __init__(self, responses: dict):
         self.responses = responses
@@ -32,6 +33,15 @@ class FakeConnector:
     def getData(self, url, params=None, headers=None, **kwargs):
         self.calls.append(url)
         return self.responses[url]
+
+    def postData(self, url, data=None):
+        return self.getData(url)
+
+    def putData(self, url, data=None):
+        return self.getData(url)
+
+    def deleteData(self, url):
+        return self.getData(url)
 
 
 def make_analytics(company_id: str, responses: dict) -> Analytics:
@@ -90,6 +100,75 @@ def test_scheduler_methods_use_resolved_endpoint():
         base + "/scheduledjobs/": {"content": [{"id": "job1"}], "lastPage": True},
         base + "/deliverysettings/": {"content": [{"id": "ds1"}]},
     })
-    assert ags.getScheduledJobs(format="raw") == [{"id": "job1"}]
-    assert ags.getDeliverySettings() == [{"id": "ds1"}]
+    with pytest.warns(UserWarning, match="Unofficial endpoints"):
+        assert ags.getScheduledJobs(format="raw") == [{"id": "job1"}]
+    with pytest.warns(UserWarning, match="Unofficial endpoints"):
+        assert ags.getDeliverySettings() == [{"id": "ds1"}]
     assert ags.connector.calls == [DISCOVERY_URL, base + "/scheduledjobs/", base + "/deliverysettings/"]
+
+
+@pytest.mark.parametrize("method_name, method_kwargs, path", [
+    ("getScheduledJobs", {"format": "raw"}, "/scheduledjobs/"),
+    ("getScheduledJob", {"scheduleId": "job1"}, "/scheduledjobs/job1"),
+    ("createScheduledJob", {"projectId": "project1", "schedule": {"type": "daily"}}, "/scheduledjobs/"),
+    ("updateScheduledJob", {"scheduleId": "job1", "scheduleObj": {}}, "/scheduledjobs/job1"),
+    ("deleteScheduledJob", {"scheduleId": "job1"}, "/scheduledjobs/job1"),
+    ("getDeliverySettings", {}, "/deliverysettings/"),
+    ("getDeliverySetting", {"deliverySettingId": "ds1"}, "/deliverysettings/ds1/"),
+    ("createDeliverySetting", {}, "/deliverysettings/"),
+    ("updateDeliverySetting", {"deliveryId": "ds1"}, "/deliverysettings/ds1"),
+    ("deleteDeliverySetting", {"deliveryId": "ds1"}, "/deliverysettings/ds1"),
+])
+@pytest.mark.parametrize("warning_kwargs, expected_count", [({}, 1), ({"showWarning": False}, 0)])
+def test_scheduler_warning_and_opt_out(method_name, method_kwargs, path, warning_kwargs, expected_count, monkeypatch):
+    base = "https://example.test/scheduler"
+    response = {"id": "job1", "content": [{"id": "job1"}], "lastPage": True}
+    ags = make_analytics("comp1", {
+        base + path: response,
+        base + "/deliverysettings/": {"id": "ds1", "content": [{"id": "ds1"}]},
+    })
+    ags.schedulerEndpoint = base
+    if method_name == "createScheduledJob":
+        ags.connector.config = {"org_id": "ORG2@AdobeOrg"}
+        monkeypatch.setattr(ags, "getUserMe", lambda: {"imsUserId": "user1"})
+        monkeypatch.setattr(ags, "getProject", lambda project_id: {"id": project_id, "name": "Project 1"})
+    method = getattr(ags, method_name)
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always")
+        caller_line = inspect.currentframe().f_lineno + 1
+        method(**method_kwargs, **warning_kwargs)
+    assert len(captured) == expected_count
+    if expected_count:
+        assert str(captured[0].message) == "Unofficial endpoints and may change or break at any moment."
+        assert captured[0].category is UserWarning
+        assert captured[0].filename == __file__
+        assert captured[0].lineno == caller_line
+    expected_calls = [base + path]
+    if method_name == "createScheduledJob":
+        expected_calls.insert(0, base + "/deliverysettings/")
+    assert ags.connector.calls == expected_calls
+
+
+@pytest.mark.parametrize("method_name, path", [
+    ("getScheduledJobs", "/scheduledjobs/"),
+    ("getDeliverySettings", "/deliverysettings/"),
+])
+@pytest.mark.parametrize("warning_kwargs, expected_count", [({}, 1), ({"showWarning": False}, 0)])
+def test_paginated_scheduler_warning_is_emitted_once(method_name, path, warning_kwargs, expected_count, monkeypatch):
+    base = "https://example.test/scheduler"
+    ags = make_analytics("comp1", {})
+    ags.schedulerEndpoint = base
+
+    def get_page(url, params=None, headers=None):
+        ags.connector.calls.append(url)
+        if params["page"] == 0:
+            return {"content": [{"id": "first"}] * 1000, "lastPage": False}
+        return {"content": [{"id": "last"}], "lastPage": True}
+
+    monkeypatch.setattr(ags.connector, "getData", get_page)
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always")
+        result = getattr(ags, method_name)(**warning_kwargs)
+    assert len(captured) == expected_count
+    assert len(result) == 1001
+    assert ags.connector.calls == [base + path, base + path]
