@@ -1096,6 +1096,9 @@ class WorkspaceManager:
     - created
     - modified
     - owner
+    - approved
+    - companyTemplate
+    - organizationTemplate
 
     Typical usage::
 
@@ -1186,6 +1189,9 @@ class WorkspaceManager:
         self.version: str = ""
         self.created: str = ""
         self.modified: str = ""
+        self.approved: Optional[bool] = None
+        self.companyTemplate: Optional[bool] = None
+        self.organizationTemplate: Optional[bool] = None
         if analytics is None and (config is None or companyId is None) and data is None:
             raise ValueError("Either 'analytics' or both 'config' and 'companyId' must be provided when not loading from 'data'.")
         self._config = config
@@ -1224,6 +1230,9 @@ class WorkspaceManager:
             self.description = description or data.get("description", "")
             self.created = data.get("created", "")
             self.modified = data.get("modified", "")
+            self.approved = data.get("approved")
+            self.companyTemplate = data.get("companyTemplate")
+            self.organizationTemplate = data.get("organizationTemplate")
             if data.get("owner"):
                 self.owner = dict(data["owner"])
             if self._analytics:
@@ -2498,6 +2507,10 @@ class WorkspaceManager:
             result["tags"] = list(self.tags)
         if self.shares:
             result["shares"] = list(self.shares)
+        for field in ("approved", "companyTemplate", "organizationTemplate"):
+            value = getattr(self, field)
+            if value is not None:
+                result[field] = value
         return result
 
     def createProject(self) -> dict:
