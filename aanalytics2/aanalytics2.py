@@ -1,6 +1,6 @@
 # Created by julien piccini
 # email : piccini.julien@gmail.com
-import json, os, re, io, time
+import json, os, re, io, time, warnings
 import time, datetime
 from concurrent import futures
 from copy import deepcopy
@@ -1613,6 +1613,14 @@ class Analytics:
         res = self.connector.putData(self.endpoint_company + path, data=data, headers=self.header)
         return res
 
+    def _warnUnofficialEndpoint(self, showWarning: bool = True) -> None:
+        if showWarning:
+            warnings.warn(
+                "Unofficial endpoints and may change or break at any moment.",
+                UserWarning,
+                stacklevel=3
+            )
+
     def _getSchedulerEndpoint(self) -> str:
         """
         Return the base URL of the Scheduler API (scheduled projects and delivery settings).
@@ -1641,7 +1649,7 @@ class Analytics:
         return self.schedulerEndpoint
 
     def getScheduledJobs(self, includeType: str = "all", full: bool = True, limit: int = 1000, format: str = "df",
-                         verbose: bool = False) -> JsonListOrDataFrameType:
+                         verbose: bool = False, *, showWarning: bool = True) -> JsonListOrDataFrameType:
         """
         Get Scheduled Projects. You can retrieve the projectID out of the tasks column to see for which workspace a schedule
         Arguments:
@@ -1652,7 +1660,9 @@ class Analytics:
             limit : OPTIONAL : Number of element retrieved by request (default max 1000)
             format : OPTIONAL : Define the format you want to output the result. Default "df" for dataframe, other option "raw"
             verbose: OPTIONAL : set to True for debug output
+            showWarning : OPTIONAL : Set to False to suppress the unofficial endpoint warning. Default True.
         """
+        self._warnUnofficialEndpoint(showWarning)
         if self.loggingEnabled:
             self.logger.debug(f"starting getScheduledJobs")
         params = {"includeType": includeType,
@@ -1690,14 +1700,16 @@ class Analytics:
             return df
         return data
 
-    def getScheduledJob(self, scheduleId: str = None) -> dict:
+    def getScheduledJob(self, scheduleId: str = None, *, showWarning: bool = True) -> dict:
         """
         Return a scheduled project definition.
         Arguments:
             scheduleId : REQUIRED : Schedule project ID
+            showWarning : OPTIONAL : Set to False to suppress the unofficial endpoint warning. Default True.
         """
         if scheduleId is None:
             raise ValueError("A schedule ID is required")
+        self._warnUnofficialEndpoint(showWarning)
         if self.loggingEnabled:
             self.logger.debug(f"starting getScheduledJob with ID: {scheduleId}")
         path = f"/scheduledjobs/{scheduleId}"
@@ -1707,7 +1719,8 @@ class Analytics:
         return res
 
     def createScheduledJob(self, projectId: str = None, type: str = "pdf", schedule: dict = None, loginIds: list = None,
-                           emails: list = None, groupIds: list = None, width: int = None) -> dict:
+                           emails: list = None, groupIds: list = None, width: int = None, *,
+                           showWarning: bool = True) -> dict:
         """
         Creates a schedule job based on the information provided as arguments.
         Expiration will be in one year by default.
@@ -1742,14 +1755,17 @@ class Analytics:
             emails : OPTIONAL : If users are not registered in AA, you can specify a list of email addresses.
             groupIds : OPTIONAL : Group Id to send the report to.
             width : OPTIONAL : width of the report to be sent. (Minimum 800)
+            showWarning : OPTIONAL : Set to False to suppress the unofficial endpoint warning. Default True.
         """
+        self._warnUnofficialEndpoint(showWarning)
         if self.loggingEnabled:
             self.logger.debug(f"starting createScheduleJob")
         path = f"/scheduledjobs/"
         dateNow = datetime.datetime.now()
         nowDateTime = datetime.datetime.isoformat(dateNow, timespec='seconds')
         futureDate = datetime.datetime.isoformat(dateNow.replace(dateNow.year + 1), timespec='seconds')
-        deliveryId_res = self.createDeliverySetting(loginIds=loginIds, emails=emails, groupIds=groupIds)
+        deliveryId_res = self.createDeliverySetting(loginIds=loginIds, emails=emails, groupIds=groupIds,
+                                showWarning=False)
         deliveryId = deliveryId_res.get('id', '')
         if deliveryId == "":
             if self.loggingEnabled:
@@ -1804,41 +1820,48 @@ class Analytics:
         res = self.connector.postData(self._getSchedulerEndpoint() + path, data=data)
         return res
 
-    def updateScheduledJob(self, scheduleId: str = None, scheduleObj: dict = None) -> dict:
+    def updateScheduledJob(self, scheduleId: str = None, scheduleObj: dict = None, *, showWarning: bool = True) -> dict:
         """
         Update a schedule Job based on its id and the definition attached to it.
         Arguments:
             scheduleId : REQUIRED : the jobs to be updated.
             scheduleObj : REQUIRED : The object to replace the current definition.
+            showWarning : OPTIONAL : Set to False to suppress the unofficial endpoint warning. Default True.
         """
         if scheduleId is None:
             raise ValueError("A schedule ID is required")
         if scheduleObj is None:
             raise ValueError('A schedule Object is required')
+        self._warnUnofficialEndpoint(showWarning)
         if self.loggingEnabled:
             self.logger.debug(f"starting updateScheduleJob with ID: {scheduleId}")
         path = f"/scheduledjobs/{scheduleId}"
         res = self.connector.putData(self._getSchedulerEndpoint() + path, data=scheduleObj)
         return res
 
-    def deleteScheduledJob(self, scheduleId: str = None) -> dict:
+    def deleteScheduledJob(self, scheduleId: str = None, *, showWarning: bool = True) -> dict:
         """
         Delete a schedule project based on its ID.
         Arguments:
             scheduleId : REQUIRED : the schedule ID to be deleted.
+            showWarning : OPTIONAL : Set to False to suppress the unofficial endpoint warning. Default True.
         """
         if scheduleId is None:
             raise Exception("A schedule ID is required for deletion")
+        self._warnUnofficialEndpoint(showWarning)
         if self.loggingEnabled:
             self.logger.debug(f"starting deleteScheduleJob with ID: {scheduleId}")
         path = f"/scheduledjobs/{scheduleId}"
         res = self.connector.deleteData(self._getSchedulerEndpoint() + path)
         return res
 
-    def getDeliverySettings(self) -> list:
+    def getDeliverySettings(self, *, showWarning: bool = True) -> list:
         """
         Return a list of delivery settings.
+        Arguments:
+            showWarning : OPTIONAL : Set to False to suppress the unofficial endpoint warning. Default True.
         """
+        self._warnUnofficialEndpoint(showWarning)
         path = f"/deliverysettings/"
         params = {'expansion': 'definition', "limit": 1000}  # the API caps page size at 1000
         lastPage = False
@@ -1855,18 +1878,21 @@ class Analytics:
             page_nb += 1
         return data
 
-    def getDeliverySetting(self, deliverySettingId: str = None) -> dict:
+    def getDeliverySetting(self, deliverySettingId: str = None, *, showWarning: bool = True) -> dict:
         """
         Retrieve the delivery setting from a scheduled project.
         Argument:
             deliverySettingId : REQUIRED : The delivery setting ID of the scheduled project.
+            showWarning : OPTIONAL : Set to False to suppress the unofficial endpoint warning. Default True.
         """
+        self._warnUnofficialEndpoint(showWarning)
         path = f"/deliverysettings/{deliverySettingId}/"
         params = {'expansion': 'definition'}
         res = self.connector.getData(self._getSchedulerEndpoint() + path, params=params)
         return res
 
-    def createDeliverySetting(self, loginIds: list = None, emails: list = None, groupIds: list = None) -> dict:
+    def createDeliverySetting(self, loginIds: list = None, emails: list = None, groupIds: list = None, *,
+                              showWarning: bool = True) -> dict:
         """
         Create a delivery setting for a specific scheduled project.
         Automatically used when using `createScheduleJob`.
@@ -1874,7 +1900,9 @@ class Analytics:
             loginIds : REQUIRED : List of login ID to send the scheduled project to. Can be retrieved by the getUsers method.
             emails : OPTIONAL : In case the recipient are not in the analytics interface.
             groupIds : OPTIONAL : List of group ID to send the scheduled project to.
+            showWarning : OPTIONAL : Set to False to suppress the unofficial endpoint warning. Default True.
         """
+        self._warnUnofficialEndpoint(showWarning)
         path = f"/deliverysettings/"
         if loginIds is None:
             loginIds = []
@@ -1896,7 +1924,7 @@ class Analytics:
         return res
 
     def updateDeliverySetting(self, deliveryId: str = None, loginIds: list = None, emails: list = None,
-                              groupIds: list = None) -> dict:
+                              groupIds: list = None, *, showWarning: bool = True) -> dict:
         """
         Create a delivery setting for a specific scheduled project.
         Automatically created for email setting.
@@ -1905,9 +1933,11 @@ class Analytics:
             loginIds : REQUIRED : List of login ID to send the scheduled project to. Can be retrieved by the getUsers method.
             emails : OPTIONAL : In case the recipient are not in the analytics interface.
             groupIds : OPTIONAL : List of group ID to send the scheduled project to.
+            showWarning : OPTIONAL : Set to False to suppress the unofficial endpoint warning. Default True.
         """
         if deliveryId is None:
             raise ValueError("Require a delivery setting ID")
+        self._warnUnofficialEndpoint(showWarning)
         path = f"/deliverysettings/{deliveryId}"
         if loginIds is None:
             loginIds = []
@@ -1928,14 +1958,16 @@ class Analytics:
         res = self.connector.putData(self._getSchedulerEndpoint() + path, data=data)
         return res
 
-    def deleteDeliverySetting(self, deliveryId: str = None) -> dict:
+    def deleteDeliverySetting(self, deliveryId: str = None, *, showWarning: bool = True) -> dict:
         """
         Delete a delivery setting based on the ID passed.
         Arguments:
             deliveryId : REQUIRED : The delivery setting ID to be deleted.
+            showWarning : OPTIONAL : Set to False to suppress the unofficial endpoint warning. Default True.
         """
         if deliveryId is None:
             raise ValueError("Require a delivery setting ID")
+        self._warnUnofficialEndpoint(showWarning)
         path = f"/deliverysettings/{deliveryId}"
         res = self.connector.deleteData(self._getSchedulerEndpoint() + path)
         return res
