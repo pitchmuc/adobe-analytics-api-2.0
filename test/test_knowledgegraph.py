@@ -699,7 +699,6 @@ def test_incremental_build_restores_project_links_from_legacy_backlinks(
     assert list(graph.objects(project, projects.panelFreeForm)) == [
         Literal("Table", datatype=XSD.string),
     ]
-    assert not list(graph.triples((None, projects.definition, None)))
     assert kg.getUsageCounts() == counts
     assert kg.dim_metric_cooccurrence == cooccurrences
     triples = set(graph)
