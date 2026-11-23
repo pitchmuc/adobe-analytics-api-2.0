@@ -2018,6 +2018,16 @@ class Analytics:
                 with open('projects.json', 'w') as f:
                     f.write(json.dumps(res, indent=2))
             return res
+        if isinstance(res, dict):
+            # The API sends an error body (a dict) instead of a list of projects, for
+            # example when the user lacks access. pd.DataFrame() on that dict fails with
+            # "If using all scalar values, you must pass an index", which hides the cause.
+            code = res.get("errorCode") or res.get("error_code") or res.get("statusCode")
+            description = res.get("errorDescription") or res.get("message") or res.get("error")
+            raise ValueError(
+                f"getProjects did not return a list of projects. The API returned: {code}: {description}. "
+                'Use format="raw" to see the full response.'
+            )
         df = pd.DataFrame(res)
         if df.empty == False:
             df['created'] = pd.to_datetime(df['created'], format='%Y-%m-%dT%H:%M:%SZ')
