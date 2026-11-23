@@ -643,9 +643,9 @@ class KnowledgeGraph:
                     - 'users' : Load projects based on the user(s) who own them (requires a list of user email addresses)
             """
             def get_project_details(project):
-                        project_id = project.get('id')
-                        project_details = self.analyticsAPI.getProject(projectId=project_id)
-                        return WorkspaceManager(project_details)
+                project_id = project.get('id')
+                project_details = self.analyticsAPI.getProject(projectId=project_id)
+                return WorkspaceManager(project_details)
             if projects == "all":
                 projects = self.projects
             elif isinstance(projects, int):
