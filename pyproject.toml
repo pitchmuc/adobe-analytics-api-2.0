@@ -26,10 +26,8 @@ classifiers = [
 ]
 dependencies = [
     'pandas>=0.25.3',
-    'pathlib',
     'requests',
     "dicttoxml",
-    "pytest",
     "openpyxl>2.6.0",
     "deprecation",
     "httpx",
@@ -55,4 +53,4 @@ mypkg = ["*.pickle"]
 aanalytics2 = ["resources/*.md"]
 
 [project.optional-dependencies]
-dynamic = ["version"]
+test = ["pytest"]

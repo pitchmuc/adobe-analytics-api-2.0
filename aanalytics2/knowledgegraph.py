@@ -2,7 +2,6 @@ import time, datetime
 import logging
 from concurrent import futures
 from pathlib import Path
-from tkinter import NO
 from aanalytics2 import WorkspaceManager, Login
 from rdflib.namespace import RDF, RDFS, XSD
 from rdflib import Graph, Namespace, Literal, URIRef, BNode

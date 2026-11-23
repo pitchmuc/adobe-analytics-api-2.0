@@ -47,11 +47,8 @@ setup(
     include_package_data=True,
     install_requires=[
         'pandas>=0.25.3',
-        'pathlib2',
-        'pathlib',
         'requests',
         "dicttoxml",
-        "pytest",
         "openpyxl>2.6.0",
         "deprecation",
         "httpx",
