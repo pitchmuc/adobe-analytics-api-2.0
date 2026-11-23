@@ -1,8 +1,6 @@
 pandas>1.0.0
-pathlib2>=2.3.5
 requests>=2.22.0
 dicttoxml>=1.7.4
-pathlib>=1.0.0
 openpyxl>=2.6.1
 deprecation
 httpx
