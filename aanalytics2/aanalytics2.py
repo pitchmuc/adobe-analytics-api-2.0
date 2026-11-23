@@ -2334,9 +2334,13 @@ class Analytics:
             raise ValueError("Data to be sent is required")
         path = f"/datasources/job/{rsid}/{accountId}"
         privateHeader = deepcopy(self.header)
-        privateHeader['Content-Type'] = 'text/csv'
-        files = {'file': (data,open(data, 'rb'),'multipart/form-data')}
-        res = self.connector.postData(self.endpoint_company + path, files=files, headers=privateHeader)
+        # requests must set "multipart/form-data; boundary=..." itself; any other Content-Type breaks the upload (HTTP 415).
+        # None (not pop) is needed, because the session also carries the default "application/json" header
+        # and requests only drops a session header if the request sets it to None.
+        privateHeader['Content-Type'] = None
+        with open(data, 'rb') as f:
+            files = {'file': (os.path.basename(data), f, 'text/plain')}
+            res = self.connector.postData(self.endpoint_company + path, files=files, headers=privateHeader)
         return res
     
     def getDataSourceJobs(self, rsid: str = None, accountId: str = None, status:str=None, start_date:str=None,end_date:str=None,format: str = "df") -> JsonListOrDataFrameType:
