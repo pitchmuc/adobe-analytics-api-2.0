@@ -54,10 +54,16 @@ The Knowledge Graph tools only appear if you start the server with a `.ttl` file
 
 ## Installing
 
-From your local checkout of the repository:
+The MCP server needs the optional `mcp` package, which a plain `pip install aanalytics2` does not install. Install the package with the `mcp` extra:
 
 ```bash
-pip install -e .
+pip install "aanalytics2[mcp]"
+```
+
+Or, from your local checkout of the repository:
+
+```bash
+pip install -e ".[mcp]"
 ```
 
 This installs the `mcp` dependency and registers the `aanalytics2-mcp` console script on your `PATH`. Confirm it resolved correctly:
