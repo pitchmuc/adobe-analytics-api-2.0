@@ -54,10 +54,16 @@ setup(
         "deprecation",
         "httpx",
         "rich>=13.0.0",
+        "rdflib",
     ],
+    extras_require={
+        "mcp": ["mcp>=2.0"],
+        "test": ["pytest", "mcp>=2.0"],
+    },
     entry_points={
         "console_scripts": [
             "aanalytics2=aanalytics2.cli.__main__:main",
+            "aanalytics2-mcp=aanalytics2.mcp_server:main",
         ],
     },
     classifiers=CLASSIFIERS,

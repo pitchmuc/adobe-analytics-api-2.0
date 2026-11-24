@@ -24,8 +24,17 @@ from aanalytics2.configs import importConfigFile, find_path
 from aanalytics2.requestCreator import RequestCreator
 from aanalytics2.workspaceManager import WorkspaceManager, FreeForm
 
-from mcp.server.mcpserver import MCPServer
-from mcp.server.mcpserver.exceptions import ToolError
+try:
+    from mcp.server.mcpserver import MCPServer
+    from mcp.server.mcpserver.exceptions import ToolError
+except ModuleNotFoundError as exc:
+    if exc.name is None or exc.name.split(".")[0] != "mcp":
+        raise
+    raise ModuleNotFoundError(
+        "The aanalytics2 MCP server needs the optional 'mcp' package. "
+        "Install it with: pip install \"aanalytics2[mcp]\"",
+        name=exc.name,
+    ) from exc
 
 
 _ApiResult = TypeVar("_ApiResult")

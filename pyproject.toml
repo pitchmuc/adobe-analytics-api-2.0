@@ -34,7 +34,6 @@ dependencies = [
     "httpx",
     "rich>=13.0.0",
     "rdflib",
-    "mcp>=2.0",
 ]
 dynamic = ["version"]
 
@@ -54,4 +53,5 @@ mypkg = ["*.pickle"]
 aanalytics2 = ["resources/*.md"]
 
 [project.optional-dependencies]
-test = ["pytest"]
+mcp = ["mcp>=2.0"]
+test = ["pytest", "mcp>=2.0"]
