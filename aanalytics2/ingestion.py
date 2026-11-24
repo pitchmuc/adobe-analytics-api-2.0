@@ -21,11 +21,12 @@ class DIAPI:
         example : "xxxx.sc.omtrdc.net"
     """
 
-    def __init__(self, rsid: str = None, tracking_server: str = None):
+    def __init__(self, rsid: str = None, tracking_server: str = None, verbose: bool = False):
         """
         Arguments:
             rsid : REQUIRED : Report Suite ID
             tracking_server : REQUIRED : tracking server for tracking.
+            verbose : OPTIONAL : Print diagnostic messages to stdout when True (default False).
         """
         if rsid is None:
             raise Exception("Expecting a ReportSuite ID (rsid)")
@@ -43,7 +44,8 @@ class DIAPI:
                 path = pkg_resources.resource_filename(
                     "aanalytics2", "supported_tags.pickle")
             except:
-                print('no supported_tags file')
+                if verbose:
+                    print('no supported_tags file')
         try:
             with path as f:
                 self.REFERENCE = pd.read_pickle(f)
@@ -115,7 +117,12 @@ class Bulkapi:
         endpoint : OPTIONAL : by default using https://analytics-collection.adobe.io
     """
 
-    def __init__(self, endpoint: str = "https://analytics-collection.adobe.io", config_object: dict = config.config_object):
+    def __init__(
+        self,
+        endpoint: str = "https://analytics-collection.adobe.io",
+        config_object: dict = config.config_object,
+        verbose: bool = False,
+    ):
         """
         Initialize the Bulk API connection. Returns an object with methods to send data to Analytics.
         Arguments:
@@ -124,6 +131,7 @@ class Bulkapi:
                     - https://analytics-collection-va7.adobe.io	(US)
                     - https://analytics-collection-nld2.adobe.io (EU)
             config_object : REQUIRED : config object containing the different information to send data.
+            verbose : OPTIONAL : Print diagnostic messages to stdout when True (default False).
         """
         self.endpoint = endpoint
         try:
@@ -137,7 +145,8 @@ class Bulkapi:
                 path = pkg_resources.resource_filename(
                     "aanalytics2", "CSV_Column_and_Query_String_Reference.pickle")
             except:
-                print('no CSV_Column_and_Query_string_Reference file')
+                if verbose:
+                    print('no CSV_Column_and_Query_string_Reference file')
         try:
             with path as f:
                 self.REFERENCE = pd.read_pickle(f)

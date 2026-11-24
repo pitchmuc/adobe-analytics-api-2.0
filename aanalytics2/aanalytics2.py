@@ -103,17 +103,18 @@ class Login:
                 self.logger.error(f"Error trying to get companyId: {json_res}")
             return None
 
-    def createAnalyticsConnection(self, companyId: str = None, loggingObject: dict = None) -> object:
+    def createAnalyticsConnection(self, companyId: str = None, loggingObject: dict = None, verbose: bool = False) -> object:
         """
         Returns an instance of the Analytics class so you can query the different elements from that instance.
         Arguments:
             companyId: REQUIRED : The globalCompanyId that you want to use in your connection
             loggingObject : OPTIONAL : If you want to set logging capability for your actions.
+            verbose : OPTIONAL : Print diagnostic messages to stdout when True (default False).
         the retry parameter set in the previous class instantiation will be used here.
         """
         analytics = Analytics(company_id=companyId,
                               config_object=self.connector.config, header=self.header, retry=self.retry,
-                              loggingObject=loggingObject)
+                              loggingObject=loggingObject, verbose=verbose)
         return analytics
 
 
@@ -171,7 +172,8 @@ class Analytics:
                  header: dict = None,
                  retry: int = 0,
                  loggingObject: dict = None,
-                 proxy: str | dict | None = None):
+                 proxy: str | dict | None = None,
+                 verbose: bool = False):
         """
         Instantiate the Analytics class.
         The Analytics class will be automatically connected to the API 2.0.
@@ -220,8 +222,9 @@ class Analytics:
                 streamHandler.setFormatter(formatter)
                 self.logger.addHandler(streamHandler)
         self.connector = connector.AdobeRequest(
-            config_object=config_object, header=header, retry=retry, loggingEnabled=self.loggingEnabled,
+            config_object=config_object, header=header, verbose=verbose, retry=retry, loggingEnabled=self.loggingEnabled,
             logger=self.logger,company_id=company_id, proxy=proxy)
+        self.verbose = verbose
         self.header = self.connector.header
         self.endpoint_company = f"{self._endpoint}/{company_id}"
         self.schedulerEndpoint = None  # resolved lazily via _getSchedulerEndpoint()
@@ -242,7 +245,8 @@ class Analytics:
                 pathLOGS = pkg_resources.resource_filename(
                     "aanalytics2", "eventType_usageLogs.pickle")
             except:
-                print('Empty LOGS_EVENT_TYPE attribute')
+                if verbose:
+                    print('Empty LOGS_EVENT_TYPE attribute')
         try:
             with pathLOGS as f:
                 self.LOGS_EVENT_TYPE = pd.read_pickle(f)
@@ -326,7 +330,7 @@ class Analytics:
         return df_full
 
     def getReportSuites(self, txt: str = None, rsid_list: str = None, limit: int = 100, extended_info: bool = False,
-                        save: bool = False) -> list:
+                        save: bool = False, verbose: bool = False) -> list:
         """
         Get the reportSuite IDs data. Returns a dataframe of reportSuite name and report suite id.
         Arguments:
@@ -391,13 +395,15 @@ class Analytics:
             df_rsids.to_csv('RSIDS.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
             message = f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request'
-            print(message)
+            if verbose:
+                print(message)
             if self.loggingEnabled:
                 self.logger.warning(message)
         return df_rsids
 
     def getVirtualReportSuites(self, extended_info: bool = False, limit: int = 100, filterIds: str = None,
-                               idContains: str = None, segmentIds: str = None, save: bool = False) -> list:
+                               idContains: str = None, segmentIds: str = None, save: bool = False,
+                               verbose: bool = False) -> list:
         """
         return a lit of virtual reportSuites and their id. It can contain more information if expansion is selected.
         Arguments:
@@ -464,7 +470,8 @@ class Analytics:
             df_vrsids.to_csv('VRSIDS.csv', sep='\t')
         if nb_error > 0 or nb_empty > 0:
             message = f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve reportSuite or increase limit per request'
-            print(message)
+            if verbose:
+                print(message)
             if self.loggingEnabled:
                 self.logger.warning(message)
         return df_vrsids
@@ -816,7 +823,7 @@ class Analytics:
             df_users['lastAccess'] = pd.to_datetime(df_users['lastAccess'])
         if save:
             df_users.to_csv(f'users_{int(time.time())}.csv', sep='\t')
-        if nb_error > 0 or nb_empty > 0:
+        if (nb_error > 0 or nb_empty > 0) and verbose:
             print(
                 f'WARNING : Retrieved data are partial.\n{nb_error}/{len(list_urls) + 1} requests returned an error.\n{nb_empty}/{len(list_urls)} requests returned an empty response. \nTry to use filter to retrieve users or increase limit')
         return df_users
@@ -987,7 +994,7 @@ class Analytics:
                     }
         return res
 
-    def createSegment(self, segmentJSON: dict = None) -> dict:
+    def createSegment(self, segmentJSON: dict = None, verbose: bool = False) -> dict:
         """
         Method that creates a new segment based on the dictionary passed to it.
         Arguments:
@@ -997,7 +1004,8 @@ class Analytics:
         if self.loggingEnabled:
             self.logger.debug(f"starting createSegment")
         if segmentJSON is None:
-            print('No segment data has been pushed')
+            if verbose:
+                print('No segment data has been pushed')
             return None
         data = deepcopy(segmentJSON)
         seg = self.connector.postData(
@@ -1007,7 +1015,7 @@ class Analytics:
         )
         return seg
 
-    def createSegmentValidate(self, segmentJSON: dict = None) -> object:
+    def createSegmentValidate(self, segmentJSON: dict = None, verbose: bool = False) -> object:
         """
         Method that validate a new segment based on the dictionary passed to it.
         Arguments:
@@ -1017,14 +1025,15 @@ class Analytics:
         if self.loggingEnabled:
             self.logger.debug(f"starting createSegmentValidate")
         if segmentJSON is None:
-            print('No segment data has been pushed')
+            if verbose:
+                print('No segment data has been pushed')
             return None
         data = deepcopy(segmentJSON)
         path = "/segments/validate"
         seg = self.connector.postData(self.endpoint_company + path, data=data)
         return seg
 
-    def updateSegment(self, segmentID: str = None, segmentJSON: dict = None) -> object:
+    def updateSegment(self, segmentID: str = None, segmentJSON: dict = None, verbose: bool = False) -> object:
         """
         Method that updates a specific segment based on the dictionary passed to it.
         Arguments:
@@ -1034,7 +1043,8 @@ class Analytics:
         if self.loggingEnabled:
             self.logger.debug(f"starting updateSegment")
         if segmentJSON is None or segmentID is None:
-            print('No segment or segmentID data has been pushed')
+            if verbose:
+                print('No segment or segmentID data has been pushed')
             if self.loggingEnabled:
                 self.logger.error(f"No segment or segmentID data has been pushed")
             return None
@@ -1046,14 +1056,15 @@ class Analytics:
         )
         return seg
 
-    def deleteSegment(self, segmentID: str = None) -> object:
+    def deleteSegment(self, segmentID: str = None, verbose: bool = False) -> object:
         """
         Method that delete a specific segment based the ID passed.
         Arguments:
             segmentID : REQUIRED : Segment ID to be deleted
         """
         if segmentID is None:
-            print('No segmentID data has been pushed')
+            if verbose:
+                print('No segmentID data has been pushed')
             return None
         if self.loggingEnabled:
             self.logger.debug(f"starting deleteSegment for {segmentID}")
@@ -1243,7 +1254,7 @@ class Analytics:
         cm = self.connector.postData(self.endpoint_company + path, data=metricJSON)
         return cm
 
-    def updateCalculatedMetric(self, calcID: str = None, calcJSON: dict = None) -> object:
+    def updateCalculatedMetric(self, calcID: str = None, calcJSON: dict = None, verbose: bool = False) -> object:
         """
         Method that updates a specific Calculated Metrics based on the dictionary passed to it.
         Arguments:
@@ -1251,7 +1262,8 @@ class Analytics:
             calcJSON : REQUIRED : the dictionary that represents the JSON statement for the calculated metric.
         """
         if calcJSON is None or calcID is None:
-            print('No calcMetric or calcMetric JSON data has been passed')
+            if verbose:
+                print('No calcMetric or calcMetric JSON data has been passed')
             return None
         if self.loggingEnabled:
             self.logger.debug(f"starting updateCalculatedMetric for {calcID}")
@@ -1263,14 +1275,15 @@ class Analytics:
         )
         return cm
 
-    def deleteCalculatedMetric(self, calcID: str = None) -> object:
+    def deleteCalculatedMetric(self, calcID: str = None, verbose: bool = False) -> object:
         """
         Method that delete a specific calculated metrics based on the id passed..
         Arguments:
             calcID : REQUIRED : Calculated Metrics ID to be deleted
         """
         if calcID is None:
-            print('No calculated metrics data has been passed')
+            if verbose:
+                print('No calculated metrics data has been passed')
             return None
         if self.loggingEnabled:
             self.logger.debug(f"starting deleteCalculatedMetric for {calcID}")
@@ -1329,7 +1342,7 @@ class Analytics:
         return df_dates
 
     
-    def createDateRange(self,dateRangeJSON: dict = None) -> dict:
+    def createDateRange(self, dateRangeJSON: dict = None, verbose: bool = False) -> dict:
         """
         Create a date range based on the dictionary passed to it.
         Arguments:
@@ -1338,7 +1351,8 @@ class Analytics:
         if self.loggingEnabled:
             self.logger.debug(f"starting createDateRange")
         if dateRangeJSON is None:
-            print('No date range data has been pushed')
+            if verbose:
+                print('No date range data has been pushed')
             return None
         data = deepcopy(dateRangeJSON)
         dr = self.connector.postData(
@@ -1385,14 +1399,15 @@ class Analytics:
         )
         return dr
 
-    def deleteDateRange(self, dateRangeID: str = None) -> object:
+    def deleteDateRange(self, dateRangeID: str = None, verbose: bool = False) -> object:
         """
         Method that deletes a specific date Range based on the id passed.
         Arguments:
             dateRangeID : REQUIRED : ID of Date Range  to be deleted
         """
         if dateRangeID is None:
-            print('No Date Range ID has been pushed')
+            if verbose:
+                print('No Date Range ID has been pushed')
             return None
         if self.loggingEnabled:
             self.logger.debug(f"starting deleteDateRange for {dateRangeID}")
@@ -4564,17 +4579,18 @@ class Analytics:
             if 'lastPage' not in report and unsafe == False:  # checking error when no lastPage key in report
                 if verbose:
                     print(json.dumps(report, indent=2))
-                print('Warning : Server Error')
-                print(json.dumps(report))
+                    print('Warning : Server Error')
+                    print(json.dumps(report))
                 if debug:
                     with open(f'server_failure_request_{timestamp}.json', 'w') as f:
                         f.write(json.dumps(request, indent=4))
                     with open(f'server_failure_response_{timestamp}.json', 'w') as f:
                         f.write(json.dumps(report, indent=4))
-                    print(
-                        f'Warning : Save JSON request : server_failure_request_{timestamp}.json')
-                    print(
-                        f'Warning : Save JSON response : server_failure_response_{timestamp}.json')
+                    if verbose:
+                        print(
+                            f'Warning : Save JSON request : server_failure_request_{timestamp}.json')
+                        print(
+                            f'Warning : Save JSON response : server_failure_response_{timestamp}.json')
                 obj['data'] = pd.DataFrame()
                 return obj
             # fallback when no lastPage in report
@@ -4582,16 +4598,18 @@ class Analytics:
             if verbose:
                 print(f'last page status : {last_page}')
             if 'errorCode' in report.keys():
-                print('Error with your statement \n' +
-                      report['errorDescription'])
+                if verbose:
+                    print('Error with your statement \n' +
+                          report['errorDescription'])
                 return {report['errorCode']: report['errorDescription']}
             count_elements += report.get('numberOfElements', 0)
             total_elements = report.get(
                 'totalElements', request['settings']['limit'])
             if total_elements == 0:
                 obj['data'] = pd.DataFrame()
-                print(
-                    'Warning : No data returned & lastPage is False.\nExit the loop - no save file & empty dataframe.')
+                if verbose:
+                    print(
+                        'Warning : No data returned & lastPage is False.\nExit the loop - no save file & empty dataframe.')
                 if debug:
                     with open(f'report_no_element_{timestamp}.json', 'w') as f:
                         f.write(json.dumps(report, indent=4))

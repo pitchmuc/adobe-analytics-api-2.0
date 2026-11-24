@@ -195,33 +195,57 @@ class Workspace:
         """
         Breakdown a specific index or value of the dataframe, by another dimension.
         NOTE: breakdowns are possible only from normal reportType.
+        Does not mutate this Workspace instance, so multiple breakdowns (across
+        different dimensions or rows) can be executed from the same original report.
         Return a workspace instance.
         Arguments:
-            index : REQUIRED : Value to use as filter for the breakdown or index of the dataframe to use for the breakdown.
+            index : REQUIRED : Value (or itemId) to use as filter for the breakdown, or 0-based row index of the dataframe.
             dimension : REQUIRED : dimension to report.
             n_results : OPTIONAL : number of results you want to have on your breakdown. Default 10, can use "inf"
         """
-        n_results = float(n_results) ## transforming n_result in float
         if index is None or dimension is None:
             raise ValueError(
                 "Require a value to use as breakdown and dimension to request"
             )
-        breadown_dimension = list(self.dataframe.columns)[1]
-        if type(index) == str:
-            row: pd.Series = self.dataframe[self.dataframe.iloc[:, 1] == index]
-            itemValue: str = row["itemId"].values[0]
-        elif type(index) == int:
-            itemValue = self.dataframe.loc[index, "itemId"]
-        breakdown = f"{breadown_dimension}:::{itemValue}"
+        if self.reportType != "normal":
+            raise ValueError(
+                f"Breakdowns are only supported on 'normal' reports (got reportType={self.reportType!r})."
+            )
+        if self.dataframe is None or self.dataframe.empty or len(self.dataframe.columns) < 2:
+            raise ValueError("Cannot run a breakdown on an empty report.")
+        req_dict = self.dataRequest.to_dict() if hasattr(self.dataRequest, "to_dict") else {}
+        breakdown_dimension = req_dict.get("dimension") or list(self.dataframe.columns)[1]
+        if isinstance(index, str):
+            row = self.dataframe[self.dataframe.iloc[:, 1] == index]
+            if row.empty and "itemId" in self.dataframe.columns:
+                row = self.dataframe[self.dataframe["itemId"].astype(str) == index]
+            if row.empty:
+                raise ValueError(
+                    f"Row value or itemId {index!r} not found in dimension {breakdown_dimension!r}."
+                )
+            itemValue = str(row["itemId"].iloc[0])
+        elif isinstance(index, int) and not isinstance(index, bool):
+            if index < 0 or index >= len(self.dataframe):
+                raise ValueError(
+                    f"Row index {index} out of range (report has {len(self.dataframe)} rows)."
+                )
+            itemValue = str(self.dataframe.iloc[index]["itemId"])
+        else:
+            raise ValueError(
+                f"index must be a 0-based row integer or a dimension value/itemId string, got {type(index).__name__}."
+            )
+        breakdown_filter = f"{breakdown_dimension}:::{itemValue}"
         new_request = RequestCreator(self.dataRequest.to_dict())
         new_request.setDimension(dimension)
-        metrics = new_request.getMetrics()
-        for metric in metrics:
-            new_request.addMetricFilter(metricId=metric, filterId=breakdown)
-        new_request.setLimit(n_results)
-        report = self.analyticsObject.getReport2(
-            new_request, n_results=n_results
-        )
+        new_request.addMetricFilter(metricId="all", filterId=breakdown_filter)
+        if isinstance(n_results, str) and n_results.lower() == "inf":
+            report = self.analyticsObject.getReport2(new_request, n_results="inf")
+        else:
+            limit_int = int(float(n_results))
+            new_request.setLimit(limit_int)
+            report = self.analyticsObject.getReport2(
+                new_request, n_results=limit_int, limit=limit_int
+            )
         return report
 
 
@@ -269,6 +293,7 @@ class TargetWorkspace(Workspace):
         method: str = 'z-test',
         apiCalls: int = 0,
         activityFilter: str = None,
+        verbose: bool = False,
     ) -> None:
         """
         Build a TargetWorkspace directly from raw report API response data.
@@ -375,7 +400,8 @@ class TargetWorkspace(Workspace):
         try:
             self.dataframe = self._compute_confidence(df.copy())
         except Exception as e:
-            print(f"Error computing confidence. The data returned may not be suitable for confidence computation: {e}")
+            if verbose:
+                print(f"Error computing confidence. The data returned may not be suitable for confidence computation: {e}")
             self.dataframe = df.copy()
 
     def _betacf(self, a: float, b: float, x: float, max_iter: int = 200, eps: float = 3e-7) -> float:
