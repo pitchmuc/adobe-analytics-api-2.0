@@ -1138,6 +1138,9 @@ class WorkspaceManager:
         config=None,
         companyId=None,
         analytics=None,
+        component_lookups: Optional[tuple] = None,
+        owner_info: Optional[dict] = None,
+        rsid_name: Optional[str] = None,
     ) -> None:
         """
         Arguments:
@@ -1202,8 +1205,11 @@ class WorkspaceManager:
         else:
             self._analytics = analytics
         # Normalise the owner argument
-        userMe = self._analytics.getUserMe() if self._analytics else None
-        self.owner: dict = {"id": userMe["loginId"], "name": userMe.get("name", ""), "login": userMe.get("login", "")} if userMe else {"id": None, "name": "", "login": ""}
+        if owner_info is not None:
+            self.owner = dict(owner_info)
+        else:
+            userMe = self._analytics.getUserMe() if self._analytics else None
+            self.owner: dict = {"id": userMe["loginId"], "name": userMe.get("name", ""), "login": userMe.get("login", "")} if userMe else {"id": None, "name": "", "login": ""}
         # Normalise tags
         if tags:
             for t in tags:
@@ -1235,7 +1241,9 @@ class WorkspaceManager:
             self.organizationTemplate = data.get("organizationTemplate")
             if data.get("owner"):
                 self.owner = dict(data["owner"])
-            if self._analytics:
+            if rsid_name is not None:
+                self.rsid_name = rsid_name
+            elif self._analytics:
                 self.rsid_name = self._analytics.getReportSuite(self.rsid).get('name') or data.get("reportSuiteName", self.rsid)
             else:
                 self.rsid_name = data.get("reportSuiteName", self.rsid)
@@ -1284,9 +1292,17 @@ class WorkspaceManager:
             self.rsid = rsid
             self.name = name
             self.description = description
-            self.rsid_name = self._analytics.getReportSuite(self.rsid).get('name')
+            self.rsid_name = rsid_name if rsid_name is not None else self._analytics.getReportSuite(self.rsid).get('name')
 
-        if self._analytics:
+        if component_lookups is not None:
+            (
+                self._segments_id_name,
+                self._dim_id_name,
+                self._metric_id_name,
+                self._calc_metric_id_name,
+                self._date_ranges_id_name,
+            ) = component_lookups
+        elif self._analytics:
             (
                 self._segments_id_name,
                 self._dim_id_name,

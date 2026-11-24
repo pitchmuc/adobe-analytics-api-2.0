@@ -84,6 +84,7 @@ If `aanalytics2-mcp` isn't found (e.g. it's installed in a virtual environment y
 | `-kg`, `--knowledge_graph` | Path to a local Knowledge Graph `.ttl` file. Enables the KG tool group when loaded. If the file does not exist, the server warns on stderr and starts without a Knowledge Graph. |
 | `-kg-endpoint`, `--kg_endpoint` | Remote SPARQL endpoint URL. **Not implemented yet** — the server exits with an error if you pass this today. |
 | `-kg-ontology`, `--kg_ontology` | Path to a markdown file describing a custom Knowledge Graph ontology. Overrides the built-in default (see [below](#knowledge-graph-ontology-resource)). |
+| `--legacy-stdio` | Opt-in compatibility bridge for clients that probe `server/discover` and then fall back to `initialize` on the same connection. Rejects discovery before it reaches the SDK; retains MCP SDK 2.x and all tools/resources. Leave unset for native protocol negotiation. |
 
 `-kg` and `-kg-endpoint` are mutually exclusive.
 
@@ -195,6 +196,16 @@ This writes the entry to your user config at `~/.copilot/mcp-config.json`. Omit 
 
 Note this is `"type": "local"` (Copilot CLI's naming), not `"type": "stdio"` used by VS Code/Claude Code below — the `.vscode/mcp.json` format isn't read by Copilot CLI. As with the other clients, use absolute paths for `-cf`/`-kg` since the CLI doesn't run the server from your project directory. Run `copilot mcp list` to confirm the server registered, then ask Copilot to use an `aanalytics2` tool — no restart required for the CLI, though project-level files only load after you confirm folder trust.
 
+If connection logs report `connection is serving the 2026-07-28 protocol; the initialize
+handshake is not accepted` with `requested: 2025-11-25`, append `"--legacy-stdio"` to
+the server's `args` and run `/mcp reload`. SDK 2.x supports the older handshake, but an
+initial modern discovery probe can lock the connection before the client falls back.
+The bridge rejects that probe with JSON-RPC `Method not found`, allowing the client to
+initialize normally. It starts one child server process, forwards other messages unchanged,
+inherits stderr for diagnostics, and propagates the child's exit status. It does not restrict
+authoring tools or enforce element ownership; callers must still respect account permissions
+and any read-only/ownership requirements.
+
 ## VS Code setup
 
 VS Code can talk to MCP servers two ways: through **GitHub Copilot Chat's** built-in MCP support, or through the **Claude Code** extension. Both can be configured side by side; pick whichever you use day to day.
@@ -260,28 +271,35 @@ into `.mcp.json` (project scope) or your user-level Claude config (`claude mcp a
 | Group | Tools |
 | -- | -- |
 | Discovery | `list_report_suites`, `list_dimensions`, `list_metrics`, `list_segments`, `find_segment`, `list_calculated_metrics`, `find_calculated_metric`, `list_date_ranges`, `list_projects`, `get_segment`, `get_project` |
-| Reporting | `build_report_request`, `run_report`, `get_top_items` |
+| Reporting | `build_report_request`, `run_report`, `breakdown_report`, `list_cached_reports`, `get_top_items` |
 | Segment / Calculated Metric / Date Range authoring | `validate_segment`, `create_segment`, `update_segment`, `validate_calculated_metric`, `create_calculated_metric`, `update_calculated_metric`, `create_date_range`, `update_date_range` |
 | Workspace building | `create_workspace`, `add_panel`, `add_segment_filter`, `add_dropdown_filter`, `add_text`, `add_freeform`, `add_breakdown`, `add_chart`, `add_segment_comparison_table`, `publish_workspace`, `update_workspace` |
 | Classifications | `list_classification_datasets`, `get_classification_dataset_id`, `get_classification_dataset` |
-| Knowledge Graph *(needs `-kg`)* | `sparql_query`, `get_related_metrics`, `get_related_dimensions`, `get_related_segments`, `get_popular_combinations`, `get_component_context` |
+| Knowledge Graph *(only registered when `-kg` is loaded)* | `sparql_query`, `get_related_metrics`, `get_related_dimensions`, `get_related_segments`, `get_popular_combinations`, `get_component_context` |
 
 `list_segments`/`list_calculated_metrics` always hit the live API and return everything that matches, which on large accounts (thousands of segments/calculated metrics) can be very large. For a single lookup by name and/or rsid, use `find_segment`/`find_calculated_metric` instead — they query the local Knowledge Graph first (loaded with `-kg`), which is much cheaper, and only fall back to a live API call when: no Knowledge Graph is connected; the Knowledge Graph has no match for the given name/rsid (it's a point-in-time snapshot, so it can miss anything created or renamed since it was last built); or the caller passes `force_live=True` to explicitly bypass it. Either way the result is capped by `limit` (default 20) to keep the response small. The result is always `{"source": "knowledge_graph" | "live_api", "note": str | None, "results": [...]}` — `note` explains *why* the tool fell back to the live API and is only set when `source` is `"live_api"`, so a caller can tell at a glance whether an answer is Knowledge-Graph-backed or not.
 
-Workspace-building tools are stateless: each one takes the project dict returned by the previous call and returns an updated one, so a typical session chains `create_workspace` → `add_panel` → `add_freeform` → `add_chart` → `publish_workspace`. Each tool's full parameter list is in its own docstring, visible to the client when it inspects the tool.
+Reporting tools cache executed `Workspace` objects in memory for the session: `run_report` returns a `report_id` (e.g. `"report_1"`) alongside `rows`, `row_count`, and `columns`, and skips re-running identical requests unless `force_refresh=True` (or `request` can be omitted to run the most recent `build_report_request`, or set to an existing `report_id` to re-slice it). Pass that `report_id` to `breakdown_report(report_id, dimension_id, row=...)` (matching `row` by 0-based index, display value, or `itemId`) to drill down using `Workspace.breakdown` without mutating or re-executing the original report — so you can run multiple independent breakdowns with different dimensions on the same `report_id`, or chain multi-level breakdowns on the child `report_id`. Use `list_cached_reports` to inspect cached report handles.
+
+Workspace-building tools keep a single cached `WorkspaceManager` instance (and cache company/report-suite component lookup tables across workspaces), while still returning the updated project dict on each call. You can chain `create_workspace` → `add_panel` → `add_freeform` → `add_chart` → `publish_workspace` with `project` omitted on every subsequent step (targeting the active cached instance without resending the full project JSON or re-fetching lookup tables), or pass a workspace/project ID string or a project dict explicitly.
 
 `get_top_items` returns the dimension's display value alongside its Adobe `itemId`;
 the display value is not the numeric item ID. Knowledge Graph relationship tools
 return integer co-occurrence counts and preserve full component IDs such as
 `variables/page` and `metrics/visits`, so those IDs can be passed directly to the
 reporting tools. `get_component_context` returns the bare report suite ID for
-dimensions, metrics, segments, and calculated metrics.
+dimensions, metrics, segments, and calculated metrics. `sparql_query` supports
+read-only SPARQL 1.1 `SELECT`, `ASK`, `CONSTRUCT`, and `DESCRIBE` queries,
+automatically injects standard ontology `PREFIX` declarations when omitted, caps
+returned rows/triples via `limit` (default 200), and surfaces syntax or mutating
+SPARQL Update errors as `ToolError`s. When `-kg` is omitted (or missing), `rdflib`,
+the ontology resource, and the Knowledge Graph tool group are not loaded at all.
 Adobe API responses containing `errorCode` or `error` are surfaced as MCP tool
 errors with the API's error description, rather than successful results or empty
 classification/report lists. Validation results such as `{"valid": false}` remain
 normal responses so callers can inspect definition errors.
 
-To edit an **existing** project instead of building a new one, start from `get_project` instead of `create_workspace`, chain the same `add_*` tools on the returned dict, then call `update_workspace` instead of `publish_workspace` — `update_workspace` requires the project dict to still carry its original `"id"` (present on anything returned by `get_project`) and saves in place rather than creating a duplicate.
+To edit an **existing** project instead of building a new one, call `get_project(project_id)` first — it caches the fetched definition under `project_id` — then call `add_panel(project=project_id, ...)` (or pass the returned dict), chain the remaining `add_*` tools, and finish with `update_workspace()` instead of `publish_workspace` so it saves in place rather than creating a duplicate.
 
 There is no builder class for segment/calculated metric/date range definitions (unlike `build_report_request` or `WorkspaceManager`), so `validate_segment`/`create_segment`/`update_segment`/`validate_calculated_metric`/`create_calculated_metric`/`update_calculated_metric`/`create_date_range`/`update_date_range` take and submit the raw API dict shape directly. The most reliable way for an LLM client to produce that shape is to first fetch a similar existing component's full definition — `get_segment(segment_id)`, or `list_calculated_metrics`/`list_date_ranges` (both already return full metadata, including `"definition"`) — and adapt it rather than constructing one from scratch. Always call `validate_segment`/`validate_calculated_metric` before the corresponding `create_*`/`update_*` call to catch definition errors without saving a bad component; there is no validate endpoint for date ranges. Each `update_*` tool replaces the target's whole definition (identified by `segment_id`/`calculated_metric_id`/`date_range_id`), not just the fields you pass, so start from the existing component's dict and edit it rather than building a partial one. See the [segment](https://developer.adobe.com/analytics-apis/docs/2.0/guides/endpoints/segments/definition/) and [calculated metric](https://developer.adobe.com/analytics-apis/docs/2.0/guides/endpoints/calculatedmetrics/) definition references for the full syntax.
 

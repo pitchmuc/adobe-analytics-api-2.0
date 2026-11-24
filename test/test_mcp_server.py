@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import inspect
+import io
 from unittest.mock import Mock
 
 import pandas as pd
@@ -425,6 +426,36 @@ def startup(monkeypatch, tmp_path):
     return server_builder
 
 
+def test_main_legacy_stdio_relays_arguments_without_recursing(startup, monkeypatch):
+    from aanalytics2 import mcp_compat
+
+    relay = Mock(return_value=7)
+    monkeypatch.setattr(mcp_compat, "relay_legacy_stdio", relay)
+    stdin = io.TextIOWrapper(io.BytesIO())
+    stdout = io.TextIOWrapper(io.BytesIO())
+    monkeypatch.setattr(sys, "stdin", stdin)
+    monkeypatch.setattr(sys, "stdout", stdout)
+    monkeypatch.setattr(
+        sys, "argv",
+        [*sys.argv, "--legacy-stdio", "-cf", "config with spaces.json",
+         "-kg", "graph.ttl", "-kg-ontology", "ontology.md"],
+    )
+
+    with pytest.raises(SystemExit) as error:
+        mcp_server.main()
+
+    assert error.value.code == 7
+    relay.assert_called_once_with(
+        [sys.executable, "-u", "-m", "aanalytics2.mcp_server",
+         "-cf", "config with spaces.json", "-cid", "dummy", "-rsid", "rs1",
+         "-kg", "graph.ttl", "-kg-ontology", "ontology.md"],
+        stdin.buffer,
+        stdout.buffer,
+    )
+    startup.assert_not_called()
+    mcp_server.importConfigFile.assert_not_called()
+
+
 @pytest.mark.parametrize("flag", ["-kg", "--knowledge_graph"])
 @pytest.mark.parametrize("path_kind", ["relative", "absolute", "missing_parent"])
 def test_main_missing_knowledge_graph_warns_and_starts(
@@ -461,7 +492,7 @@ def test_main_without_knowledge_graph_starts_without_warning(startup, capsys):
 
 
 @pytest.mark.parametrize("empty", [False, True])
-def test_main_loads_existing_knowledge_graph(startup, monkeypatch, tmp_path, capsys, empty):
+def test_main_loads_existing_knowledge_graph(startup, monkeypatch, tmp_path, capsys, caplog, empty):
     expected = Graph() if empty else _build_test_kg()
     graph_path = tmp_path / "knowledge graph.ttl"
     expected.serialize(destination=graph_path, format="turtle")
@@ -477,6 +508,7 @@ def test_main_loads_existing_knowledge_graph(startup, monkeypatch, tmp_path, cap
     assert captured.out == ""
     assert f"Knowledge Graph loaded: {len(expected)} triples." in captured.err
     assert "Warning:" not in captured.err
+    assert "does not look like a valid URI" not in caplog.text
 
 
 def test_main_invalid_knowledge_graph_still_raises(startup, monkeypatch, tmp_path):
@@ -499,3 +531,310 @@ def test_main_unreadable_knowledge_graph_still_raises(startup, monkeypatch, tmp_
         mcp_server.main()
 
     startup.assert_not_called()
+
+
+# ── Workspace builder caching ────────────────────────────────────────────────
+
+
+def test_workspace_builder_caches_single_instance_and_lookup_tables(monkeypatch):
+    fetch_calls = 0
+    user_calls = 0
+    rs_calls = 0
+
+    async def counting_fetch(self):
+        nonlocal fetch_calls
+        fetch_calls += 1
+        return (
+            dict(_FAKE_LOOKUPS[0]),
+            dict(_FAKE_LOOKUPS[1]),
+            dict(_FAKE_LOOKUPS[2]),
+            dict(_FAKE_LOOKUPS[3]),
+            dict(_FAKE_LOOKUPS[4]),
+        )
+
+    class CountingAnalytics(DummyAnalytics):
+        def getUserMe(self):
+            nonlocal user_calls
+            user_calls += 1
+            return super().getUserMe()
+
+        def getReportSuite(self, rsid):
+            nonlocal rs_calls
+            rs_calls += 1
+            return super().getReportSuite(rsid)
+
+        def createProject(self, project):
+            return {"id": "p_published", **project}
+
+        def getProject(self, projectId=None):
+            return {
+                "id": projectId,
+                "name": "Existing Proj",
+                "description": "",
+                "rsid": "rs1",
+                "type": "project",
+                "definition": {"version": "98", "workspaces": [{"id": "ws_ext", "name": "Existing Proj", "panels": []}]},
+            }
+
+    monkeypatch.setattr(wmmod.WorkspaceManager, "_fetch_all_company_data", counting_fetch)
+    mcp = build_server(analytics=CountingAnalytics(), company_id="dummy", default_rsid="rs1")
+
+    # Chain builder calls omitting `project` — mutates the single cached WorkspaceManager instance.
+    _call(mcp, "create_workspace", {"rsid": "rs1", "name": "Cached Proj"})
+    _call(mcp, "add_panel", {"name": "Overview"})
+    _call(mcp, "add_text", {"title": "Note", "content": "Hello"})
+    _call(mcp, "add_freeform", {"title": "Browser Table", "metrics": ["metrics/visits"], "item_id": "variables/evar3"})
+    _call(mcp, "add_chart", {"viz_type": "bar", "source": 0, "title": "Visits Bar"})
+    # Newly created segment mid-session is immediately resolvable in the cached lookup table.
+    _call(mcp, "create_segment", {"segment": {"name": "VIP Visitors", "rsid": "rs1", "definition": {}}})
+    _call(mcp, "add_freeform", {"title": "VIP Table", "metrics": ["metrics/visits"], "items": ["s_new"]})
+    published = _call(mcp, "publish_workspace", {})
+
+    assert fetch_calls == 1
+    assert user_calls == 1
+    assert rs_calls == 1
+    assert published["id"] == "p_published"
+    vip_rows = published["definition"]["workspaces"][0]["panels"][-1]["subPanels"][-1]["reportlet"]["freeformTable"]["staticRows"]
+    assert vip_rows[0]["component"]["__metaData__"]["name"] == "VIP Visitors"
+
+    # Creating a second workspace on the same rsid OR editing a fetched get_project by ID
+    # also reuses the cached company/rsid lookups without hitting the network again.
+    _call(mcp, "create_workspace", {"rsid": "rs1", "name": "Second Proj"})
+    _call(mcp, "get_project", {"project_id": "p_existing"})
+    _call(mcp, "add_panel", {"project": "p_existing", "name": "Added Panel"})
+    updated = _call(mcp, "update_workspace", {})
+    assert updated["id"] == "p_existing"
+    assert fetch_calls == 1
+    assert user_calls == 1
+    assert rs_calls == 1
+
+
+# ── Report response caching & reusable breakdowns ────────────────────────────
+
+
+def test_run_report_caches_workspace_and_allows_multiple_independent_breakdowns():
+    from aanalytics2.workspace import Workspace
+
+    calls = []
+
+    class ReportAnalytics(DummyAnalytics):
+        def getMetrics(self, rsid=None, **kwargs):
+            return pd.DataFrame([{"id": "metrics/visits", "name": "Visits"}])
+
+        def getReport2(self, request=None, n_results=None, limit=None):
+            req_dict = request.to_dict() if hasattr(request, "to_dict") else dict(request)
+            calls.append(req_dict)
+            dim = req_dict["dimension"]
+            if dim == "variables/page":
+                rows = {"home_id": ["Home", 100], "cart_id": ["Cart", 40]}
+            elif dim == "variables/evar3":
+                rows = {"br_1": ["Chrome", 70], "br_2": ["Safari", 30]}
+            elif dim == "variables/evar8":
+                rows = {"mkt_1": ["US", 60], "mkt_2": ["DE", 40]}
+            else:
+                rows = {"sub_1": ["SubVal", 25]}
+            return Workspace(
+                responseData=rows,
+                dataRequest=req_dict,
+                columns={"columnIds": ["0"]},
+                summaryData={},
+                analyticsConnector=self,
+                reportType="normal",
+                metrics={"0": "metrics/visits"},
+                resolveColumns=True,
+            )
+
+    mcp = build_server(analytics=ReportAnalytics(), company_id="dummy", default_rsid="rs1")
+
+    req = _call(mcp, "build_report_request", {
+        "dimension_id": "variables/page",
+        "metrics": ["metrics/visits"],
+        "date_range": "2024-01-01/2024-01-31",
+    })
+    first = _call(mcp, "run_report", {"request": req, "n_results": 20})
+    assert first["report_id"] == "report_1"
+    assert first["cached"] is False
+    assert len(calls) == 1
+
+    # Re-running the same request dict or by report_id returns from cache without calling getReport2.
+    second = _call(mcp, "run_report", {"request": req, "n_results": 20})
+    by_id = _call(mcp, "run_report", {"request": "report_1", "n_results": 1})
+    assert second["cached"] is True
+    assert by_id["cached"] is True
+    assert len(by_id["rows"]) == 1
+    assert len(calls) == 1
+
+    # Breakdown #1 on report_1 by variables/evar3.
+    bd_browser = _call(mcp, "breakdown_report", {
+        "report_id": "report_1",
+        "row": "Home",
+        "dimension_id": "variables/evar3",
+        "n_results": 10,
+    })
+    assert bd_browser["report_id"] == "report_2"
+    assert bd_browser["parent_report_id"] == "report_1"
+    assert bd_browser["breakdown_filter"] == "variables/page:::home_id"
+    assert bd_browser["cached"] is False
+    assert len(calls) == 2
+
+    # Breakdown #2 on the SAME original report_1 using a DIFFERENT dimension (variables/evar8):
+    # original report_1 is not re-executed and does NOT carry variables/evar3's filter.
+    bd_market = _call(mcp, "breakdown_report", {
+        "report_id": "report_1",
+        "row": 0,
+        "dimension_id": "variables/evar8",
+        "n_results": 10,
+    })
+    assert bd_market["report_id"] == "report_3"
+    assert bd_market["parent_report_id"] == "report_1"
+    assert bd_market["breakdown_filter"] == "variables/page:::home_id"
+    assert len(calls) == 3
+    market_filters = calls[-1]["metricContainer"]["metricFilters"]
+    assert len(market_filters) == 1
+    assert market_filters[0]["dimension"] == "variables/page"
+    assert market_filters[0]["itemId"] == "home_id"
+
+    # Repeating an identical breakdown reuses the breakdown cache.
+    bd_browser_cached = _call(mcp, "breakdown_report", {
+        "report_id": "report_1",
+        "row": 0,
+        "dimension_id": "variables/evar3",
+        "n_results": 10,
+    })
+    assert bd_browser_cached["cached"] is True
+    assert bd_browser_cached["report_id"] == "report_2"
+    assert len(calls) == 3
+
+    # Multi-level breakdown on report_2 stacks both breakdown filters cleanly.
+    bd_nested = _call(mcp, "breakdown_report", {
+        "report_id": "report_2",
+        "row": "Chrome",
+        "dimension_id": "variables/geocountry",
+        "n_results": 5,
+    })
+    assert bd_nested["parent_report_id"] == "report_2"
+    nested_filters = calls[-1]["metricContainer"]["metricFilters"]
+    assert [(f["dimension"], f["itemId"]) for f in nested_filters] == [
+        ("variables/page", "home_id"),
+        ("variables/evar3", "br_1"),
+    ]
+
+    cached_list = asyncio.run(mcp.call_tool("list_cached_reports", {}))
+    cached_ids = [json.loads(b.text)["report_id"] for b in cached_list.content]
+    assert cached_ids == ["report_1", "report_2", "report_3", "report_4"]
+
+
+# ── Knowledge Graph lazy loading & SPARQL improvements ───────────────────────
+
+
+def test_server_without_kg_omits_kg_tools_and_skips_ontology_read(startup, monkeypatch):
+    import subprocess
+
+    # Importing mcp_server in a clean process does not eagerly import rdflib.
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            f"import sys; sys.path.insert(0, {parent_dir!r}); import aanalytics2.mcp_server; assert 'rdflib' not in sys.modules",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+
+    mcp_no_kg = _server()
+    tool_names_no_kg = {t.name for t in asyncio.run(mcp_no_kg.list_tools())}
+    resources_no_kg = asyncio.run(mcp_no_kg.list_resources())
+    assert "sparql_query" not in tool_names_no_kg
+    assert "get_related_metrics" not in tool_names_no_kg
+    assert len(resources_no_kg) == 0
+
+    mcp_with_kg = _server_with_kg()
+    tool_names_with_kg = {t.name for t in asyncio.run(mcp_with_kg.list_tools())}
+    resources_with_kg = asyncio.run(mcp_with_kg.list_resources())
+    assert "sparql_query" in tool_names_with_kg
+    assert "get_related_metrics" in tool_names_with_kg
+    assert len(resources_with_kg) == 1
+
+    # main() without -kg skips reading the bundled ontology file altogether.
+    ontology_spy = Mock(side_effect=AssertionError("should not read ontology without -kg"))
+    monkeypatch.setattr(mcp_server, "_default_ontology_md", ontology_spy)
+    mcp_server.main()
+    ontology_spy.assert_not_called()
+
+
+def test_sparql_query_auto_prefixes_query_forms_types_and_errors():
+    from rdflib import BNode, XSD
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    kg = _build_test_kg()
+    seg_ns = Namespace("http://analytics.com/dummy/segment#")
+    seg_uri = URIRef("http://analytics.com/dummy/segment/s_kg1")
+    kg.add((seg_uri, seg_ns.lastAccess, Literal("2026-03-01T12:00:00", datatype=XSD.dateTime)))
+    kg.add((seg_uri, seg_ns.shares, Literal(5, datatype=XSD.integer)))
+    kg.add((seg_uri, seg_ns.bnodeRef, BNode("node1")))
+
+    mcp = build_server(analytics=DummyAnalytics(), company_id="dummy", default_rsid="rs1", kg_graph=kg)
+
+    # SELECT without explicit PREFIX lines (auto-injected) + datetime/int/BNode JSON serialization.
+    select_res = _call(mcp, "sparql_query", {
+        "query": "SELECT ?id ?label ?dt ?shares ?bn WHERE { ?s seg:id ?id ; rdfs:label ?label ; seg:lastAccess ?dt ; seg:shares ?shares ; seg:bnodeRef ?bn }",
+    })
+    assert select_res["query_type"] == "SELECT"
+    assert select_res["truncated"] is False
+    assert select_res["rows"] == [{
+        "id": "s_kg1",
+        "label": "Mobile Visitors KG",
+        "dt": "2026-03-01T12:00:00",
+        "shares": 5,
+        "bn": "_:node1",
+    }]
+
+    # Explicit PREFIX containing `#` in IRI is preserved, and `limit` truncates cleanly.
+    trunc_res = _call(mcp, "sparql_query", {
+        "query": "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\nSELECT ?s ?p ?o WHERE { ?s ?p ?o }",
+        "limit": 2,
+    })
+    assert trunc_res["row_count"] == 2
+    assert trunc_res["total_rows"] > 2
+    assert trunc_res["truncated"] is True
+
+    # ASK and CONSTRUCT are handled cleanly without crashing on results.vars == None.
+    ask_res = _call(mcp, "sparql_query", {"query": "ASK { ?s seg:id 's_kg1' }"})
+    assert ask_res == {"query_type": "ASK", "boolean": True}
+
+    construct_res = _call(mcp, "sparql_query", {
+        "query": "CONSTRUCT { ?s rdfs:label ?label } WHERE { ?s seg:id 's_kg1' ; rdfs:label ?label }",
+    })
+    assert construct_res["query_type"] == "CONSTRUCT"
+    assert construct_res["triple_count"] == 1
+    assert construct_res["triples"][0]["object"] == "Mobile Visitors KG"
+
+    # Read-only guard rejects SPARQL Update statements, and syntax errors become ToolError.
+    with pytest.raises(ToolError, match="read-only"):
+        _call(mcp, "sparql_query", {"query": "INSERT DATA { <urn:a> <urn:b> 'c' }"})
+    with pytest.raises(ToolError, match="Invalid SPARQL query"):
+        _call(mcp, "sparql_query", {"query": "SELECT ?s WHERE { ?s ?p"})
+
+
+def test_core_methods_silence_stdout_unless_verbose_true(capsys):
+    from aanalytics2.aanalytics2 import Analytics
+
+    dummy = Analytics.__new__(Analytics)
+    dummy.loggingEnabled = False
+    dummy.logger = None
+
+    assert dummy.createSegment(None) is None
+    assert dummy.createSegmentValidate(None) is None
+    assert dummy.updateSegment(None, None) is None
+    assert dummy.deleteSegment(None) is None
+    assert dummy.updateCalculatedMetric(None, None) is None
+    assert dummy.deleteCalculatedMetric(None) is None
+    assert dummy.createDateRange(None) is None
+    assert dummy.deleteDateRange(None) is None
+    assert capsys.readouterr().out == ""
+
+    assert dummy.createSegment(None, verbose=True) is None
+    assert "No segment data has been pushed" in capsys.readouterr().out
+

@@ -3,6 +3,15 @@
 This page will give you the change that are occuring when a new version has been published on pypi.
 The changes have been tracked starting version 0.1.0
 
+## version 0.5.7
+* Fix sending data to Data Source by correctly setting header type
+* Passing all `print()` statements behind a `verbose` flag
+* Adding a compatibility layer for MCP server on old stdio protocol.
+* Cache MCP report results and reuse report IDs for breakdowns without re-running the original report.
+* Reuse MCP Workspace builders and component lookups to reduce API calls and avoid resending full project definitions.
+* Load Knowledge Graph tools and dependencies only when a graph is available, and improve SPARQL queries with automatic prefixes and bounded results.
+
+
 ## version 0.5.6
 * Add outgoing Knowledge Graph links from Workspace projects to their dimensions, metrics, calculated metrics, and segments (`proj:dimensions`, `proj:metrics`, `proj:calculatedMetrics`, and `proj:segments`), plus segment-to-project backlinks and a `proj:id` for newly processed projects. Full and incremental builds retain freeform summaries and lightweight component relationships rather than full project JSON. [Documentation](./knowledgegraph.md#buildgraph)
 * Derive outgoing project links from existing component backlinks during graph builds, including for previously counted projects loaded from Turtle snapshots, without fetching those projects again or changing usage counters. Older snapshots lack segment backlinks; use a full build with all desired projects to recover those links. Component links represent a project-wide union; co-occurrence counts remain based on individual tables and visualizations.
