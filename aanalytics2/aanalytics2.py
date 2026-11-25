@@ -891,7 +891,7 @@ class Analytics:
         if sidFilter is not None:
             if type(sidFilter) == list:
                 sidFilter = ','.join(sidFilter)
-            params.update({'rsids': sidFilter})
+            params.update({'segmentFilter': sidFilter})
         data = []
         lastPage = False
         page_nb = 0
